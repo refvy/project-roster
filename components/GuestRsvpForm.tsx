@@ -34,6 +34,8 @@ export function GuestRsvpForm({
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="position" value={position} />
 
+      <h2 className="font-display text-2xl tracking-tight">I’m going</h2>
+
       <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
         Your name
         <input
@@ -109,7 +111,7 @@ export function GuestRsvpForm({
         disabled={pending}
         className="min-h-16 rounded-full bg-accent px-8 text-lg font-semibold text-on-accent transition hover:bg-accent-deep disabled:opacity-60"
       >
-        {pending ? "Saving…" : "Done"}
+        {pending ? "Saving…" : status === "GOING" ? "I’m going" : "I’m out"}
       </button>
     </form>
   );

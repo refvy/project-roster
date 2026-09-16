@@ -15,6 +15,9 @@ import {
 } from "@/lib/pitch";
 import { parseSport } from "@/lib/positions";
 
+const TEAL = "#00D4C8";
+const CREAM = "#f7f4ef";
+
 export function CoachBoard({
   matchdayId,
   sport,
@@ -86,7 +89,10 @@ export function CoachBoard({
         <HalfPitchBoard lines={lines} />
       )}
 
-      <AnyStrip any={any} overflow={bench.filter((p) => p.positionKey !== "ANY")} />
+      <AnyStrip
+        any={any}
+        overflow={bench.filter((p) => p.positionKey !== "ANY")}
+      />
     </section>
   );
 }
@@ -95,11 +101,11 @@ function HalfPitchBoard({ lines }: { lines: PitchLine[] }) {
   return (
     <div
       data-testid="half-pitch"
-      className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl bg-surface ring-1 ring-ink/15"
-      style={{ aspectRatio: "68 / 52.5" }}
+      className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
+      style={{ aspectRatio: "3 / 4" }}
     >
       <HalfPitchMarks />
-      <div className="absolute inset-0 z-10 flex flex-col-reverse justify-between px-4 py-3 sm:px-6 sm:py-4">
+      <div className="absolute inset-0 z-10 flex flex-col-reverse justify-between px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14">
         {lines.map((line, lineIndex) => (
           <div
             key={`${line.area}-${lineIndex}`}
@@ -123,7 +129,7 @@ function HalfCourtBoard({ lines }: { lines: PitchLine[] }) {
   return (
     <div
       data-testid="half-court"
-      className="relative mx-auto w-full max-w-lg overflow-hidden rounded-3xl bg-surface ring-1 ring-ink/20"
+      className="relative mx-auto w-full max-w-lg overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
       style={{ aspectRatio: "15 / 14" }}
     >
       <HalfCourtMarks />
@@ -155,30 +161,33 @@ function AnyStrip({
   overflow: GoingPlayer[];
 }) {
   const people = [...any, ...overflow];
-  if (people.length === 0) return null;
   return (
     <div
       data-testid="bench"
-      className="rounded-2xl bg-surface px-4 py-3 ring-1 ring-ink/10"
+      className="rounded-2xl bg-cream px-4 py-3 ring-1 ring-accent/20"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
-        Any
+        Bench / Any
       </p>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {people.map((player) => (
-          <li
-            key={player.id}
-            className="inline-flex items-center gap-2 rounded-full bg-cream px-3 py-1.5 text-sm"
-          >
-            <span className="font-medium">{player.name}</span>
-            <span className="text-xs font-semibold tracking-wide text-ink-soft">
-              {!player.positionKey || player.positionKey === "ANY"
-                ? "Any"
-                : player.positionKey}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {people.length === 0 ? (
+        <p className="mt-2 text-sm text-ink-soft">Nobody on the bench yet.</p>
+      ) : (
+        <ul className="mt-2 flex flex-wrap gap-2">
+          {people.map((player) => (
+            <li
+              key={player.id}
+              className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm ring-1 ring-ink/10"
+            >
+              <span className="font-medium">{player.name}</span>
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-deep">
+                {!player.positionKey || player.positionKey === "ANY"
+                  ? "Any"
+                  : player.positionKey}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -209,9 +218,9 @@ function PitchSlotView({
   return (
     <div
       data-testid={`slot-empty-${slot.key}-${index}`}
-      className="flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full border border-dashed border-ink/15 bg-surface/80 px-2.5 py-1.5 text-center sm:min-h-14 sm:min-w-[4.25rem]"
+      className="flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full border-2 border-accent/40 bg-surface/70 px-2.5 py-1.5 text-center sm:min-h-14 sm:min-w-[4.25rem]"
     >
-      <span className="text-[11px] font-medium uppercase tracking-wide text-ink/35">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-ink/40">
         {slot.key}
       </span>
     </div>
@@ -223,24 +232,19 @@ function HalfPitchMarks() {
     <svg
       aria-hidden
       className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 680 525"
+      viewBox="0 0 600 800"
       preserveAspectRatio="xMidYMid meet"
     >
-      <rect width="680" height="525" fill="#fffdf9" />
-      <g
-        fill="none"
-        stroke="#1a1714"
-        strokeOpacity="0.55"
-        strokeWidth="1.6"
-      >
-        <rect x="12" y="12" width="656" height="501" />
-        <rect x="248" y="458" width="184" height="55" />
-        <rect x="138" y="348" width="404" height="165" />
-        <path d="M 303 513 H 377 V 525 H 303 Z" />
-        <circle cx="340" cy="403" r="2.2" fill="#1a1714" stroke="none" />
-        <path d="M 267 348 A 91.5 91.5 0 0 0 413 348" />
-        <path d="M 248.5 12 A 91.5 91.5 0 0 1 431.5 12" />
-        <circle cx="340" cy="12" r="2.2" fill="#1a1714" stroke="none" />
+      <rect width="600" height="800" fill={CREAM} />
+      <g fill="none" stroke={TEAL} strokeWidth="2" strokeLinejoin="round">
+        <rect x="24" y="24" width="552" height="752" rx="2" />
+        <rect x="224" y="698" width="152" height="78" />
+        <rect x="136" y="548" width="328" height="228" />
+        <path d="M258 776 h84 v16 h-84 z" />
+        <circle cx="300" cy="624" r="3.2" fill={TEAL} stroke="none" />
+        <path d="M214 548 A 86 86 0 0 1 386 548" />
+        <path d="M214 24 A 86 86 0 0 0 386 24" />
+        <circle cx="300" cy="24" r="3.2" fill={TEAL} stroke="none" />
       </g>
     </svg>
   );
@@ -254,14 +258,9 @@ function HalfCourtMarks() {
       viewBox="0 0 500 470"
       preserveAspectRatio="xMidYMid meet"
     >
-      <rect width="500" height="470" fill="#fffdf9" />
-      <g
-        fill="none"
-        stroke="#1a1714"
-        strokeOpacity="0.62"
-        strokeWidth="1.5"
-      >
-        <rect x="16" y="16" width="468" height="438" />
+      <rect width="500" height="470" fill={CREAM} />
+      <g fill="none" stroke={TEAL} strokeWidth="2" strokeLinecap="round">
+        <rect x="16" y="16" width="468" height="438" rx="2" />
         <line x1="16" y1="16" x2="484" y2="16" />
         <rect x="175" y="16" width="150" height="175" />
         <path d="M 175 191 A 75 75 0 0 0 325 191" />

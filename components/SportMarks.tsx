@@ -6,12 +6,12 @@ export function FootballMark({ className }: { className?: string }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
       strokeLinejoin="round"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 6.2 14.3 8.9l.2 3.1-2.5 1.8-2.5-1.8.2-3.1Z" />
-      <path d="M14.3 8.9 18.2 7.4M9.7 8.9 5.8 7.4M12 13.8v3.9M9.5 13.8 7 17.2M14.5 13.8 17 17.2" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 6.4 14.2 8.9l.15 2.9-2.35 1.7-2.35-1.7.15-2.9Z" />
+      <path d="M14.2 8.9 17.8 7.5M9.8 8.9 6.2 7.5M12 13.5v3.6M9.6 13.5 7.2 16.8M14.4 13.5 16.8 16.8" />
     </svg>
   );
 }
@@ -24,12 +24,14 @@ export function BasketballMark({ className }: { className?: string }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
       strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 3v18M3 12h18" />
-      <path d="M6.2 5.4c2.6 2.2 2.6 10.9 0 13.2M17.8 5.4c-2.6 2.2-2.6 10.9 0 13.2" />
+      <rect x="4.5" y="4.5" width="15" height="15" rx="1" />
+      <rect x="9" y="4.5" width="6" height="6.5" />
+      <path d="M9 11a3 3 0 0 0 6 0" />
+      <path d="M6.2 4.5a6.2 6.2 0 0 0 11.6 0" />
     </svg>
   );
 }

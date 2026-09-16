@@ -200,11 +200,16 @@ test.describe("matchday board", () => {
     await expect(pitch).toBeVisible();
     const box = await pitch.boundingBox();
     expect(box).toBeTruthy();
-    expect(box!.width / box!.height).toBeGreaterThan(1.15);
+    expect(box!.width / box!.height).toBeGreaterThan(0.65);
+    expect(box!.width / box!.height).toBeLessThan(0.9);
     const gk = await orgPage.getByTestId("slot-empty-GK-0").boundingBox();
     const cf = await orgPage.getByTestId("slot-empty-CF-0").boundingBox();
     expect(gk && cf).toBeTruthy();
     expect(gk!.y).toBeGreaterThan(cf!.y);
+    await expect(orgPage.getByTestId("bench")).toContainText("Bench / Any");
+    await expect(orgPage.getByTestId("bench")).toContainText(
+      "Nobody on the bench yet.",
+    );
     await expect(orgPage.getByTestId("coach-banner")).toContainText(
       /Pitch fills as players tap Going/i,
     );
@@ -318,8 +323,12 @@ test.describe("matchday board", () => {
     const shareUrl = await orgPage.getByTestId("share-url").inputValue();
     await guestGoing(browser, shareUrl, "Bee", "ANY");
     await orgPage.reload();
+    await expect(orgPage.getByTestId("bench")).toContainText("Bench / Any");
     await expect(orgPage.getByTestId("bench")).toContainText("Bee");
     await expect(orgPage.getByTestId("bench")).toContainText("Any");
+    await expect(orgPage.getByTestId("bench")).not.toContainText(
+      "Nobody on the bench yet.",
+    );
     await expect(orgPage.locator("[data-testid^=slot-filled-]")).toHaveCount(0);
     await expect(orgPage.getByTestId("roster")).toContainText("Bee");
 
@@ -347,7 +356,11 @@ test.describe("matchday board", () => {
     await page.getByTestId("position-CB").click();
     await page.getByTestId("rsvp-submit").click();
     await expect(page.getByTestId("rsvp-confirmed")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /i.?m going/i })).toBeVisible();
     await expect(page.getByTestId("add-friend")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /add someone else/i }),
+    ).toBeVisible();
 
     await page.getByTestId("friend-name").fill("Bee");
     await page.getByTestId("friend-submit-going").click();

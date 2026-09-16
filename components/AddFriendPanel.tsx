@@ -28,7 +28,7 @@ export function AddFriendPanel({
 }) {
   return (
     <section className="flex flex-col gap-6" data-testid="add-friend">
-      <h2 className="font-display text-2xl tracking-tight">Add a friend</h2>
+      <h2 className="font-display text-2xl tracking-tight">Add someone else</h2>
       <p className="text-sm text-ink-soft">
         Same link. They’re listed as added by you.
       </p>
