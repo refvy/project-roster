@@ -132,6 +132,7 @@ test.describe("matchday board", () => {
     const guest = await browser.newContext();
     const page = await guest.newPage();
     await page.goto(shareUrl);
+    await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
     await expect(page.getByTestId("position-PG")).toBeVisible();
     await expect(page.getByTestId("coach-board")).toHaveCount(0);
     await expect(page.getByTestId("position-C")).toBeVisible();
@@ -184,6 +185,7 @@ test.describe("matchday board", () => {
 
 async function signIn(page: Page, email: string) {
   await page.goto("/");
+  await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: /magic link/i }).click();
   const magic = page.getByTestId("debug-magic-link");
@@ -201,6 +203,7 @@ async function guestGoing(
   const context = await browser.newContext();
   const page: Page = await context.newPage();
   await page.goto(shareUrl);
+  await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
   await page.getByLabel("Your name").fill(name);
   await page.getByTestId("status-going").click();
   await page.getByTestId(`position-${position}`).click();

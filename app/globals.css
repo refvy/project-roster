@@ -3,9 +3,9 @@
 /*
  * Visual tokens — swap this :root block to restyle.
  *
- * Locked skin: Airbnb-inspired cream / warm-white ground, dark ink,
- * Signal teal accent (#00D4C8 family) for wordmark, Going, selected chips, CTAs.
- * Not cobalt, coral, Volt lime, or WhatsApp green. No brand lockup.
+ * Locked skin: cream / warm-white ground, dark ink,
+ * Signal teal accent (#00D4C8 family) for the Skwad lockup, Going, selected chips, CTAs.
+ * Not cobalt, coral, Volt lime, or WhatsApp green.
  */
 :root {
   --cream: #f7f4ef;

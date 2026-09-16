@@ -1,6 +1,6 @@
-# Project Roster
+# Skwad
 
-Paste-link **matchday board** for Bangkok recreational sports ก๊วน. Working code name — public brand TBD.
+Paste-link **matchday board** for Bangkok recreational sports ก๊วน. Public name **Skwad** (repo: project-roster).
 
 Football first, multi-sport later. Smallest credible board: organiser creates a matchday, copies a link, guests tap Going / Out.
 
@@ -28,13 +28,13 @@ Positions snapshot as JSON on each matchday. Players stay on chips.
 
 ## Visual tokens
 
-All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle — no brand lockup yet.
+All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle.
 
-Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the wordmark, Going, selected chips, and CTAs.
+Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Interim logo: white SKWAD (chevron A, no crossbar) on a Signal teal capsule.
 
 ## What it is not
 
-Venues, ratings, matchmaking, chat, payments, charging players, public brand hunt, photo uploads, embedded maps, player apps/accounts, drag-and-drop tactics, Footballizer chrome.
+Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, embedded maps, player apps/accounts, drag-and-drop tactics, Footballizer chrome.
 
 ## Pitch fill
 
@@ -96,7 +96,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so the organiser pitch and formation chips go live. New sport enums apply to matchdays created after deploy.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so the locked **Skwad** wordmark, favicon, and share cards go live. Coach-board and chips are unchanged.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

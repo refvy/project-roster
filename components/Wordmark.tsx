@@ -4,14 +4,17 @@ export function Wordmark({ href = "/" }: { href?: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex items-baseline gap-2 no-underline"
+      aria-label="Skwad"
+      className="inline-flex items-center no-underline"
     >
-      <span className="font-display text-2xl tracking-tight text-accent">
-        Roster
-      </span>
-      <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">
-        working name
-      </span>
+      <img
+        src="/skwad-logo.svg"
+        alt=""
+        width={146}
+        height={36}
+        className="h-9 w-auto sm:h-10"
+        draggable={false}
+      />
     </Link>
   );
 }
