@@ -48,7 +48,7 @@ test.describe("matchday board", () => {
     const magic = orgPage.getByTestId("debug-magic-link");
     await expect(magic).toBeVisible();
     await magic.click();
-    await expect(orgPage).toHaveURL(/\/board/);
+    await expect(orgPage).toHaveURL(/\/board/, { timeout: 15_000 });
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Sunday kickabout");

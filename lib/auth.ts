@@ -80,13 +80,18 @@ export async function consumeMagicLink(token: string) {
     },
   });
 
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, signValue(sessionToken), {
+  return { organiser: record.organiser, sessionToken };
+}
+
+export function sessionCookieOptions() {
+  return {
     ...cookieBase(),
     maxAge: SESSION_DAYS * 24 * 60 * 60,
-  });
+  };
+}
 
-  return record.organiser;
+export function signedSessionCookie(sessionToken: string) {
+  return signValue(sessionToken);
 }
 
 export async function getOrganiser() {
@@ -101,14 +106,6 @@ export async function getOrganiser() {
     return null;
   }
   return session.organiser;
-}
-
-export async function requireOrganiser() {
-  const organiser = await getOrganiser();
-  if (!organiser) {
-    return null;
-  }
-  return organiser;
 }
 
 export async function logoutOrganiser() {

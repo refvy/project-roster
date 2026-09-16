@@ -25,7 +25,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://roster:roster@127.0.0.1:5432/roster
       AUTH_SECRET: ci-auth-secret-please-use-32chars
-      APP_URL: http://127.0.0.1:3000
+      APP_URL: http://localhost:3000
       AUTH_DEBUG: "true"
     steps:
       - uses: actions/checkout@v4
