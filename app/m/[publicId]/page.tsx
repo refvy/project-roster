@@ -4,7 +4,7 @@ import { GoingList } from "@/components/GoingList";
 import { Wordmark } from "@/components/Wordmark";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
-import { parsePositions } from "@/lib/positions";
+import { parsePositions, sportLabel } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 
@@ -76,7 +76,10 @@ export default async function GuestMatchdayPage({
           <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
             {matchday.title}
           </h1>
-          <p className="mt-3 text-lg text-ink-soft">{matchday.whenWhere}</p>
+          <p data-testid="sport-label" className="mt-2 text-sm text-ink-soft">
+            {sportLabel(matchday.sport)}
+          </p>
+          <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
         </div>
         <GuestRsvpForm
           publicId={publicId}

@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions/auth";
 import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
+import { sportLabel } from "@/lib/positions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -52,7 +53,13 @@ export default async function BoardPage() {
             {matchdays.map((matchday) => (
               <li key={matchday.id} className="py-5">
                 <Link href={`/board/${matchday.id}`} className="block">
-                  <p className="font-display text-2xl tracking-tight">
+                  <span
+                    data-testid="sport-chip"
+                    className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-deep"
+                  >
+                    {sportLabel(matchday.sport)}
+                  </span>
+                  <p className="mt-2 font-display text-2xl tracking-tight">
                     {matchday.title}
                   </p>
                   <p className="mt-1 text-sm text-ink-soft">

@@ -12,8 +12,21 @@ export type PitchSlot = {
   players: GoingPlayer[];
 };
 
-/** Names shown on a slot chip; extras collapse to +N. Desktop bump to 3 is later. */
-export const SLOT_STACK_VISIBLE = 2;
+/** Names shown on a slot chip; extras collapse to +N (N = total − 1). */
+export const SLOT_STACK_VISIBLE = 1;
+
+/**
+ * Compatible fill when the active formation has no exact slot for the chip.
+ * CAM/CDM → CM; LW ↔ LM; RW ↔ RM.
+ */
+export const COMPATIBLE_POSITIONS: Record<string, string[]> = {
+  CAM: ["CM"],
+  CDM: ["CM"],
+  LW: ["LM"],
+  RW: ["RM"],
+  LM: ["LW"],
+  RM: ["RW"],
+};
 
 export type PitchLine = {
   area: "the keeper" | "defence" | "midfield" | "attack" | "guards" | "wings" | "the paint";
@@ -109,7 +122,7 @@ export function slotOverflowCount(players: GoingPlayer[]) {
   return Math.max(0, players.length - SLOT_STACK_VISIBLE);
 }
 
-/** Back→front slot order for the match formation (full stacks), then Any / unmatched on the bench. */
+/** Back→front slot order (including Any who filled vacancies), then leftover Any / unmatched. */
 export function orderGoingForRoster(
   going: GoingPlayer[],
   sport: string,
@@ -126,10 +139,8 @@ export function orderGoingForRoster(
 }
 
 /**
- * Stack-then-expand: a named chip stacks on matching formation slots (signup
- * order, balanced across duplicate keys). Overflow stays on the slot — never
- * dumped to the bench. Any and unmatched keys (no slot in this formation) sit
- * on Bench / Any.
+ * Fill order: exact position → compatible position → Any vacancies.
+ * Named-position overflow stacks on the slot (+N). Bench = leftover Any + unmatched.
  */
 export function fillPitch(
   template: { area: PitchLine["area"]; keys: string[] }[],
@@ -139,34 +150,59 @@ export function fillPitch(
     area: line.area,
     slots: line.keys.map((key) => ({ key, players: [] })),
   }));
-  const bench: GoingPlayer[] = [];
-  const any: GoingPlayer[] = [];
+  const placed = new Set<string>();
 
-  for (const player of going) {
-    const key = player.positionKey;
-    if (!key || key === "ANY") {
-      any.push(player);
-      bench.push(player);
-      continue;
-    }
-    const matching: PitchSlot[] = [];
-    for (const line of lines) {
-      for (const slot of line.slots) {
-        if (slot.key === key) matching.push(slot);
-      }
-    }
-    if (matching.length === 0) {
-      bench.push(player);
-      continue;
-    }
-    let target = matching[0]!;
-    for (const slot of matching) {
-      if (slot.players.length < target.players.length) target = slot;
-    }
-    target.players.push(player);
+  const named = going.filter(
+    (player) => player.positionKey && player.positionKey !== "ANY",
+  );
+  for (const player of named) {
+    const matching = slotsWithKey(lines, player.positionKey!);
+    if (matching.length === 0) continue;
+    pickFewest(matching).players.push(player);
+    placed.add(player.id);
   }
 
-  return { lines, bench, any };
+  for (const player of named) {
+    if (placed.has(player.id)) continue;
+    const alts = (COMPATIBLE_POSITIONS[player.positionKey!] ?? []).flatMap(
+      (key) => slotsWithKey(lines, key),
+    );
+    if (alts.length === 0) continue;
+    pickFewest(alts).players.push(player);
+    placed.add(player.id);
+  }
+
+  const leftoverAny: GoingPlayer[] = [];
+  for (const player of going) {
+    if (player.positionKey && player.positionKey !== "ANY") continue;
+    const vacancy = allSlots(lines).find((slot) => slot.players.length === 0);
+    if (vacancy) {
+      vacancy.players.push(player);
+      placed.add(player.id);
+    } else {
+      leftoverAny.push(player);
+    }
+  }
+
+  const unmatched = named.filter((player) => !placed.has(player.id));
+  const bench = [...leftoverAny, ...unmatched];
+  return { lines, bench, any: leftoverAny };
+}
+
+function allSlots(lines: PitchLine[]) {
+  return lines.flatMap((line) => line.slots);
+}
+
+function slotsWithKey(lines: PitchLine[], key: string) {
+  return allSlots(lines).filter((slot) => slot.key === key);
+}
+
+function pickFewest(slots: PitchSlot[]) {
+  let target = slots[0]!;
+  for (const slot of slots) {
+    if (slot.players.length < target.players.length) target = slot;
+  }
+  return target;
 }
 
 export function emptySlotCount(lines: PitchLine[]) {

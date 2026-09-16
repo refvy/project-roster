@@ -10,7 +10,6 @@ import {
   getFormation,
   parseFormation,
   slotOverflowCount,
-  SLOT_STACK_VISIBLE,
   type FormationId,
   type GoingPlayer,
   type PitchLine,
@@ -27,11 +26,13 @@ export function CoachBoard({
   sport,
   formation: savedFormation,
   going,
+  out = [],
 }: {
   matchdayId: string;
   sport: string;
   formation: string;
   going: GoingPlayer[];
+  out?: { id: string; name: string }[];
 }) {
   const isBasketball = parseSport(sport) === "basketball";
   const [formationId, setFormationId] = useState<FormationId>(
@@ -101,6 +102,8 @@ export function CoachBoard({
         any={any}
         overflow={bench.filter((p) => p.positionKey !== "ANY")}
       />
+
+      <OutSection people={out} />
 
       {sheet ? (
         <SlotSheet
@@ -209,7 +212,13 @@ function AnyStrip({
               className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm ring-1 ring-ink/10"
             >
               <span className="font-medium">{player.name}</span>
-              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-deep">
+              <span
+                className={
+                  !player.positionKey || player.positionKey === "ANY"
+                    ? "rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold tracking-wide text-on-accent"
+                    : "rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-deep"
+                }
+              >
                 {!player.positionKey || player.positionKey === "ANY"
                   ? "Any"
                   : player.positionKey}
@@ -244,7 +253,7 @@ function PitchSlotView({
     );
   }
 
-  const visible = slot.players.slice(0, SLOT_STACK_VISIBLE);
+  const lead = slot.players[0]!;
   const overflow = slotOverflowCount(slot.players);
 
   return (
@@ -252,27 +261,20 @@ function PitchSlotView({
       type="button"
       data-testid={`slot-filled-${slot.key}`}
       onClick={onOpen}
-      className="flex min-h-12 min-w-[3.75rem] max-w-[5.5rem] flex-col items-center justify-center rounded-full bg-accent px-2 py-1 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem] sm:px-2.5"
+      className="relative flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full bg-accent px-2.5 py-1.5 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem]"
     >
-      {visible.map((player, visibleIndex) => (
+      <span className="max-w-[4.5rem] truncate text-xs font-semibold">
+        {firstName(lead.name)}
+      </span>
+      {overflow > 0 ? (
         <span
-          key={player.id}
-          className="flex max-w-full items-center justify-center gap-0.5 leading-tight"
+          data-testid={`slot-overflow-${slot.key}`}
+          className="absolute -right-1 -top-1 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-accent-deep ring-1 ring-accent/40"
         >
-          <span className="truncate text-[11px] font-semibold sm:text-xs">
-            {firstName(player.name)}
-          </span>
-          {visibleIndex === visible.length - 1 && overflow > 0 ? (
-            <span
-              data-testid={`slot-overflow-${slot.key}`}
-              className="rounded-full bg-surface px-1 text-[9px] font-bold text-accent-deep"
-            >
-              +{overflow}
-            </span>
-          ) : null}
+          +{overflow}
         </span>
-      ))}
-      <span className="text-[9px] font-medium uppercase tracking-wide opacity-70">
+      ) : null}
+      <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
         {slot.key}
       </span>
     </button>
@@ -343,12 +345,53 @@ function SlotSheet({
                 ) : null}
               </div>
               <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
-                {slotKey}
+                {!player.positionKey || player.positionKey === "ANY"
+                  ? slotKey
+                  : player.positionKey}
               </span>
             </li>
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+function OutSection({ people }: { people: { id: string; name: string }[] }) {
+  const [open, setOpen] = useState(false);
+  if (people.length === 0) return null;
+  return (
+    <div data-testid="out-section" className="rounded-2xl bg-cream ring-1 ring-ink/10">
+      <button
+        type="button"
+        data-testid="out-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-2 text-left"
+      >
+        <span className="text-sm font-semibold text-ink-soft">
+          Out · {people.length}
+        </span>
+        <svg
+          aria-hidden
+          viewBox="0 0 20 20"
+          className={`h-4 w-4 text-ink-soft transition ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        >
+          <path d="M5 7.5 10 12.5 15 7.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open ? (
+        <ul data-testid="out-list" className="border-t border-ink/10 px-4 py-2">
+          {people.map((person) => (
+            <li key={person.id} className="py-2 text-sm font-medium">
+              {person.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

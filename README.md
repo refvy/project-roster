@@ -24,7 +24,7 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 - Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
 - Copy the share link
 - Live roster of Going players + positions, same back→front order guests see
-- Organiser-only board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (key + arc, same teal line weight). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. **Stack-then-expand** on matching slots (up to 2 first names + teal `+N`; tap for the full list). **Any is not a slot** — muted cream **Bench / Any** strip is Any + unmatched only (named-position overflow stays on the slot). No drag, no player-facing pitch.
+- Organiser-only board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (key + arc, same teal line weight). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Compact slots: **one** first name + teal `+N` (N = extra people). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench / Any** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag, no player-facing pitch.
 - Imbalance banner when the side looks skewed
 
 Positions snapshot as JSON on each matchday. Players stay on chips.
@@ -41,7 +41,7 @@ Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, e
 
 ## Pitch fill
 
-Organiser-only. Going players **stack** on matching formation slots in signup order (balanced across duplicate keys like two CBs). Each chip shows up to **2** first names (~8 chars) and a teal `+N` for the rest — tap the slot for the full list. Overflow for a named position **stays on that slot**, never the bench. **Any** and unmatched keys (no slot in this formation) sit on a muted cream **Bench / Any** strip. Empty bench: `Nobody on the bench yet.` Empty slot shows a muted abbr only, soft teal ring — no `Need CB` pills. Football is a ~3:4 portrait half-pitch (cream, teal lines; goal at the bottom, kickoff circle at the top). Basketball is a cream schematic half-court with the same teal lines. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`3 on LW · light on RW`).
+Organiser-only. Fill order: **exact position → compatible → Any vacancies**. Compatible when the formation has no exact slot: CAM/CDM → CM; LW ↔ LM; RW ↔ RM. Named-position overflow **stays on that slot** as a teal `+N` (N = total − 1). Each chip shows **one** first name (~8 chars) and the slot abbr. Tap opens the full list. Leftover **Any** (pitch full) and unmatched keys sit on **Bench / Any** with a teal Any chip. Empty bench: `Nobody on the bench yet.` Empty slot: muted abbr only. **Out · N** is a collapsed row under the bench (hidden when nobody is Out). Football is a ~3:4 portrait half-pitch. Basketball is a cream schematic half-court. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`.
 
 ## Imbalance rule
 
@@ -90,7 +90,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: Football match → guest CB on the roster → Too many GKs; ~3:4 half-pitch GK below CF; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; empty **Bench / Any** copy, then Any on the strip; **3 LWs stack** (2 names + `+1`, sheet lists all, overflow off the bench); Basketball match → PG chips + half-court; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any; guest **I’m going** then **Add someone else** (`added by`) then edits and deletes them.
+Playwright covers: compact slot (one name + `+N`); CAM/CDM on CM in 4-3-3; Out · N collapsed and hidden when empty; sport chip on the dashboard and muted sport under the title; Football CB roster → Too many GKs; ~3:4 half-pitch; muted empty slots; Basketball PG + half-court; edit/delete; guest Going list; I’m going / Add someone else.
 
 ```bash
 npx prisma migrate deploy
@@ -100,7 +100,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so stack-then-expand slot chips, cream/teal boards, Bench / Any strip, I’m going / Add someone else, Outfit type, and the locked **Skwad** brand go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so compact +N slots, CAM/CDM→CM fill, Out · N, and sport chips go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

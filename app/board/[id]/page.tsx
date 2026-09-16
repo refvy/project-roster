@@ -73,9 +73,13 @@ export default async function OrganiserMatchdayPage({
               <h1 className="font-display text-4xl tracking-tight md:text-5xl">
                 {matchday.title}
               </h1>
-              <p className="mt-2 text-lg text-ink-soft">
-                {sportLabel(matchday.sport)} · {matchday.whenWhere}
+              <p
+                data-testid="sport-label"
+                className="mt-2 text-sm text-ink-soft"
+              >
+                {sportLabel(matchday.sport)}
               </p>
+              <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
             </div>
             <div className="flex items-center gap-4 pt-2">
               <Link
@@ -101,6 +105,9 @@ export default async function OrganiserMatchdayPage({
             positionKey: rsvp.positionKey,
             addedByName: rsvp.addedByName,
           }))}
+          out={matchday.rsvps
+            .filter((rsvp) => rsvp.status === "OUT")
+            .map((rsvp) => ({ id: rsvp.id, name: rsvp.name }))}
         />
 
         <ImbalanceBanner message={imbalance} />

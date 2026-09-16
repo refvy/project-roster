@@ -94,7 +94,7 @@ test.describe("pitch fill", () => {
     expect(bench).toEqual([]);
   });
 
-  test("three LWs stack on the one LW slot with +1 overflow", () => {
+  test("three LWs stack on the one LW slot with +2 overflow", () => {
     const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
       { id: "1", name: "Tim", positionKey: "LW" },
       { id: "2", name: "Dan", positionKey: "LW" },
@@ -104,12 +104,49 @@ test.describe("pitch fill", () => {
       .flatMap((line) => line.slots)
       .find((slot) => slot.key === "LW");
     expect(lw?.players.map((p) => p.name)).toEqual(["Tim", "Dan", "Mit"]);
-    expect(slotOverflowCount(lw?.players ?? [])).toBe(1);
+    expect(slotOverflowCount(lw?.players ?? [])).toBe(2);
     expect(firstName("Alexander")).toBe("Alexande");
     expect(bench).toEqual([]);
   });
 
-  test("roster order is formation back→front then Any/bench", () => {
+  test("CAM and CDM fill CM slots on 4-3-3", () => {
+    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Terng", positionKey: "CM" },
+      { id: "2", name: "Joe", positionKey: "CAM" },
+      { id: "3", name: "Wee", positionKey: "CDM" },
+    ]);
+    const cms = lines
+      .flatMap((line) => line.slots)
+      .filter((slot) => slot.key === "CM")
+      .flatMap((slot) => slot.players);
+    expect(cms.map((p) => p.name).sort()).toEqual(["Joe", "Terng", "Wee"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("CDM stays on CDM when the formation has that slot", () => {
+    const { lines } = fillPitch(getFormation("4-1-4-1").lines, [
+      { id: "1", name: "Wee", positionKey: "CDM" },
+    ]);
+    const cdm = lines
+      .flatMap((line) => line.slots)
+      .find((slot) => slot.key === "CDM");
+    expect(cdm?.players.map((p) => p.name)).toEqual(["Wee"]);
+  });
+
+  test("LW fills LM when the formation uses LM/RM", () => {
+    const { lines, bench } = fillPitch(
+      [
+        { area: "the keeper", keys: ["GK"] },
+        { area: "midfield", keys: ["LM", "CM", "CM", "RM"] },
+      ],
+      [{ id: "1", name: "Nok", positionKey: "LW" }],
+    );
+    const lm = lines.flatMap((line) => line.slots).find((slot) => slot.key === "LM");
+    expect(lm?.players.map((p) => p.name)).toEqual(["Nok"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("roster order is formation back→front then leftover Any", () => {
     const ordered = orderGoingForRoster(
       [
         { id: "1", name: "Nok", positionKey: "CB" },
@@ -119,17 +156,36 @@ test.describe("pitch fill", () => {
       "football",
       "4-1-4-1",
     );
-    expect(ordered.map((p) => p.name)).toEqual(["Aek", "Nok", "Bee"]);
+    expect(ordered.map((p) => p.name)).toEqual(["Aek", "Bee", "Nok"]);
   });
 
-  test("Any is never a formation slot", () => {
-    const { lines, any } = fillPitch(getFormation("4-3-3").lines, [
+  test("Any fills a remaining vacancy", () => {
+    const { lines, any, bench } = fillPitch(getFormation("4-3-3").lines, [
       { id: "1", name: "Bee", positionKey: "ANY" },
     ]);
-    expect(any.map((p) => p.name)).toEqual(["Bee"]);
+    expect(any).toEqual([]);
+    expect(bench).toEqual([]);
     expect(
-      lines.flatMap((line) => line.slots).every((slot) => slot.players.length === 0),
+      lines.flatMap((line) => line.slots).some((slot) =>
+        slot.players.some((p) => p.name === "Bee"),
+      ),
     ).toBe(true);
+  });
+
+  test("leftover Any sits on the bench when the pitch is full", () => {
+    const filled = getFormation("4-3-3")
+      .lines.flatMap((line) => line.keys)
+      .map((key, index) => ({
+        id: String(index),
+        name: `P${index}`,
+        positionKey: key,
+      }));
+    const { any, bench } = fillPitch(getFormation("4-3-3").lines, [
+      ...filled,
+      { id: "any", name: "Bee", positionKey: "ANY" },
+    ]);
+    expect(any.map((p) => p.name)).toEqual(["Bee"]);
+    expect(bench.map((p) => p.name)).toEqual(["Bee"]);
   });
 });
 
@@ -145,9 +201,10 @@ test.describe("matchday board", () => {
       "true",
     );
     await orgPage.getByLabel("Title").fill("Sunday kickabout");
-    await orgPage.getByLabel("When / where").fill("Sun 17:00 · Lumphini pitch 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
 
     const shareUrl = await orgPage.getByTestId("share-url").inputValue();
     expect(shareUrl).toMatch(/\/m\//);
@@ -182,6 +239,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Tue 20:00 · Court 1");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Tuesday run" })).toBeVisible();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Basketball");
     await expect(orgPage.getByTestId("half-court")).toBeVisible();
     await expect(orgPage.getByTestId("half-pitch")).toHaveCount(0);
 
@@ -190,6 +248,7 @@ test.describe("matchday board", () => {
     const page = await guest.newPage();
     await page.goto(shareUrl);
     await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
+    await expect(page.getByTestId("sport-label")).toHaveText("Basketball");
     await expect(page.getByTestId("position-PG")).toBeVisible();
     await expect(page.getByTestId("coach-board")).toHaveCount(0);
     await expect(page.getByTestId("position-C")).toBeVisible();
@@ -333,14 +392,14 @@ test.describe("matchday board", () => {
     await expect(roster).toBeVisible();
     await expect(roster.locator("li")).toHaveText([
       /Aek\s*GK/,
-      /Nok\s*CB/,
       /Bee\s*Any/,
+      /Nok\s*CB/,
     ]);
     await guest.close();
     await organiser.close();
   });
 
-  test("Any sits on the bench strip, not a formation slot", async ({
+  test("Any fills a remaining vacancy", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -354,13 +413,12 @@ test.describe("matchday board", () => {
     const shareUrl = await orgPage.getByTestId("share-url").inputValue();
     await guestGoing(browser, shareUrl, "Bee", "ANY");
     await orgPage.reload();
-    await expect(orgPage.getByTestId("bench")).toContainText("Bench / Any");
-    await expect(orgPage.getByTestId("bench")).toContainText("Bee");
-    await expect(orgPage.getByTestId("bench")).toContainText("Any");
-    await expect(orgPage.getByTestId("bench")).not.toContainText(
+    await expect(orgPage.getByTestId("bench")).toContainText(
       "Nobody on the bench yet.",
     );
-    await expect(orgPage.locator("[data-testid^=slot-filled-]")).toHaveCount(0);
+    await expect(orgPage.locator("[data-testid^=slot-filled-]")).toContainText(
+      "Bee",
+    );
     await expect(orgPage.getByTestId("roster")).toContainText("Bee");
 
     await organiser.close();
@@ -428,7 +486,7 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
-  test("3 LWs stack on the slot with +1; sheet lists all; bench is Any only", async ({
+  test("compact LW shows one name +N; CAM/CDM sit on CM; Out collapses", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -440,31 +498,31 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Sat 19:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-3-3").click();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
     const shareUrl = await orgPage.getByTestId("share-url").inputValue();
 
     await guestGoing(browser, shareUrl, "Tim", "LW");
     await guestGoing(browser, shareUrl, "Dan", "LW");
     await guestGoing(browser, shareUrl, "Mit", "LW");
-    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await guestGoing(browser, shareUrl, "Joe", "CAM");
+    await guestGoing(browser, shareUrl, "Wee", "CDM");
 
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-3-3").click();
     const slot = orgPage.getByTestId("slot-filled-LW");
     await expect(slot).toContainText("Tim");
-    await expect(slot).toContainText("Dan");
+    await expect(slot).not.toContainText("Dan");
     await expect(slot).not.toContainText("Mit");
-    await expect(orgPage.getByTestId("slot-overflow-LW")).toHaveText("+1");
-    await expect(orgPage.getByTestId("bench")).toContainText("Bee");
-    await expect(orgPage.getByTestId("bench")).toContainText("Any");
+    await expect(orgPage.getByTestId("slot-overflow-LW")).toHaveText("+2");
+    const cmText = (
+      await orgPage.getByTestId("slot-filled-CM").allTextContents()
+    ).join(" ");
+    expect(cmText).toContain("Joe");
+    expect(cmText).toContain("Wee");
     await expect(orgPage.getByTestId("bench")).not.toContainText("Dan");
-    await expect(orgPage.getByTestId("bench")).not.toContainText("Mit");
-    await expect(orgPage.getByTestId("bench")).not.toContainText("Tim");
-    await expect(orgPage.getByTestId("imbalance-banner")).toContainText(
-      "3 on LW",
-    );
-    await expect(orgPage.getByTestId("imbalance-banner")).toContainText(
-      "light on RW",
-    );
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Joe");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Wee");
 
     await slot.click();
     const sheet = orgPage.getByTestId("slot-sheet");
@@ -473,9 +531,19 @@ test.describe("matchday board", () => {
     await expect(sheet).toContainText("Tim");
     await expect(sheet).toContainText("Dan");
     await expect(sheet).toContainText("Mit");
-    await expect(sheet).toContainText("LW");
     await orgPage.getByTestId("slot-sheet-close").click();
     await expect(orgPage.getByTestId("slot-sheet")).toHaveCount(0);
+
+    await guestOut(browser, shareUrl, "Aek");
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    await expect(orgPage.getByTestId("out-toggle")).toContainText("Out · 1");
+    await expect(orgPage.getByTestId("out-list")).toHaveCount(0);
+    await orgPage.getByTestId("out-toggle").click();
+    await expect(orgPage.getByTestId("out-list")).toContainText("Aek");
+
+    await orgPage.goto("/board");
+    await expect(orgPage.getByTestId("sport-chip")).toContainText("Football");
 
     await organiser.close();
   });
@@ -507,5 +575,16 @@ async function guestGoing(
   await page.getByTestId(`position-${position}`).click();
   await page.getByTestId("rsvp-submit").click();
   await expect(page.getByTestId("rsvp-confirmed")).toContainText(/going/i);
+  await context.close();
+}
+
+async function guestOut(browser: Browser, shareUrl: string, name: string) {
+  const context = await browser.newContext();
+  const page: Page = await context.newPage();
+  await page.goto(shareUrl);
+  await page.getByLabel("Your name").fill(name);
+  await page.getByTestId("status-out").click();
+  await page.getByTestId("rsvp-submit").click();
+  await expect(page.getByTestId("rsvp-confirmed")).toContainText(/out/i);
   await context.close();
 }
