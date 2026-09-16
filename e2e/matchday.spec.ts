@@ -201,6 +201,7 @@ test.describe("matchday board", () => {
       "true",
     );
     await orgPage.getByLabel("Title").fill("Sunday kickabout");
+    await orgPage.getByLabel("When / where").fill("Sun 17:00 · Lumphini pitch 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
