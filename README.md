@@ -14,13 +14,15 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
    - Football: GK · RB · CB · LB · RW · LW · CM · CAM · CDM · CF · Any
    - Basketball: PG · SG · SF · PF · C · Any
 4. Type a name (remembered in a cookie)
-5. Done in under a minute
+5. See who’s Going, sorted back→front for that match’s formation, then Any / extras
+6. Done in under a minute
 
 **Organisers (magic-link auth)**
 
 - Create a matchday: sport (Football | Basketball, default Football), title, when/where as text (no venue booking)
+- Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
 - Copy the share link
-- Live roster of Going players + positions
+- Live roster of Going players + positions, same back→front order guests see
 - Organiser-only cream/teal pitch: Football formation chips (4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2), Basketball 5-slot half-court. First-fit from Going chips; extras on the bench. No drag, no player-facing pitch.
 - Imbalance banner when the side looks skewed
 
@@ -38,7 +40,7 @@ Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, e
 
 ## Pitch fill
 
-Organiser-only. Going players fill the first empty slot whose key matches their chip (`Any` and extras go to **bench**). Empty slot shows a muted abbr and a soft teal `Need CB` pill. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`.
+Organiser-only. Going players fill the first empty slot whose key matches their chip (`Any` and extras go to **bench**). Empty slot shows a muted abbr only — no `Need CB` pills. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`need a CB`).
 
 ## Imbalance rule
 
@@ -86,7 +88,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: Football match → guest CB on the roster → Too many GKs; 4-1-4-1 empty `Need` pills then a Going CB fills a CB slot; Basketball match → PG chips.
+Playwright covers: Football match → guest CB on the roster → Too many GKs; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; Basketball match → PG chips; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any.
 
 ```bash
 npx prisma migrate deploy
@@ -96,7 +98,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so Steve’s locked **Skwad** header, 512 icon, and 1600 OG image go live. Coach-board and chips are unchanged.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so edit/delete, guest Going list, muted empty slots, and the locked **Skwad** brand go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

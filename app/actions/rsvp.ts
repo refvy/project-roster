@@ -31,7 +31,9 @@ export async function submitRsvp(
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
   });
-  if (!matchday) return { ok: false, error: "This matchday link is not valid." };
+  if (!matchday || matchday.deletedAt) {
+    return { ok: false, error: "This matchday was deleted." };
+  }
 
   const positions = parsePositions(matchday.positions);
   const positionKey = positionKeyRaw || null;

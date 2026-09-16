@@ -1,12 +1,15 @@
 import { logoutAction } from "@/app/actions/auth";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
+import { GoingList } from "@/components/GoingList";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
+import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions, sportLabel } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -25,12 +28,17 @@ export default async function OrganiserMatchdayPage({
     where: { id },
     include: { rsvps: { orderBy: { createdAt: "asc" } } },
   });
-  if (!matchday || matchday.organiserId !== organiser.id) {
+  if (
+    !matchday ||
+    matchday.organiserId !== organiser.id ||
+    matchday.deletedAt
+  ) {
     notFound();
   }
 
   const positions = parsePositions(matchday.positions);
   const going = matchday.rsvps.filter((rsvp) => rsvp.status === "GOING");
+  const ordered = orderGoingForRoster(going, matchday.sport, matchday.formation);
   const imbalance = describeImbalance(going, positions, matchday.sport);
   const shareUrl = `${getAppUrl()}/m/${matchday.publicId}`;
 
@@ -60,18 +68,33 @@ export default async function OrganiserMatchdayPage({
               ← Matchdays
             </Link>
           </p>
-          <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
-            {matchday.title}
-          </h1>
-          <p className="mt-2 text-lg text-ink-soft">
-            {sportLabel(matchday.sport)} · {matchday.whenWhere}
-          </p>
+          <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="font-display text-4xl tracking-tight md:text-5xl">
+                {matchday.title}
+              </h1>
+              <p className="mt-2 text-lg text-ink-soft">
+                {sportLabel(matchday.sport)} · {matchday.whenWhere}
+              </p>
+            </div>
+            <div className="flex items-center gap-4 pt-2">
+              <Link
+                href={`/board/${matchday.id}/edit`}
+                className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+              >
+                Edit
+              </Link>
+              <DeleteMatchdayButton matchdayId={matchday.id} />
+            </div>
+          </div>
         </div>
 
         <CopyLinkButton url={shareUrl} />
 
         <CoachBoard
+          matchdayId={matchday.id}
           sport={matchday.sport}
+          formation={matchday.formation}
           going={going.map((rsvp) => ({
             id: rsvp.id,
             name: rsvp.name,
@@ -90,25 +113,10 @@ export default async function OrganiserMatchdayPage({
               {counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
             </p>
           </div>
-          {going.length === 0 ? (
-            <p className="mt-6 text-ink-soft">
-              Waiting on the first Going. Share the link.
-            </p>
-          ) : (
-            <ul data-testid="roster" className="mt-6 divide-y divide-ink/10">
-              {going.map((rsvp) => (
-                <li
-                  key={rsvp.id}
-                  className="flex items-center justify-between gap-4 py-4"
-                >
-                  <span className="text-lg font-medium">{rsvp.name}</span>
-                  <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
-                    {rsvp.positionKey ?? "—"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <GoingList
+            going={ordered}
+            empty="Waiting on the first Going. Share the link."
+          />
         </section>
       </main>
     </div>

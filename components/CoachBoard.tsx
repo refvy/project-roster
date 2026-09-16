@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { saveMatchdayFormation } from "@/app/actions/matchday";
 import {
   BASKETBALL_LINES,
   describePitchNeed,
   fillPitch,
   getFormation,
+  parseFormation,
   type FormationId,
   type GoingPlayer,
   type PitchLine,
@@ -14,14 +16,21 @@ import {
 import { parseSport } from "@/lib/positions";
 
 export function CoachBoard({
+  matchdayId,
   sport,
+  formation: savedFormation,
   going,
 }: {
+  matchdayId: string;
   sport: string;
+  formation: string;
   going: GoingPlayer[];
 }) {
   const isBasketball = parseSport(sport) === "basketball";
-  const [formationId, setFormationId] = useState<FormationId>("4-3-3");
+  const [formationId, setFormationId] = useState<FormationId>(
+    parseFormation(savedFormation),
+  );
+  const [, startTransition] = useTransition();
   const template = isBasketball
     ? BASKETBALL_LINES
     : getFormation(formationId).lines;
@@ -43,7 +52,12 @@ export function CoachBoard({
                 type="button"
                 data-testid={`formation-${item.id}`}
                 aria-pressed={formationId === item.id}
-                onClick={() => setFormationId(item.id)}
+                onClick={() => {
+                  setFormationId(item.id);
+                  startTransition(() => {
+                    void saveMatchdayFormation(matchdayId, item.id);
+                  });
+                }}
                 className={`inline-flex min-h-11 items-center rounded-full border-2 px-4 text-sm font-semibold tracking-wide transition ${
                   formationId === item.id
                     ? "border-accent bg-accent text-on-accent"
@@ -142,16 +156,10 @@ function PitchSlotView({
   return (
     <div
       data-testid={`slot-empty-${slot.key}-${index}`}
-      className="flex min-h-16 min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-full border border-dashed border-ink/15 bg-surface/70 px-3 py-2 text-center"
+      className="flex min-h-16 min-w-[4.5rem] flex-col items-center justify-center rounded-full border border-dashed border-ink/15 bg-surface/70 px-3 py-2 text-center"
     >
-      <span className="text-xs font-medium uppercase tracking-wide text-ink-soft">
+      <span className="text-xs font-medium uppercase tracking-wide text-ink/35">
         {slot.key}
-      </span>
-      <span
-        data-testid={`need-${slot.key}`}
-        className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-deep"
-      >
-        Need {slot.key}
       </span>
     </div>
   );

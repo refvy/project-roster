@@ -3,6 +3,7 @@ import { describeImbalance } from "../lib/imbalance";
 import {
   fillPitch,
   getFormation,
+  orderGoingForRoster,
 } from "../lib/pitch";
 import {
   BASKETBALL_POSITIONS,
@@ -75,6 +76,19 @@ test.describe("pitch fill", () => {
     expect(cbs[0]?.player?.name).toBe("Nok");
     expect(cbs[1]?.player?.name).toBe("Bee");
     expect(bench.map((p) => p.name)).toEqual(["Aek"]);
+  });
+
+  test("roster order is formation back→front then Any/bench", () => {
+    const ordered = orderGoingForRoster(
+      [
+        { id: "1", name: "Nok", positionKey: "CB" },
+        { id: "2", name: "Bee", positionKey: "ANY" },
+        { id: "3", name: "Aek", positionKey: "GK" },
+      ],
+      "football",
+      "4-1-4-1",
+    );
+    expect(ordered.map((p) => p.name)).toEqual(["Aek", "Nok", "Bee"]);
   });
 });
 
@@ -153,7 +167,7 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
-  test("4-1-4-1 empty Need pills, Going CB fills a CB slot", async ({
+  test("empty slots show muted abbr only, Going CB fills a CB slot", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -165,9 +179,11 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Thu 20:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-1-4-1").click();
-    await expect(
-      orgPage.getByTestId("coach-board").getByText("Need CB"),
-    ).toHaveCount(2);
+    await expect(orgPage.getByTestId("coach-board").getByText(/Need /)).toHaveCount(
+      0,
+    );
+    await expect(orgPage.getByTestId("slot-empty-CB-1")).toBeVisible();
+    await expect(orgPage.getByTestId("slot-empty-CB-1")).toHaveText("CB");
     await expect(orgPage.getByTestId("coach-banner")).toContainText(
       /Pitch fills as players tap Going/i,
     );
@@ -179,6 +195,91 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByTestId("slot-filled-CB")).toContainText("Nok");
     await expect(orgPage.getByTestId("roster")).toContainText("Nok");
 
+    await organiser.close();
+  });
+
+  test("edit title and when/where", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+edit+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Sunday kickabout");
+    await orgPage.getByLabel("When / where").fill("Sun 17:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
+
+    await orgPage.getByRole("link", { name: /^edit$/i }).click();
+    await orgPage.getByLabel("Title").fill("Monday 5s");
+    await orgPage.getByLabel("When / where").fill("Mon 20:00 · Court 1");
+    await orgPage.getByTestId("edit-formation-4-1-4-1").click();
+    await orgPage.getByRole("button", { name: /^save$/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Monday 5s" })).toBeVisible();
+    await expect(orgPage.getByText(/Mon 20:00 · Court 1/)).toBeVisible();
+    await expect(orgPage.getByTestId("formation-4-1-4-1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await organiser.close();
+  });
+
+  test("delete matchday: guest sees deleted state", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+del+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("To delete");
+    await orgPage.getByLabel("When / where").fill("Fri 19:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await expect(orgPage.getByRole("link", { name: "To delete" })).toHaveCount(0);
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-gone")).toContainText(
+      /deleted/i,
+    );
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await guest.close();
+    await organiser.close();
+  });
+
+  test("guest sees Going list sorted back→front then Any", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+sort+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Sorted roster");
+    await orgPage.getByLabel("When / where").fill("Sat 16:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    const roster = page.getByTestId("roster");
+    await expect(roster).toBeVisible();
+    await expect(roster.locator("li")).toHaveText([
+      /Aek\s*GK/,
+      /Nok\s*CB/,
+      /Bee\s*Any/,
+    ]);
+    await guest.close();
     await organiser.close();
   });
 });

@@ -10,7 +10,7 @@ export default async function BoardPage() {
   if (!organiser) redirect("/");
 
   const matchdays = await prisma.matchday.findMany({
-    where: { organiserId: organiser.id },
+    where: { organiserId: organiser.id, deletedAt: null },
     orderBy: { createdAt: "desc" },
     include: {
       _count: {

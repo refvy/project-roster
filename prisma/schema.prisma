@@ -48,8 +48,10 @@ model Matchday {
   title       String
   whenWhere   String
   sport       String    @default("football")
+  formation   String    @default("4-3-3")
   positions   Json
   createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
   rsvps       Rsvp[]
 
   @@index([organiserId])

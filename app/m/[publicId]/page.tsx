@@ -1,6 +1,8 @@
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
+import { GoingList } from "@/components/GoingList";
 import { Wordmark } from "@/components/Wordmark";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
+import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
@@ -13,17 +15,42 @@ export default async function GuestMatchdayPage({
   const { publicId } = await params;
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
+    include: { rsvps: { orderBy: { createdAt: "asc" } } },
   });
   if (!matchday) notFound();
+
+  if (matchday.deletedAt) {
+    return (
+      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
+        <header>
+          <Wordmark />
+        </header>
+        <main className="mt-16" data-testid="matchday-gone">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+            Matchday
+          </p>
+          <h1 className="mt-3 font-display text-4xl tracking-tight">
+            This matchday was deleted
+          </h1>
+          <p className="mt-3 text-lg text-ink-soft">
+            The share link is no longer active.
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   const positions = parsePositions(matchday.positions);
   const guestId = await getGuestId();
   const rememberedName = await getRememberedGuestName();
   const existing = guestId
-    ? await prisma.rsvp.findUnique({
-        where: { matchdayId_guestId: { matchdayId: matchday.id, guestId } },
-      })
+    ? matchday.rsvps.find((rsvp) => rsvp.guestId === guestId) ?? null
     : null;
+  const going = orderGoingForRoster(
+    matchday.rsvps.filter((rsvp) => rsvp.status === "GOING"),
+    matchday.sport,
+    matchday.formation,
+  );
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
@@ -48,6 +75,12 @@ export default async function GuestMatchdayPage({
           defaultPosition={existing?.positionKey ?? null}
           confirmed={Boolean(existing)}
         />
+        <section>
+          <h2 className="font-display text-2xl tracking-tight">
+            Going · {going.length}
+          </h2>
+          <GoingList going={going} empty="No one Going yet." />
+        </section>
       </main>
     </div>
   );

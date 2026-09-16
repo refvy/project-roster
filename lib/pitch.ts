@@ -1,3 +1,5 @@
+import { parseSport } from "./positions";
+
 export type GoingPlayer = {
   id: string;
   name: string;
@@ -73,6 +75,40 @@ export const BASKETBALL_LINES: { area: PitchLine["area"]; keys: string[] }[] = [
 export function getFormation(id: FormationId) {
   const found = FOOTBALL_FORMATIONS.find((item) => item.id === id);
   return found ?? FOOTBALL_FORMATIONS[0]!;
+}
+
+export function parseFormation(value: unknown): FormationId {
+  if (
+    value === "4-3-3" ||
+    value === "4-4-2" ||
+    value === "4-1-4-1" ||
+    value === "3-5-2"
+  ) {
+    return value;
+  }
+  return "4-3-3";
+}
+
+export function pitchTemplate(sport: string, formation: unknown) {
+  return parseSport(sport) === "basketball"
+    ? BASKETBALL_LINES
+    : getFormation(parseFormation(formation)).lines;
+}
+
+/** Back→front slot order for the match formation, then Any / extras on the bench. */
+export function orderGoingForRoster(
+  going: GoingPlayer[],
+  sport: string,
+  formation: unknown,
+): GoingPlayer[] {
+  const { lines, bench } = fillPitch(pitchTemplate(sport, formation), going);
+  const placed: GoingPlayer[] = [];
+  for (const line of lines) {
+    for (const slot of line.slots) {
+      if (slot.player) placed.push(slot.player);
+    }
+  }
+  return [...placed, ...bench];
 }
 
 /** First-fit: Going player fills the first empty slot matching their chip. Any → bench. */
