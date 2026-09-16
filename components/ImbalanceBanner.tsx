@@ -3,9 +3,9 @@ export function ImbalanceBanner({ message }: { message: string | null }) {
   return (
     <section
       data-testid="imbalance-banner"
-      className="rounded-3xl bg-cobalt px-6 py-6 text-cream shadow-[0_20px_50px_-24px_rgba(31,75,255,0.7)]"
+      className="rounded-3xl bg-accent px-6 py-6 text-on-accent shadow-banner"
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cream/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-on-accent/70">
         Roster skew
       </p>
       <p className="mt-2 font-display text-3xl leading-tight tracking-tight md:text-4xl">

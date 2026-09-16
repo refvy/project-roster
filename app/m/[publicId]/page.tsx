@@ -32,7 +32,7 @@ export default async function GuestMatchdayPage({
       </header>
       <main className="mt-12 flex flex-col gap-10">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cobalt">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
             Matchday
           </p>
           <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">

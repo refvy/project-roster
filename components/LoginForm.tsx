@@ -19,23 +19,23 @@ export function LoginForm() {
           required
           autoComplete="email"
           placeholder="you@club.example"
-          className="min-h-14 rounded-2xl border border-ink/10 bg-white px-4 text-lg text-ink outline-none ring-cobalt/30 placeholder:text-ink/30 focus:ring-4"
+          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
       <button
         type="submit"
         disabled={pending}
-        className="min-h-14 rounded-full bg-cobalt px-6 text-base font-semibold text-cream transition hover:bg-cobalt-deep disabled:opacity-60"
+        className="min-h-14 rounded-full bg-accent px-6 text-base font-semibold text-on-accent transition hover:bg-accent-deep disabled:opacity-60"
       >
         {pending ? "Sending…" : "Email me a magic link"}
       </button>
       {state?.error ? (
-        <p className="text-sm font-medium text-red-700" role="alert">
+        <p className="text-sm font-medium text-danger" role="alert">
           {state.error}
         </p>
       ) : null}
       {state?.ok && state.debugUrl ? (
-        <p className="rounded-2xl bg-cobalt-soft px-4 py-3 text-sm text-cobalt-deep">
+        <p className="rounded-2xl bg-accent-soft px-4 py-3 text-sm text-accent-deep">
           AUTH_DEBUG is on.{" "}
           <a
             data-testid="debug-magic-link"

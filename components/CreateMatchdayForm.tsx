@@ -19,7 +19,7 @@ export function CreateMatchdayForm() {
           minLength={2}
           maxLength={80}
           placeholder="Sunday kickabout"
-          className="min-h-14 rounded-2xl border border-ink/10 bg-white px-4 text-lg text-ink outline-none ring-cobalt/30 placeholder:text-ink/30 focus:ring-4"
+          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
@@ -31,18 +31,18 @@ export function CreateMatchdayForm() {
           maxLength={200}
           rows={3}
           placeholder="Sun 17:00 · Lumphini pitch 2"
-          className="rounded-2xl border border-ink/10 bg-white px-4 py-3 text-lg text-ink outline-none ring-cobalt/30 placeholder:text-ink/30 focus:ring-4"
+          className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
       {state?.error ? (
-        <p className="text-sm font-medium text-red-700" role="alert">
+        <p className="text-sm font-medium text-danger" role="alert">
           {state.error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={pending}
-        className="min-h-14 rounded-full bg-cobalt px-6 text-base font-semibold text-cream transition hover:bg-cobalt-deep disabled:opacity-60"
+        className="min-h-14 rounded-full bg-accent px-6 text-base font-semibold text-on-accent transition hover:bg-accent-deep disabled:opacity-60"
       >
         {pending ? "Creating…" : "Create matchday"}
       </button>

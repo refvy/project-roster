@@ -43,7 +43,7 @@ export function GuestRsvpForm({
           defaultValue={defaultName}
           autoComplete="name"
           placeholder="Nok"
-          className="min-h-14 rounded-2xl border border-ink/10 bg-white px-4 text-lg text-ink outline-none ring-cobalt/30 placeholder:text-ink/30 focus:ring-4"
+          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
 
@@ -88,14 +88,14 @@ export function GuestRsvpForm({
       ) : null}
 
       {state?.error ? (
-        <p className="text-sm font-medium text-red-700" role="alert">
+        <p className="text-sm font-medium text-danger" role="alert">
           {state.error}
         </p>
       ) : null}
       {state?.ok ? (
         <p
           data-testid="rsvp-confirmed"
-          className="rounded-2xl bg-cobalt-soft px-4 py-3 text-sm font-medium text-cobalt-deep"
+          className="rounded-2xl bg-accent-soft px-4 py-3 text-sm font-medium text-accent-deep"
         >
           {status === "GOING"
             ? `You're going${position ? ` · ${position}` : ""}.`
@@ -107,7 +107,7 @@ export function GuestRsvpForm({
         type="submit"
         data-testid="rsvp-submit"
         disabled={pending}
-        className="min-h-16 rounded-full bg-cobalt px-8 text-lg font-semibold text-cream transition hover:bg-cobalt-deep disabled:opacity-60"
+        className="min-h-16 rounded-full bg-accent px-8 text-lg font-semibold text-on-accent transition hover:bg-accent-deep disabled:opacity-60"
       >
         {pending ? "Saving…" : "Done"}
       </button>
@@ -134,8 +134,8 @@ function FatChoice({
       onClick={onClick}
       className={`inline-flex min-h-14 min-w-[4.5rem] items-center justify-center rounded-full border-2 px-6 text-lg font-semibold tracking-wide transition ${
         selected
-          ? "border-cobalt bg-cobalt text-cream"
-          : "border-ink/15 bg-white text-ink hover:border-cobalt/40"
+          ? "border-accent bg-accent text-on-accent"
+          : "border-ink/15 bg-surface text-ink hover:border-accent/40"
       }`}
     >
       {children}

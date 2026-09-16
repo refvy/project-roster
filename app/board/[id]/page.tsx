@@ -90,7 +90,7 @@ export default async function OrganiserMatchdayPage({
                   className="flex items-center justify-between gap-4 py-4"
                 >
                   <span className="text-lg font-medium">{rsvp.name}</span>
-                  <span className="rounded-full bg-cobalt-soft px-3 py-1 text-sm font-semibold tracking-wide text-cobalt-deep">
+                  <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
                     {rsvp.positionKey ?? "—"}
                   </span>
                 </li>

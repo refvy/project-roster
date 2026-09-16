@@ -23,6 +23,12 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 Positions live as JSON on each matchday so another sport can swap the chip set later without a schema rewrite.
 
+## Visual tokens
+
+All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle — no brand lockup yet.
+
+Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for Going, selected chips, and CTAs.
+
 ## What it is not
 
 Venues, ratings, matchmaking, chat, payments, charging players, public brand hunt, photo uploads, embedded maps, player apps/accounts.

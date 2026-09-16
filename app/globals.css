@@ -1,25 +1,40 @@
 @import "tailwindcss";
 
+/*
+ * Visual tokens — swap this :root block to restyle.
+ *
+ * Locked skin: Airbnb-inspired cream / warm-white ground, dark ink,
+ * Signal teal accent (#00D4C8 family) for Going, selected chips, CTAs.
+ * Not cobalt, coral, Volt lime, or WhatsApp green. No brand lockup.
+ */
 :root {
-  --cream: #f4efe6;
-  --cream-deep: #ebe3d4;
-  --ink: #161410;
-  --ink-soft: #5d564c;
-  --cobalt: #1f4bff;
-  --cobalt-deep: #1636c9;
-  --cobalt-soft: #d7e0ff;
+  --cream: #f7f4ef;
+  --cream-deep: #efe9df;
+  --surface: #fffdf9;
+  --ink: #1a1714;
+  --ink-soft: #5e584f;
+  --accent: #00d4c8;
+  --accent-deep: #009e95;
+  --accent-soft: #d4f6f3;
+  --on-accent: #042f2c;
+  --danger: #b42318;
+  --accent-rgb: 0 212 200;
 }
 
 @theme inline {
   --color-cream: var(--cream);
   --color-cream-deep: var(--cream-deep);
+  --color-surface: var(--surface);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
-  --color-cobalt: var(--cobalt);
-  --color-cobalt-deep: var(--cobalt-deep);
-  --color-cobalt-soft: var(--cobalt-soft);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
   --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --shadow-banner: 0 20px 50px -24px rgb(var(--accent-rgb) / 0.55);
 }
 
 html,

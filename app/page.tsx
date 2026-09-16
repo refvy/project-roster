@@ -28,7 +28,7 @@ export default async function HomePage({
       </header>
       <main className="mt-16 grid gap-16 lg:mt-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cobalt">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
             Matchday board
           </p>
           <h1 className="mt-4 max-w-xl font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
@@ -48,7 +48,7 @@ export default async function HomePage({
             Magic link. No password. Players never sign in.
           </p>
           {errorCopy ? (
-            <p className="mb-4 text-sm font-medium text-red-700" role="alert">
+            <p className="mb-4 text-sm font-medium text-danger" role="alert">
               {errorCopy}
             </p>
           ) : null}

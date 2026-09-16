@@ -38,7 +38,7 @@ export default async function BoardPage() {
           <h1 className="font-display text-4xl tracking-tight">Matchdays</h1>
           <Link
             href="/board/new"
-            className="inline-flex min-h-12 items-center rounded-full bg-cobalt px-5 text-sm font-semibold text-cream hover:bg-cobalt-deep"
+            className="inline-flex min-h-12 items-center rounded-full bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent-deep"
           >
             New matchday
           </Link>
