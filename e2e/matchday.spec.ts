@@ -90,6 +90,16 @@ test.describe("pitch fill", () => {
     );
     expect(ordered.map((p) => p.name)).toEqual(["Aek", "Nok", "Bee"]);
   });
+
+  test("Any is never a formation slot", () => {
+    const { lines, any } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Bee", positionKey: "ANY" },
+    ]);
+    expect(any.map((p) => p.name)).toEqual(["Bee"]);
+    expect(
+      lines.flatMap((line) => line.slots).every((slot) => slot.player === null),
+    ).toBe(true);
+  });
 });
 
 test.describe("matchday board", () => {
@@ -141,6 +151,8 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Tue 20:00 · Court 1");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Tuesday run" })).toBeVisible();
+    await expect(orgPage.getByTestId("half-court")).toBeVisible();
+    await expect(orgPage.getByTestId("half-pitch")).toHaveCount(0);
 
     const shareUrl = await orgPage.getByTestId("share-url").inputValue();
     const guest = await browser.newContext();
@@ -184,6 +196,15 @@ test.describe("matchday board", () => {
     );
     await expect(orgPage.getByTestId("slot-empty-CB-1")).toBeVisible();
     await expect(orgPage.getByTestId("slot-empty-CB-1")).toHaveText("CB");
+    const pitch = orgPage.getByTestId("half-pitch");
+    await expect(pitch).toBeVisible();
+    const box = await pitch.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.width / box!.height).toBeGreaterThan(1.15);
+    const gk = await orgPage.getByTestId("slot-empty-GK-0").boundingBox();
+    const cf = await orgPage.getByTestId("slot-empty-CF-0").boundingBox();
+    expect(gk && cf).toBeTruthy();
+    expect(gk!.y).toBeGreaterThan(cf!.y);
     await expect(orgPage.getByTestId("coach-banner")).toContainText(
       /Pitch fills as players tap Going/i,
     );
@@ -279,6 +300,86 @@ test.describe("matchday board", () => {
       /Nok\s*CB/,
       /Bee\s*Any/,
     ]);
+    await guest.close();
+    await organiser.close();
+  });
+
+  test("Any sits on the bench strip, not a formation slot", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+any+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Any strip");
+    await orgPage.getByLabel("When / where").fill("Sat 10:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("bench")).toContainText("Bee");
+    await expect(orgPage.getByTestId("bench")).toContainText("Any");
+    await expect(orgPage.locator("[data-testid^=slot-filled-]")).toHaveCount(0);
+    await expect(orgPage.getByTestId("roster")).toContainText("Bee");
+
+    await organiser.close();
+  });
+
+  test("guest adds a friend with added by, then edits and deletes them", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+friend+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Bring a friend");
+    await orgPage.getByLabel("When / where").fill("Sun 11:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await page.getByLabel("Your name").fill("Nok");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-CB").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expect(page.getByTestId("rsvp-confirmed")).toBeVisible();
+    await expect(page.getByTestId("add-friend")).toBeVisible();
+
+    await page.getByTestId("friend-name").fill("Bee");
+    await page.getByTestId("friend-submit-going").click();
+    await page.getByTestId("friend-submit-position-ANY").click();
+    await page.getByTestId("friend-submit").click();
+    await expect(page.getByTestId("added-by")).toContainText("added by Nok");
+    await expect(page.getByTestId("roster")).toContainText("Bee");
+    await expect(page.getByTestId("my-extras")).toContainText("Bee");
+
+    await page.getByRole("button", { name: /^edit$/i }).click();
+    await page.getByTestId("extra-name").fill("Bee2");
+    await page.locator('[data-testid^="extra-save-"]').click();
+    await expect(page.getByTestId("roster")).toContainText("Bee2");
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator('[data-testid^="extra-delete-"]').click();
+    await expect(page.getByTestId("roster")).not.toContainText("Bee2");
+    await expect(page.getByTestId("my-extras")).toHaveCount(0);
+
+    const other = await browser.newContext();
+    const otherPage = await other.newPage();
+    await otherPage.goto(shareUrl);
+    await otherPage.getByLabel("Your name").fill("Aek");
+    await otherPage.getByTestId("status-going").click();
+    await otherPage.getByTestId("position-GK").click();
+    await otherPage.getByTestId("rsvp-submit").click();
+    await expect(otherPage.getByTestId("add-friend")).toBeVisible();
+    await expect(otherPage.getByTestId("my-extras")).toHaveCount(0);
+    await expect(otherPage.getByRole("button", { name: /^delete$/i })).toHaveCount(
+      0,
+    );
+    await other.close();
     await guest.close();
     await organiser.close();
   });

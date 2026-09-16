@@ -99,6 +99,7 @@ export default async function OrganiserMatchdayPage({
             id: rsvp.id,
             name: rsvp.name,
             positionKey: rsvp.positionKey,
+            addedByName: rsvp.addedByName,
           }))}
         />
 

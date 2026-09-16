@@ -15,7 +15,8 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
    - Basketball: PG · SG · SF · PF · C · Any
 4. Type a name (remembered in a cookie)
 5. See who’s Going, sorted back→front for that match’s formation, then Any / extras
-6. Done in under a minute
+6. After signing yourself, add a friend on the same link (name + Going/Out + position). Extras show `added by {you}`; you can edit/delete only people you added
+7. Done in under a minute
 
 **Organisers (magic-link auth)**
 
@@ -23,7 +24,7 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 - Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
 - Copy the share link
 - Live roster of Going players + positions, same back→front order guests see
-- Organiser-only cream/teal pitch: Football formation chips (4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2), Basketball 5-slot half-court. First-fit from Going chips; extras on the bench. No drag, no player-facing pitch.
+- Organiser-only board: football **half-pitch** (GK on the goal line, forwards at the centre circle), basketball cream/white schematic **half-court** with thin dark lines. Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. First-fit from Going chips. **Any is not a slot** — names sit on a bench strip under the board. No drag, no player-facing pitch.
 - Imbalance banner when the side looks skewed
 
 Positions snapshot as JSON on each matchday. Players stay on chips.
@@ -40,7 +41,7 @@ Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, e
 
 ## Pitch fill
 
-Organiser-only. Going players fill the first empty slot whose key matches their chip (`Any` and extras go to **bench**). Empty slot shows a muted abbr only — no `Need CB` pills. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`need a CB`).
+Organiser-only. Going players fill the first empty slot whose key matches their chip. **Any is not a formation slot** — those names sit on a soft strip under the board, with overflow extras. Empty slot shows a muted abbr only — no `Need CB` pills. Football is a half-pitch (goal at the bottom, kickoff circle at the top). Basketball is a cream schematic half-court. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`need a CB`).
 
 ## Imbalance rule
 
@@ -88,7 +89,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: Football match → guest CB on the roster → Too many GKs; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; Basketball match → PG chips; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any.
+Playwright covers: Football match → guest CB on the roster → Too many GKs; half-pitch GK below CF; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; Any on the bench strip; Basketball match → PG chips + half-court; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any; guest adds a friend (`added by`) then edits and deletes them.
 
 ```bash
 npx prisma migrate deploy
@@ -98,7 +99,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so edit/delete, guest Going list, muted empty slots, Outfit type, and the locked **Skwad** brand go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so half-pitch / half-court, Any bench strip, add-a-friend, Outfit type, and the locked **Skwad** brand go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

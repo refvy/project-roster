@@ -9,6 +9,7 @@ import {
   parseFormation,
   type FormationId,
 } from "@/lib/pitch";
+import { BasketballMark, FootballMark } from "@/components/SportMarks";
 import { SPORTS, type SportId } from "@/lib/positions";
 
 type Defaults = {
@@ -62,12 +63,21 @@ export function MatchdayForm({
               data-testid={`sport-${item.id}`}
               aria-pressed={sport === item.id}
               onClick={() => setSport(item.id)}
-              className={`inline-flex min-h-14 min-w-[7rem] items-center justify-center rounded-full border-2 px-6 text-lg font-semibold tracking-wide transition ${
+              className={`inline-flex min-h-14 min-w-[8.5rem] items-center justify-center gap-2.5 rounded-full border-2 px-5 text-lg font-semibold tracking-wide transition ${
                 sport === item.id
                   ? "border-accent bg-accent text-on-accent"
                   : "border-ink/15 bg-surface text-ink hover:border-accent/40"
               }`}
             >
+              {item.id === "football" ? (
+                <FootballMark
+                  className={`h-6 w-6 ${sport === item.id ? "" : "text-accent"}`}
+                />
+              ) : (
+                <BasketballMark
+                  className={`h-6 w-6 ${sport === item.id ? "" : "text-accent"}`}
+                />
+              )}
               {item.label}
             </button>
           ))}

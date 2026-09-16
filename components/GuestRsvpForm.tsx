@@ -115,7 +115,7 @@ export function GuestRsvpForm({
   );
 }
 
-function FatChoice({
+export function FatChoice({
   selected,
   onClick,
   children,

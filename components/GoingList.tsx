@@ -2,7 +2,12 @@ export function GoingList({
   going,
   empty,
 }: {
-  going: { id: string; name: string; positionKey: string | null }[];
+  going: {
+    id: string;
+    name: string;
+    positionKey: string | null;
+    addedByName?: string | null;
+  }[];
   empty: string;
 }) {
   if (going.length === 0) {
@@ -16,7 +21,17 @@ export function GoingList({
           key={rsvp.id}
           className="flex items-center justify-between gap-4 py-4"
         >
-          <span className="text-lg font-medium">{rsvp.name}</span>
+          <div>
+            <span className="text-lg font-medium">{rsvp.name}</span>
+            {rsvp.addedByName ? (
+              <p
+                data-testid="added-by"
+                className="mt-0.5 text-sm text-ink-soft"
+              >
+                added by {rsvp.addedByName}
+              </p>
+            ) : null}
+          </div>
           <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
             {!rsvp.positionKey || rsvp.positionKey === "ANY"
               ? "Any"

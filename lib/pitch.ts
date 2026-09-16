@@ -4,6 +4,7 @@ export type GoingPlayer = {
   id: string;
   name: string;
   positionKey: string | null;
+  addedByName?: string | null;
 };
 
 export type PitchSlot = {
@@ -111,20 +112,22 @@ export function orderGoingForRoster(
   return [...placed, ...bench];
 }
 
-/** First-fit: Going player fills the first empty slot matching their chip. Any → bench. */
+/** First-fit: Going player fills the first empty slot matching their chip. Any → bench strip, never a formation slot. */
 export function fillPitch(
   template: { area: PitchLine["area"]; keys: string[] }[],
   going: GoingPlayer[],
-): { lines: PitchLine[]; bench: GoingPlayer[] } {
+): { lines: PitchLine[]; bench: GoingPlayer[]; any: GoingPlayer[] } {
   const lines: PitchLine[] = template.map((line) => ({
     area: line.area,
     slots: line.keys.map((key) => ({ key, player: null })),
   }));
   const bench: GoingPlayer[] = [];
+  const any: GoingPlayer[] = [];
 
   for (const player of going) {
     const key = player.positionKey;
     if (!key || key === "ANY") {
+      any.push(player);
       bench.push(player);
       continue;
     }
@@ -140,7 +143,7 @@ export function fillPitch(
     if (!placed) bench.push(player);
   }
 
-  return { lines, bench };
+  return { lines, bench, any };
 }
 
 export function emptySlotCount(lines: PitchLine[]) {

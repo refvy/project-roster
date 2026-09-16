@@ -1,3 +1,4 @@
+import { AddFriendPanel } from "@/components/AddFriendPanel";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
 import { Wordmark } from "@/components/Wordmark";
@@ -47,10 +48,20 @@ export default async function GuestMatchdayPage({
     ? matchday.rsvps.find((rsvp) => rsvp.guestId === guestId) ?? null
     : null;
   const going = orderGoingForRoster(
-    matchday.rsvps.filter((rsvp) => rsvp.status === "GOING"),
+    matchday.rsvps
+      .filter((rsvp) => rsvp.status === "GOING")
+      .map((rsvp) => ({
+        id: rsvp.id,
+        name: rsvp.name,
+        positionKey: rsvp.positionKey,
+        addedByName: rsvp.addedByName,
+      })),
     matchday.sport,
     matchday.formation,
   );
+  const extras = guestId
+    ? matchday.rsvps.filter((rsvp) => rsvp.addedByGuestId === guestId)
+    : [];
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
@@ -75,6 +86,18 @@ export default async function GuestMatchdayPage({
           defaultPosition={existing?.positionKey ?? null}
           confirmed={Boolean(existing)}
         />
+        {existing ? (
+          <AddFriendPanel
+            publicId={publicId}
+            positions={positions}
+            extras={extras.map((extra) => ({
+              id: extra.id,
+              name: extra.name,
+              status: extra.status,
+              positionKey: extra.positionKey,
+            }))}
+          />
+        ) : null}
         <section>
           <h2 className="font-display text-2xl tracking-tight">
             Going · {going.length}
