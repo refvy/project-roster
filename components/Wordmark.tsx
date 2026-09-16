@@ -8,9 +8,9 @@ export function Wordmark({ href = "/" }: { href?: string }) {
       className="inline-flex items-center no-underline"
     >
       <img
-        src="/skwad-logo.svg"
+        src="/skwad-header.png"
         alt=""
-        width={146}
+        width={129}
         height={36}
         className="h-9 w-auto sm:h-10"
         draggable={false}

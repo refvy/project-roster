@@ -30,7 +30,7 @@ Positions snapshot as JSON on each matchday. Players stay on chips.
 
 All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle.
 
-Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Interim logo: white SKWAD (chevron A, no crossbar) on a Signal teal capsule.
+Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Locked logo (Steve): white SKWAD, chevron A, notched teal capsule — header `public/skwad-header.png`, icon `app/icon.png`, OG `app/opengraph-image.png`.
 
 ## What it is not
 
@@ -96,7 +96,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so the locked **Skwad** wordmark, favicon, and share cards go live. Coach-board and chips are unchanged.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so Steve’s locked **Skwad** header, 512 icon, and 1600 OG image go live. Coach-board and chips are unchanged.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).
