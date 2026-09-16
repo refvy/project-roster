@@ -359,7 +359,7 @@ test.describe("matchday board", () => {
 
     await page.getByRole("button", { name: /^edit$/i }).click();
     await page.getByTestId("extra-name").fill("Bee2");
-    await page.locator('[data-testid^="extra-save-"]').click();
+    await page.getByRole("button", { name: /^save$/i }).click();
     await expect(page.getByTestId("roster")).toContainText("Bee2");
 
     page.once("dialog", (dialog) => dialog.accept());
