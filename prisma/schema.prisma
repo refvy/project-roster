@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organiser {
+  id         String      @id @default(cuid())
+  email      String      @unique
+  createdAt  DateTime    @default(now())
+  magicLinks MagicLink[]
+  sessions   Session[]
+  matchdays  Matchday[]
+}
+
+model MagicLink {
+  id          String     @id @default(cuid())
+  organiserId String
+  organiser   Organiser  @relation(fields: [organiserId], references: [id], onDelete: Cascade)
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([organiserId])
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  organiserId String
+  organiser   Organiser @relation(fields: [organiserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([organiserId])
+}
+
+/// Positions are stored as JSON on the matchday so football defaults
+/// (GK / DEF / MID / FWD / Any) can be swapped for other sports later.
+model Matchday {
+  id          String    @id @default(cuid())
+  publicId    String    @unique
+  organiserId String
+  organiser   Organiser @relation(fields: [organiserId], references: [id], onDelete: Cascade)
+  title       String
+  whenWhere   String
+  sport       String    @default("football")
+  positions   Json
+  createdAt   DateTime  @default(now())
+  rsvps       Rsvp[]
+
+  @@index([organiserId])
+}
+
+enum RsvpStatus {
+  GOING
+  OUT
+}
+
+model Rsvp {
+  id          String     @id @default(cuid())
+  matchdayId  String
+  matchday    Matchday   @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  guestId     String
+  name        String
+  status      RsvpStatus
+  positionKey String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([matchdayId, guestId])
+  @@index([matchdayId, status])
+}
