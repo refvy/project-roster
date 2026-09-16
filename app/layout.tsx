@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Fraunces, Outfit } from "next/font/google";
+import { Outfit } from "next/font/google";
 import { getAppUrl } from "@/lib/env";
 import "./globals.css";
 
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-outfit",
-});
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-fraunces",
 });
 
 const title = "Skwad — matchday board";
@@ -42,11 +37,10 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${outfit.variable} ${fraunces.variable} h-full antialiased`}
-    >
-      <body className="min-h-full bg-cream font-sans text-ink">{children}</body>
+    <html lang="en" className={`${outfit.variable} h-full antialiased`}>
+      <body className="min-h-full bg-cream font-sans font-normal text-ink">
+        {children}
+      </body>
     </html>
   );
 }
