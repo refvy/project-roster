@@ -119,7 +119,9 @@ export function CoachBoard({
               >
                 <span className="font-medium">{player.name}</span>
                 <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
-                  {player.positionKey ?? "Any"}
+                  {!player.positionKey || player.positionKey === "ANY"
+                    ? "Any"
+                    : player.positionKey}
                 </span>
               </li>
             ))}
