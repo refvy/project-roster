@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getOrganiser } from "@/lib/auth";
 import { publicId } from "@/lib/crypto";
-import { FOOTBALL_POSITIONS } from "@/lib/positions";
+import { parseSport, positionsForSport } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
@@ -23,6 +23,7 @@ export async function createMatchday(
 
   const title = String(formData.get("title") ?? "").trim();
   const whenWhere = String(formData.get("whenWhere") ?? "").trim();
+  const sport = parseSport(formData.get("sport"));
   if (title.length < 2 || title.length > 80) {
     return { error: "Give this matchday a short title." };
   }
@@ -36,8 +37,8 @@ export async function createMatchday(
       organiserId: organiser.id,
       title,
       whenWhere,
-      sport: "football",
-      positions: FOOTBALL_POSITIONS as unknown as Prisma.InputJsonValue,
+      sport,
+      positions: positionsForSport(sport) as unknown as Prisma.InputJsonValue,
     },
   });
 

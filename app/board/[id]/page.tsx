@@ -6,7 +6,7 @@ import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
-import { parsePositions } from "@/lib/positions";
+import { parsePositions, sportLabel } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -30,7 +30,7 @@ export default async function OrganiserMatchdayPage({
 
   const positions = parsePositions(matchday.positions);
   const going = matchday.rsvps.filter((rsvp) => rsvp.status === "GOING");
-  const imbalance = describeImbalance(going, positions);
+  const imbalance = describeImbalance(going, positions, matchday.sport);
   const shareUrl = `${getAppUrl()}/m/${matchday.publicId}`;
 
   const counts = positions.map((position) => ({
@@ -62,7 +62,9 @@ export default async function OrganiserMatchdayPage({
           <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
             {matchday.title}
           </h1>
-          <p className="mt-2 text-lg text-ink-soft">{matchday.whenWhere}</p>
+          <p className="mt-2 text-lg text-ink-soft">
+            {sportLabel(matchday.sport)} · {matchday.whenWhere}
+          </p>
         </div>
 
         <CopyLinkButton url={shareUrl} />
@@ -74,7 +76,7 @@ export default async function OrganiserMatchdayPage({
             <h2 className="font-display text-2xl tracking-tight">
               Going · {going.length}
             </h2>
-            <p className="text-sm text-ink-soft">
+            <p className="max-w-xl text-right text-sm text-ink-soft" data-testid="position-counts">
               {counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
             </p>
           </div>

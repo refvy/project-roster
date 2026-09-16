@@ -10,18 +10,20 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 1. Open the share link
 2. Going or Out
-3. Fat position chips: GK / DEF / MID / FWD / Any
+3. Fat position chips from the matchday sport:
+   - Football: GK · RB · CB · LB · RW · LW · CM · CAM · CDM · CF · Any
+   - Basketball: PG · SG · SF · PF · C · Any
 4. Type a name (remembered in a cookie)
 5. Done in under a minute
 
 **Organisers (magic-link auth)**
 
-- Create a matchday: title + when/where as text (no venue booking)
+- Create a matchday: sport (Football | Basketball, default Football), title, when/where as text (no venue booking)
 - Copy the share link
 - Live roster of Going players + positions
 - Imbalance banner when the side looks skewed
 
-Positions live as JSON on each matchday so another sport can swap the chip set later without a schema rewrite.
+Positions snapshot as JSON on each matchday. No formation board, no 4-3-3 presets, no RM/LM.
 
 ## Visual tokens
 
@@ -35,13 +37,16 @@ Venues, ratings, matchmaking, chat, payments, charging players, public brand hun
 
 ## Imbalance rule
 
-Going RSVPs only. Flex / **Any** is ignored.
+Going RSVPs only. Flex / **Any** is ignored. Soft copy from the sport’s groups — not a pitch or formation.
 
-1. **Special** positions (football: GK) — if count **> 1**, warn `Too many GKs`.
-2. **Field** positions (football: DEF / MID / FWD) — if the highest count is **≥ 2** and **at least 2 more** than the lowest, warn `Too many DEFs · need a MID` (labels from the overloaded / needed chips).
-3. Fragments join with ` · `.
+**Football:** GK | backs (RB/CB/LB) | wings (RW/LW) | mids (CM/CAM/CDM) | CF
 
-So two keepers on the list is enough to show **Too many GKs**.
+**Basketball:** guards (PG/SG) | wings (SF) | bigs (PF/C)
+
+1. GK count **> 1** → `Too many GKs`. If CB is also 0 → `Too many GKs · need a CB`.
+2. A field group is **heavy** if its total is **≥ 3**, or one spot in it is **≥ 2** and the group is at least **2** above the lightest other field group.
+3. A field group is **light** if its total is **0** while another field group is heavy.
+4. Lead copy is `3 PGs` when a count-style group is piled on one chip, otherwise `Heavy on CMs`. Need copy is `light on wings`, `need a big`, or `need a CB`. Fragments join with ` · `.
 
 ## Stack
 
@@ -76,7 +81,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers the MVP loop: organiser creates a matchday → copy link → guest Going + position → roster → imbalance when too many GKs.
+Playwright covers: Football match → guest CB on the roster → Too many GKs; Basketball match → PG chips.
 
 ```bash
 npx prisma migrate deploy
@@ -86,7 +91,9 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-1. Create a Vercel project from this GitHub repo.
+Redeploy **https://project-roster-tau.vercel.app** from this branch after merge (or preview from the PR). Sport select + new position enums only take effect on newly created matchdays.
+
+1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).
 3. Set environment variables on the project: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), and `AUTH_DEBUG=true` for the first dogfood deploy so magic links show on screen.
 4. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.

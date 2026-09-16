@@ -39,8 +39,8 @@ model Session {
   @@index([organiserId])
 }
 
-/// Positions are stored as JSON on the matchday so football defaults
-/// (GK / DEF / MID / FWD / Any) can be swapped for other sports later.
+/// Positions are stored as JSON on the matchday so Football / Basketball
+/// chip enums snapshot at create time (no formation board).
 model Matchday {
   id          String    @id @default(cuid())
   publicId    String    @unique
