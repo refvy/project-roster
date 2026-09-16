@@ -24,7 +24,7 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 - Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
 - Copy the share link
 - Live roster of Going players + positions, same back→front order guests see
-- Organiser-only board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (key + arc, same teal line weight). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. First-fit from Going chips. **Any is not a slot** — muted cream **Bench / Any** strip under the board. No drag, no player-facing pitch.
+- Organiser-only board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (key + arc, same teal line weight). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. **Stack-then-expand** on matching slots (up to 2 first names + teal `+N`; tap for the full list). **Any is not a slot** — muted cream **Bench / Any** strip is Any + unmatched only (named-position overflow stays on the slot). No drag, no player-facing pitch.
 - Imbalance banner when the side looks skewed
 
 Positions snapshot as JSON on each matchday. Players stay on chips.
@@ -41,7 +41,7 @@ Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, e
 
 ## Pitch fill
 
-Organiser-only. Going players fill the first empty slot whose key matches their chip. **Any is not a formation slot** — those names sit on a muted cream **Bench / Any** strip under the board (teal Any chips), with overflow extras. Empty bench: `Nobody on the bench yet.` Empty slot shows a muted abbr only, soft teal ring — no `Need CB` pills. Football is a ~3:4 portrait half-pitch (cream, teal lines; goal at the bottom, kickoff circle at the top). Basketball is a cream schematic half-court with the same teal lines. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`need a CB`).
+Organiser-only. Going players **stack** on matching formation slots in signup order (balanced across duplicate keys like two CBs). Each chip shows up to **2** first names (~8 chars) and a teal `+N` for the rest — tap the slot for the full list. Overflow for a named position **stays on that slot**, never the bench. **Any** and unmatched keys (no slot in this formation) sit on a muted cream **Bench / Any** strip. Empty bench: `Nobody on the bench yet.` Empty slot shows a muted abbr only, soft teal ring — no `Need CB` pills. Football is a ~3:4 portrait half-pitch (cream, teal lines; goal at the bottom, kickoff circle at the top). Basketball is a cream schematic half-court with the same teal lines. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`. Soft need copy can still appear on the imbalance banner (`3 on LW · light on RW`).
 
 ## Imbalance rule
 
@@ -52,9 +52,10 @@ Going RSVPs only. Flex / **Any** is ignored. Soft copy from the sport’s groups
 **Basketball:** guards (PG/SG) | wings (SF) | bigs (PF/C)
 
 1. GK count **> 1** → `Too many GKs`. If CB is also 0 → `Too many GKs · need a CB`.
-2. A field group is **heavy** if its total is **≥ 3**, or one spot in it is **≥ 2** and the group is at least **2** above the lightest other field group.
-3. A field group is **light** if its total is **0** while another field group is heavy.
-4. Lead copy is `3 PGs` when a count-style group is piled on one chip, otherwise `Heavy on CMs`. Need copy is `light on wings`, `need a big`, or `need a CB`. Fragments join with ` · `.
+2. A single named spot **≥ 3** → `3 on LW · light on RW` (empty sibling in the same group).
+3. Otherwise a field group is **heavy** if its total is **≥ 3**, or one spot in it is **≥ 2** and the group is at least **2** above the lightest other field group.
+4. A field group is **light** if its total is **0** while another field group is heavy.
+5. Lead copy is `3 PGs` when a count-style group is piled on one chip, otherwise `Heavy on CMs`. Need copy is `light on wings`, `need a big`, or `need a CB`. Fragments join with ` · `.
 
 ## Stack
 
@@ -89,7 +90,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: Football match → guest CB on the roster → Too many GKs; ~3:4 half-pitch GK below CF; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; empty **Bench / Any** copy, then Any on the strip; Basketball match → PG chips + half-court; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any; guest **I’m going** then **Add someone else** (`added by`) then edits and deletes them.
+Playwright covers: Football match → guest CB on the roster → Too many GKs; ~3:4 half-pitch GK below CF; 4-1-4-1 empty muted slots (no `Need` pills) then a Going CB fills a CB slot; empty **Bench / Any** copy, then Any on the strip; **3 LWs stack** (2 names + `+1`, sheet lists all, overflow off the bench); Basketball match → PG chips + half-court; edit title; delete → guest deleted state; guest Going list sorted GK → CB → Any; guest **I’m going** then **Add someone else** (`added by`) then edits and deletes them.
 
 ```bash
 npx prisma migrate deploy
@@ -99,7 +100,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so the cream/teal half-pitch (~3:4) and half-court, Bench / Any strip, I’m going / Add someone else, Outfit type, and the locked **Skwad** brand go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so stack-then-expand slot chips, cream/teal boards, Bench / Any strip, I’m going / Add someone else, Outfit type, and the locked **Skwad** brand go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

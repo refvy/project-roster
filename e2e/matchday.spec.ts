@@ -2,8 +2,10 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { describeImbalance } from "../lib/imbalance";
 import {
   fillPitch,
+  firstName,
   getFormation,
   orderGoingForRoster,
+  slotOverflowCount,
 } from "../lib/pitch";
 import {
   BASKETBALL_POSITIONS,
@@ -40,16 +42,30 @@ test.describe("imbalance rule", () => {
       FOOTBALL_POSITIONS,
       "football",
     );
-    expect(message).toBe("Heavy on CMs · light on wings");
+    expect(message).toBe("3 on CM · light on CAM");
   });
 
-  test("3 PGs need a big", () => {
+  test("3 PGs need a big when SG is also Going", () => {
     const message = describeImbalance(
-      [{ positionKey: "PG" }, { positionKey: "PG" }, { positionKey: "PG" }],
+      [
+        { positionKey: "PG" },
+        { positionKey: "PG" },
+        { positionKey: "PG" },
+        { positionKey: "SG" },
+      ],
       BASKETBALL_POSITIONS,
       "basketball",
     );
-    expect(message).toBe("3 PGs · need a big");
+    expect(message).toBe("3 on PG · need a big");
+  });
+
+  test("3 on LW · light on RW", () => {
+    const message = describeImbalance(
+      [{ positionKey: "LW" }, { positionKey: "LW" }, { positionKey: "LW" }],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBe("3 on LW · light on RW");
   });
 
   test("Any is ignored", () => {
@@ -63,7 +79,7 @@ test.describe("imbalance rule", () => {
 });
 
 test.describe("pitch fill", () => {
-  test("first-fit CB fills a 4-1-4-1 CB slot; extra is bench", () => {
+  test("CBs stack across CB slots; extra stays off the bench", () => {
     const formation = getFormation("4-1-4-1");
     const { lines, bench } = fillPitch(formation.lines, [
       { id: "1", name: "Nok", positionKey: "CB" },
@@ -73,9 +89,24 @@ test.describe("pitch fill", () => {
     const cbs = lines.flatMap((line) =>
       line.slots.filter((slot) => slot.key === "CB"),
     );
-    expect(cbs[0]?.player?.name).toBe("Nok");
-    expect(cbs[1]?.player?.name).toBe("Bee");
-    expect(bench.map((p) => p.name)).toEqual(["Aek"]);
+    expect(cbs[0]?.players.map((p) => p.name)).toEqual(["Nok", "Aek"]);
+    expect(cbs[1]?.players.map((p) => p.name)).toEqual(["Bee"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("three LWs stack on the one LW slot with +1 overflow", () => {
+    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Tim", positionKey: "LW" },
+      { id: "2", name: "Dan", positionKey: "LW" },
+      { id: "3", name: "Mit", positionKey: "LW" },
+    ]);
+    const lw = lines
+      .flatMap((line) => line.slots)
+      .find((slot) => slot.key === "LW");
+    expect(lw?.players.map((p) => p.name)).toEqual(["Tim", "Dan", "Mit"]);
+    expect(slotOverflowCount(lw?.players ?? [])).toBe(1);
+    expect(firstName("Alexander")).toBe("Alexande");
+    expect(bench).toEqual([]);
   });
 
   test("roster order is formation back→front then Any/bench", () => {
@@ -97,7 +128,7 @@ test.describe("pitch fill", () => {
     ]);
     expect(any.map((p) => p.name)).toEqual(["Bee"]);
     expect(
-      lines.flatMap((line) => line.slots).every((slot) => slot.player === null),
+      lines.flatMap((line) => line.slots).every((slot) => slot.players.length === 0),
     ).toBe(true);
   });
 });
@@ -394,6 +425,58 @@ test.describe("matchday board", () => {
     );
     await other.close();
     await guest.close();
+    await organiser.close();
+  });
+
+  test("3 LWs stack on the slot with +1; sheet lists all; bench is Any only", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+stack+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("LW stack");
+    await orgPage.getByLabel("When / where").fill("Sat 19:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+
+    await guestGoing(browser, shareUrl, "Tim", "LW");
+    await guestGoing(browser, shareUrl, "Dan", "LW");
+    await guestGoing(browser, shareUrl, "Mit", "LW");
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    const slot = orgPage.getByTestId("slot-filled-LW");
+    await expect(slot).toContainText("Tim");
+    await expect(slot).toContainText("Dan");
+    await expect(slot).not.toContainText("Mit");
+    await expect(orgPage.getByTestId("slot-overflow-LW")).toHaveText("+1");
+    await expect(orgPage.getByTestId("bench")).toContainText("Bee");
+    await expect(orgPage.getByTestId("bench")).toContainText("Any");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Dan");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Mit");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Tim");
+    await expect(orgPage.getByTestId("imbalance-banner")).toContainText(
+      "3 on LW",
+    );
+    await expect(orgPage.getByTestId("imbalance-banner")).toContainText(
+      "light on RW",
+    );
+
+    await slot.click();
+    const sheet = orgPage.getByTestId("slot-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByTestId("slot-sheet-row")).toHaveCount(3);
+    await expect(sheet).toContainText("Tim");
+    await expect(sheet).toContainText("Dan");
+    await expect(sheet).toContainText("Mit");
+    await expect(sheet).toContainText("LW");
+    await orgPage.getByTestId("slot-sheet-close").click();
+    await expect(orgPage.getByTestId("slot-sheet")).toHaveCount(0);
+
     await organiser.close();
   });
 });

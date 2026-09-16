@@ -86,10 +86,12 @@ const BASKETBALL_GROUPS: GroupSpec[] = [
  * Basketball groups: guards (PG/SG) | wings (SF) | bigs (PF/C)
  *
  * 1. GK count > 1 → "Too many GKs". If CB is also 0 → "· need a CB".
- * 2. A field group is heavy if its total is ≥ 3, or one spot in it is ≥ 2
+ * 2. A single named spot ≥ 3 → "3 on LW · light on RW" (empty sibling in the
+ *    same group). Otherwise group heavy/light as below.
+ * 3. A field group is heavy if its total is ≥ 3, or one spot in it is ≥ 2
  *    and the group is at least 2 above the lightest other field group.
- * 3. A field group is light if its total is 0 while some field player is Going.
- * 4. Lead copy: "3 PGs" when a count-style group is dominated by one spot;
+ * 4. A field group is light if its total is 0 while some field player is Going.
+ * 5. Lead copy: "3 PGs" when a count-style group is dominated by one spot;
  *    otherwise "Heavy on CMs". Need copy: "light on wings", "need a big",
  *    "need a CB". Fragments join with " · ".
  */
@@ -120,6 +122,8 @@ export function describeImbalance(
     return genericFieldSkew(counts, positions);
   }
 
+  const stacked = stackedSlotCopy(counts, active);
+
   const parts: string[] = [];
   const special = active.filter((group) => group.special);
   const field = active.filter((group) => !group.special);
@@ -130,6 +134,13 @@ export function describeImbalance(
       const label = group.keys[0] ?? group.key;
       parts.push(`Too many ${pluralizeLabel(label)}`);
     }
+  }
+
+  if (stacked) {
+    for (const bit of stacked) {
+      if (!parts.includes(bit)) parts.push(bit);
+    }
+    return parts.join(" · ");
   }
 
   const fieldGoing = field.reduce(
@@ -175,6 +186,49 @@ export function describeImbalance(
   }
 
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function stackedSlotCopy(
+  counts: Map<string, number>,
+  groups: GroupSpec[],
+): string[] | null {
+  let bestKey: string | null = null;
+  let best = 0;
+  for (const group of groups) {
+    if (group.special) continue;
+    for (const key of group.keys) {
+      const n = counts.get(key) ?? 0;
+      if (n > best) {
+        best = n;
+        bestKey = key;
+      }
+    }
+  }
+  if (best < 3 || !bestKey) return null;
+  const bits = [`${best} on ${bestKey}`];
+  const group = groups.find((item) => item.keys.includes(bestKey));
+  const sibling = group?.keys.find(
+    (key) => key !== bestKey && (counts.get(key) ?? 0) === 0,
+  );
+  if (sibling) {
+    bits.push(`light on ${sibling}`);
+    return bits;
+  }
+  const field = groups.filter((item) => !item.special);
+  const light = field
+    .map((item) => ({ group: item, total: groupTotal(item, counts) }))
+    .filter((item) => item.total === 0);
+  const heavy = field
+    .map((item) => ({
+      group: item,
+      total: groupTotal(item, counts),
+      maxKey: dominantKey(item, counts),
+      maxCount: dominantCount(item, counts),
+    }))
+    .filter((item) => item.total >= 3);
+  const need = pickNeed(light, heavy, counts);
+  if (need) bits.push(need);
+  return bits;
 }
 
 function pickNeed(

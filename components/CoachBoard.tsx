@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { saveMatchdayFormation } from "@/app/actions/matchday";
 import {
   BASKETBALL_LINES,
   describePitchNeed,
   fillPitch,
+  firstName,
   getFormation,
   parseFormation,
+  slotOverflowCount,
+  SLOT_STACK_VISIBLE,
   type FormationId,
   type GoingPlayer,
   type PitchLine,
+  type PitchSlot,
   FOOTBALL_FORMATIONS,
 } from "@/lib/pitch";
 import { parseSport } from "@/lib/positions";
@@ -42,6 +46,10 @@ export function CoachBoard({
     [template, going],
   );
   const need = describePitchNeed(lines, going.length);
+  const [sheet, setSheet] = useState<{
+    key: string;
+    players: GoingPlayer[];
+  } | null>(null);
 
   return (
     <section data-testid="coach-board" className="flex flex-col gap-4">
@@ -84,20 +92,34 @@ export function CoachBoard({
       ) : null}
 
       {isBasketball ? (
-        <HalfCourtBoard lines={lines} />
+        <HalfCourtBoard lines={lines} onOpenSlot={setSheet} />
       ) : (
-        <HalfPitchBoard lines={lines} />
+        <HalfPitchBoard lines={lines} onOpenSlot={setSheet} />
       )}
 
       <AnyStrip
         any={any}
         overflow={bench.filter((p) => p.positionKey !== "ANY")}
       />
+
+      {sheet ? (
+        <SlotSheet
+          slotKey={sheet.key}
+          players={sheet.players}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
     </section>
   );
 }
 
-function HalfPitchBoard({ lines }: { lines: PitchLine[] }) {
+function HalfPitchBoard({
+  lines,
+  onOpenSlot,
+}: {
+  lines: PitchLine[];
+  onOpenSlot: (slot: { key: string; players: GoingPlayer[] }) => void;
+}) {
   return (
     <div
       data-testid="half-pitch"
@@ -116,6 +138,7 @@ function HalfPitchBoard({ lines }: { lines: PitchLine[] }) {
                 key={`${slot.key}-${slotIndex}`}
                 slot={slot}
                 index={slotIndex}
+                onOpen={() => onOpenSlot({ key: slot.key, players: slot.players })}
               />
             ))}
           </div>
@@ -125,7 +148,13 @@ function HalfPitchBoard({ lines }: { lines: PitchLine[] }) {
   );
 }
 
-function HalfCourtBoard({ lines }: { lines: PitchLine[] }) {
+function HalfCourtBoard({
+  lines,
+  onOpenSlot,
+}: {
+  lines: PitchLine[];
+  onOpenSlot: (slot: { key: string; players: GoingPlayer[] }) => void;
+}) {
   return (
     <div
       data-testid="half-court"
@@ -144,6 +173,7 @@ function HalfCourtBoard({ lines }: { lines: PitchLine[] }) {
                 key={`${slot.key}-${slotIndex}`}
                 slot={slot}
                 index={slotIndex}
+                onOpen={() => onOpenSlot({ key: slot.key, players: slot.players })}
               />
             ))}
           </div>
@@ -195,34 +225,130 @@ function AnyStrip({
 function PitchSlotView({
   slot,
   index,
+  onOpen,
 }: {
-  slot: PitchLine["slots"][number];
+  slot: PitchSlot;
   index: number;
+  onOpen: () => void;
 }) {
-  if (slot.player) {
+  if (slot.players.length === 0) {
     return (
       <div
-        data-testid={`slot-filled-${slot.key}`}
-        className="flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full bg-accent px-2.5 py-1.5 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem] sm:px-3"
+        data-testid={`slot-empty-${slot.key}-${index}`}
+        className="flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full border-2 border-accent/40 bg-surface/70 px-2.5 py-1.5 text-center sm:min-h-14 sm:min-w-[4.25rem]"
       >
-        <span className="max-w-[6.5rem] truncate text-sm font-semibold">
-          {slot.player.name}
-        </span>
-        <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-ink/40">
           {slot.key}
         </span>
       </div>
     );
   }
 
+  const visible = slot.players.slice(0, SLOT_STACK_VISIBLE);
+  const overflow = slotOverflowCount(slot.players);
+
   return (
-    <div
-      data-testid={`slot-empty-${slot.key}-${index}`}
-      className="flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full border-2 border-accent/40 bg-surface/70 px-2.5 py-1.5 text-center sm:min-h-14 sm:min-w-[4.25rem]"
+    <button
+      type="button"
+      data-testid={`slot-filled-${slot.key}`}
+      onClick={onOpen}
+      className="flex min-h-12 min-w-[3.75rem] max-w-[5.5rem] flex-col items-center justify-center rounded-full bg-accent px-2 py-1 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem] sm:px-2.5"
     >
-      <span className="text-[11px] font-medium uppercase tracking-wide text-ink/40">
+      {visible.map((player, visibleIndex) => (
+        <span
+          key={player.id}
+          className="flex max-w-full items-center justify-center gap-0.5 leading-tight"
+        >
+          <span className="truncate text-[11px] font-semibold sm:text-xs">
+            {firstName(player.name)}
+          </span>
+          {visibleIndex === visible.length - 1 && overflow > 0 ? (
+            <span
+              data-testid={`slot-overflow-${slot.key}`}
+              className="rounded-full bg-surface px-1 text-[9px] font-bold text-accent-deep"
+            >
+              +{overflow}
+            </span>
+          ) : null}
+        </span>
+      ))}
+      <span className="text-[9px] font-medium uppercase tracking-wide opacity-70">
         {slot.key}
       </span>
+    </button>
+  );
+}
+
+function SlotSheet({
+  slotKey,
+  players,
+  onClose,
+}: {
+  slotKey: string;
+  players: GoingPlayer[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-ink/40"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="slot-sheet-title"
+        data-testid="slot-sheet"
+        className="relative z-10 max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-surface px-5 py-5 shadow-banner sm:rounded-3xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3
+            id="slot-sheet-title"
+            className="font-display text-2xl tracking-tight"
+          >
+            {slotKey}
+          </h3>
+          <button
+            type="button"
+            data-testid="slot-sheet-close"
+            onClick={onClose}
+            className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+          >
+            Close
+          </button>
+        </div>
+        <ul className="mt-4 divide-y divide-ink/10">
+          {players.map((player) => (
+            <li
+              key={player.id}
+              data-testid="slot-sheet-row"
+              className="flex items-center justify-between gap-4 py-3"
+            >
+              <div>
+                <p className="text-lg font-medium">{player.name}</p>
+                {player.addedByName ? (
+                  <p className="mt-0.5 text-sm text-ink-soft">
+                    added by {player.addedByName}
+                  </p>
+                ) : null}
+              </div>
+              <span className="rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold tracking-wide text-accent-deep">
+                {slotKey}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

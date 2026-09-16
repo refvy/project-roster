@@ -9,8 +9,11 @@ export type GoingPlayer = {
 
 export type PitchSlot = {
   key: string;
-  player: GoingPlayer | null;
+  players: GoingPlayer[];
 };
+
+/** Names shown on a slot chip; extras collapse to +N. Desktop bump to 3 is later. */
+export const SLOT_STACK_VISIBLE = 2;
 
 export type PitchLine = {
   area: "the keeper" | "defence" | "midfield" | "attack" | "guards" | "wings" | "the paint";
@@ -96,7 +99,17 @@ export function pitchTemplate(sport: string, formation: unknown) {
     : getFormation(parseFormation(formation)).lines;
 }
 
-/** Back→front slot order for the match formation, then Any / extras on the bench. */
+/** First token of the name, capped at 8 chars for compact slot chips. */
+export function firstName(name: string) {
+  const token = name.trim().split(/\s+/)[0] ?? "";
+  return token.length > 8 ? token.slice(0, 8) : token;
+}
+
+export function slotOverflowCount(players: GoingPlayer[]) {
+  return Math.max(0, players.length - SLOT_STACK_VISIBLE);
+}
+
+/** Back→front slot order for the match formation (full stacks), then Any / unmatched on the bench. */
 export function orderGoingForRoster(
   going: GoingPlayer[],
   sport: string,
@@ -106,20 +119,25 @@ export function orderGoingForRoster(
   const placed: GoingPlayer[] = [];
   for (const line of lines) {
     for (const slot of line.slots) {
-      if (slot.player) placed.push(slot.player);
+      placed.push(...slot.players);
     }
   }
   return [...placed, ...bench];
 }
 
-/** First-fit: Going player fills the first empty slot matching their chip. Any → bench strip, never a formation slot. */
+/**
+ * Stack-then-expand: a named chip stacks on matching formation slots (signup
+ * order, balanced across duplicate keys). Overflow stays on the slot — never
+ * dumped to the bench. Any and unmatched keys (no slot in this formation) sit
+ * on Bench / Any.
+ */
 export function fillPitch(
   template: { area: PitchLine["area"]; keys: string[] }[],
   going: GoingPlayer[],
 ): { lines: PitchLine[]; bench: GoingPlayer[]; any: GoingPlayer[] } {
   const lines: PitchLine[] = template.map((line) => ({
     area: line.area,
-    slots: line.keys.map((key) => ({ key, player: null })),
+    slots: line.keys.map((key) => ({ key, players: [] })),
   }));
   const bench: GoingPlayer[] = [];
   const any: GoingPlayer[] = [];
@@ -131,16 +149,21 @@ export function fillPitch(
       bench.push(player);
       continue;
     }
-    let placed = false;
+    const matching: PitchSlot[] = [];
     for (const line of lines) {
-      const slot = line.slots.find((item) => item.key === key && !item.player);
-      if (slot) {
-        slot.player = player;
-        placed = true;
-        break;
+      for (const slot of line.slots) {
+        if (slot.key === key) matching.push(slot);
       }
     }
-    if (!placed) bench.push(player);
+    if (matching.length === 0) {
+      bench.push(player);
+      continue;
+    }
+    let target = matching[0]!;
+    for (const slot of matching) {
+      if (slot.players.length < target.players.length) target = slot;
+    }
+    target.players.push(player);
   }
 
   return { lines, bench, any };
@@ -148,7 +171,7 @@ export function fillPitch(
 
 export function emptySlotCount(lines: PitchLine[]) {
   return lines.reduce(
-    (sum, line) => sum + line.slots.filter((slot) => !slot.player).length,
+    (sum, line) => sum + line.slots.filter((slot) => slot.players.length === 0).length,
     0,
   );
 }
@@ -173,7 +196,7 @@ export function describePitchNeed(
 
   const byArea = new Map<PitchLine["area"], number>();
   for (const line of lines) {
-    const n = line.slots.filter((slot) => !slot.player).length;
+    const n = line.slots.filter((slot) => slot.players.length === 0).length;
     if (n === 0) continue;
     byArea.set(line.area, (byArea.get(line.area) ?? 0) + n);
   }
