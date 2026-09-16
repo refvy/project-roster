@@ -21,9 +21,10 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 - Create a matchday: sport (Football | Basketball, default Football), title, when/where as text (no venue booking)
 - Copy the share link
 - Live roster of Going players + positions
+- Organiser-only cream/teal pitch: Football formation chips (4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2), Basketball 5-slot half-court. First-fit from Going chips; extras on the bench. No drag, no player-facing pitch.
 - Imbalance banner when the side looks skewed
 
-Positions snapshot as JSON on each matchday. No formation board, no 4-3-3 presets, no RM/LM.
+Positions snapshot as JSON on each matchday. Players stay on chips.
 
 ## Visual tokens
 
@@ -33,7 +34,11 @@ Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` fa
 
 ## What it is not
 
-Venues, ratings, matchmaking, chat, payments, charging players, public brand hunt, photo uploads, embedded maps, player apps/accounts.
+Venues, ratings, matchmaking, chat, payments, charging players, public brand hunt, photo uploads, embedded maps, player apps/accounts, drag-and-drop tactics, Footballizer chrome.
+
+## Pitch fill
+
+Organiser-only. Going players fill the first empty slot whose key matches their chip (`Any` and extras go to **bench**). Empty slot shows a muted abbr and a soft teal `Need CB` pill. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`.
 
 ## Imbalance rule
 
@@ -81,7 +86,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: Football match → guest CB on the roster → Too many GKs; Basketball match → PG chips.
+Playwright covers: Football match → guest CB on the roster → Too many GKs; 4-1-4-1 empty `Need` pills then a Going CB fills a CB slot; Basketball match → PG chips.
 
 ```bash
 npx prisma migrate deploy
@@ -91,7 +96,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this branch after merge (or preview from the PR). Sport select + new position enums only take effect on newly created matchdays.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so the organiser pitch and formation chips go live. New sport enums apply to matchdays created after deploy.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

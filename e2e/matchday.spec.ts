@@ -1,6 +1,10 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { describeImbalance } from "../lib/imbalance";
 import {
+  fillPitch,
+  getFormation,
+} from "../lib/pitch";
+import {
   BASKETBALL_POSITIONS,
   FOOTBALL_POSITIONS,
 } from "../lib/positions";
@@ -54,6 +58,23 @@ test.describe("imbalance rule", () => {
       "football",
     );
     expect(message).toBeNull();
+  });
+});
+
+test.describe("pitch fill", () => {
+  test("first-fit CB fills a 4-1-4-1 CB slot; extra is bench", () => {
+    const formation = getFormation("4-1-4-1");
+    const { lines, bench } = fillPitch(formation.lines, [
+      { id: "1", name: "Nok", positionKey: "CB" },
+      { id: "2", name: "Bee", positionKey: "CB" },
+      { id: "3", name: "Aek", positionKey: "CB" },
+    ]);
+    const cbs = lines.flatMap((line) =>
+      line.slots.filter((slot) => slot.key === "CB"),
+    );
+    expect(cbs[0]?.player?.name).toBe("Nok");
+    expect(cbs[1]?.player?.name).toBe("Bee");
+    expect(bench.map((p) => p.name)).toEqual(["Aek"]);
   });
 });
 
@@ -112,6 +133,7 @@ test.describe("matchday board", () => {
     const page = await guest.newPage();
     await page.goto(shareUrl);
     await expect(page.getByTestId("position-PG")).toBeVisible();
+    await expect(page.getByTestId("coach-board")).toHaveCount(0);
     await expect(page.getByTestId("position-C")).toBeVisible();
     await expect(page.getByTestId("position-GK")).toHaveCount(0);
     await expect(page.getByTestId("position-CB")).toHaveCount(0);
@@ -126,6 +148,35 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await expect(orgPage.getByTestId("roster")).toContainText("Dan");
     await expect(orgPage.getByTestId("roster")).toContainText("PG");
+
+    await organiser.close();
+  });
+
+  test("4-1-4-1 empty Need pills, Going CB fills a CB slot", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+pitch+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Coach board");
+    await orgPage.getByLabel("When / where").fill("Thu 20:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    await expect(
+      orgPage.getByTestId("coach-board").getByText("Need CB"),
+    ).toHaveCount(2);
+    await expect(orgPage.getByTestId("coach-banner")).toContainText(
+      /Pitch fills as players tap Going/i,
+    );
+
+    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    await expect(orgPage.getByTestId("slot-filled-CB")).toContainText("Nok");
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
 
     await organiser.close();
   });

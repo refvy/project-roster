@@ -39,8 +39,7 @@ model Session {
   @@index([organiserId])
 }
 
-/// Positions are stored as JSON on the matchday so Football / Basketball
-/// chip enums snapshot at create time (no formation board).
+/// Positions snapshot as JSON on create. Organiser pitch is view-only first-fit.
 model Matchday {
   id          String    @id @default(cuid())
   publicId    String    @unique

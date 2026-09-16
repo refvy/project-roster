@@ -1,4 +1,5 @@
 import { logoutAction } from "@/app/actions/auth";
+import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -68,6 +69,15 @@ export default async function OrganiserMatchdayPage({
         </div>
 
         <CopyLinkButton url={shareUrl} />
+
+        <CoachBoard
+          sport={matchday.sport}
+          going={going.map((rsvp) => ({
+            id: rsvp.id,
+            name: rsvp.name,
+            positionKey: rsvp.positionKey,
+          }))}
+        />
 
         <ImbalanceBanner message={imbalance} />
 
