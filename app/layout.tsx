@@ -10,8 +10,7 @@ const outfit = Outfit({
 });
 
 const title = "Skwad — matchday board";
-const description =
-  "Paste-link matchday board for recreational sports groups. Players RSVP in under a minute.";
+const description = "Paste a link. Get your squad signed up.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(getAppUrl()),

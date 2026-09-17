@@ -8,6 +8,7 @@ import {
   fillPitch,
   firstName,
   getFormation,
+  overflowBadgeLabel,
   orderGoingForRoster,
   slotOverflowCount,
 } from "../lib/pitch";
@@ -112,6 +113,16 @@ test.describe("pitch fill", () => {
       .find((slot) => slot.key === "LW");
     expect(lw?.players.map((p) => p.name)).toEqual(["Tim", "Dan", "Mit"]);
     expect(slotOverflowCount(lw?.players ?? [])).toBe(2);
+    expect(overflowBadgeLabel(lw?.players ?? [])).toBe("+2");
+    expect(
+      overflowBadgeLabel(
+        Array.from({ length: 12 }, (_, i) => ({
+          id: String(i),
+          name: `P${i}`,
+          positionKey: "LW",
+        })),
+      ),
+    ).toBe("9+");
     expect(firstName("Alexander")).toBe("Alexande");
     expect(bench).toEqual([]);
   });
@@ -224,11 +235,10 @@ test.describe("pitch fill", () => {
         row.map((p) => p.key),
       ),
     ).toEqual([
-      ["GK"],
-      ["LB", "CB", "RB"],
-      ["CDM", "CM", "CAM"],
       ["LW", "CF", "RW"],
-      ["ANY"],
+      ["CAM", "CM", "CDM"],
+      ["LB", "CB", "RB"],
+      ["ANY", "GK"],
     ]);
   });
 });
@@ -240,6 +250,15 @@ test.describe("matchday board", () => {
     await signIn(orgPage, `mark+fb+${Date.now()}@example.com`);
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await expect(orgPage.getByTestId("sport-icon-football")).toBeVisible();
+    await expect(orgPage.getByTestId("sport-icon-basketball")).toBeVisible();
+    await saveShot(orgPage.getByTestId("sport-football"), "sport-icon-football.png");
+    await orgPage.getByTestId("sport-basketball").click();
+    await saveShot(
+      orgPage.getByTestId("sport-basketball"),
+      "sport-icon-basketball.png",
+    );
+    await orgPage.getByTestId("sport-football").click();
     await expect(orgPage.getByTestId("sport-football")).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -254,6 +273,17 @@ test.describe("matchday board", () => {
     const shareUrl = await shareUrlOf(orgPage);
     expect(shareUrl).toMatch(/\/m\//);
     await orgPage.getByTestId("copy-link").click();
+
+    const chipGuest = await browser.newContext();
+    const chipPage = await chipGuest.newPage();
+    await chipPage.goto(shareUrl);
+    const lwChip = await chipPage.getByTestId("position-LW").boundingBox();
+    const gkChip = await chipPage.getByTestId("position-GK").boundingBox();
+    const anyChip = await chipPage.getByTestId("position-ANY").boundingBox();
+    expect(lwChip && gkChip && anyChip).toBeTruthy();
+    expect(lwChip!.y).toBeLessThan(gkChip!.y);
+    expect(Math.abs(anyChip!.y - gkChip!.y)).toBeLessThan(20);
+    await chipGuest.close();
 
     await guestGoing(browser, shareUrl, "Nok", "CB");
     await orgPage.reload();
@@ -313,6 +343,8 @@ test.describe("matchday board", () => {
     expect(centerX(sf!) - centerX(pf!)).toBeGreaterThan(
       centerX(pg!) - centerX(sg!),
     );
+    await expect(orgPage.getByTestId("bb-3pt")).toBeVisible();
+    await expect(orgPage.getByTestId("bb-center-circle")).toBeVisible();
 
     const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
@@ -344,7 +376,7 @@ test.describe("matchday board", () => {
     );
     await expect(
       page.locator('meta[property="og:description"]'),
-    ).toHaveAttribute("content", "Tap Going. Pick your spot. No app.");
+    ).toHaveAttribute("content", "Tue 20:00 · Court 1");
 
     await page.getByLabel("Your name").fill("Dan");
     await page.getByTestId("status-going").click();
@@ -579,7 +611,7 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
-  test("hero +N chip has no name when count≥2; CAM/CDM sit on CM; Out collapses", async ({
+  test("crowded chip keeps the name and a corner +N badge; CAM/CDM sit on CM; Out collapses", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -604,12 +636,21 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-3-3").click();
     const slot = orgPage.getByTestId("slot-filled-LW");
-    await expect(slot).not.toContainText("Tim");
+    await expect(slot).toContainText("Tim");
     await expect(slot).not.toContainText("Dan");
     await expect(slot).not.toContainText("Mit");
     await expect(slot).toContainText("LW");
-    await expect(orgPage.getByTestId("slot-overflow-LW")).toHaveText("+2");
-    await saveShot(slot, "hero-plus-n.png");
+    const badge = orgPage.getByTestId("slot-overflow-LW");
+    await expect(badge).toHaveText("+2");
+    const slotBox = await slot.boundingBox();
+    const badgeBox = await badge.boundingBox();
+    expect(slotBox && badgeBox).toBeTruthy();
+    expect(Math.min(badgeBox!.width, badgeBox!.height)).toBeGreaterThanOrEqual(
+      22,
+    );
+    expect(badgeBox!.y).toBeLessThan(slotBox!.y + slotBox!.height / 2);
+    expect(badgeBox!.x).toBeGreaterThan(slotBox!.x + slotBox!.width / 2);
+    await saveShot(slot, "name-plus-n.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
@@ -644,9 +685,27 @@ test.describe("matchday board", () => {
   });
 
   test("home tabs Invited and Hosting; OG image", async ({ browser }) => {
+    const landing = await browser.newPage();
+    await landing.goto("/");
+    await expect(landing.locator('meta[property="og:description"]')).toHaveAttribute(
+      "content",
+      "Paste a link. Get your squad signed up.",
+    );
+    const landingOg = await landing.request.get("/opengraph-image");
+    expect(landingOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-landing.png"), await landingOg.body());
+    await landing.close();
+
     const host = await browser.newContext();
     const hostPage = await host.newPage();
     await signIn(hostPage, `mark+host+${Date.now()}@example.com`);
+    await expect(
+      hostPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Paste a link. Get your squad signed up.");
+    const boardOg = await hostPage.request.get("/board/opengraph-image");
+    expect(boardOg.ok()).toBeTruthy();
+    writeFileSync(join(SCREENSHOT_DIR, "og-board.png"), await boardOg.body());
     await expect(
       hostPage.getByRole("link", { name: "+ New matchday" }),
     ).toBeVisible();

@@ -38,14 +38,13 @@ export const BASKETBALL_POSITIONS: Position[] = [
   { key: "ANY", label: "Any", role: "flex", group: "flex" },
 ];
 
-/** Chip rows matching the board: basketball C / PF SF / SG PG; football back→front. */
+/** Chip rows matching the board: basketball C / PF SF / SG PG; football attack at top, Any·GK bottom. */
 const BASKETBALL_CHIP_ROWS = [["C"], ["PF", "SF"], ["SG", "PG"], ["ANY"]];
 const FOOTBALL_CHIP_ROWS = [
-  ["GK"],
-  ["LB", "CB", "RB"],
-  ["CDM", "CM", "CAM"],
   ["LW", "CF", "RW"],
-  ["ANY"],
+  ["CAM", "CM", "CDM"],
+  ["LB", "CB", "RB"],
+  ["ANY", "GK"],
 ];
 
 export function groupedPositionRows(positions: Position[]): Position[][] {

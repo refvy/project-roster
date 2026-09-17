@@ -18,13 +18,13 @@ export async function generateMetadata({
   const { publicId } = await params;
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
-    select: { title: true, deletedAt: true },
+    select: { title: true, deletedAt: true, whenWhere: true },
   });
   if (!matchday || matchday.deletedAt) {
     return { title: "Matchday" };
   }
   const title = `Signup now for ${matchday.title} — powered by SKWAD`;
-  const description = "Tap Going. Pick your spot. No app.";
+  const description = matchday.whenWhere;
   return {
     title: { absolute: title },
     description,

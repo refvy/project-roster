@@ -132,6 +132,14 @@ export function slotOverflowCount(players: GoingPlayer[]) {
   return Math.max(0, players.length - SLOT_STACK_VISIBLE);
 }
 
+/** +N extras on a chip. Caps at +9; more than 9 extras → 9+. */
+export function overflowBadgeLabel(players: GoingPlayer[]) {
+  const extra = slotOverflowCount(players);
+  if (extra <= 0) return null;
+  if (extra > 9) return "9+";
+  return `+${extra}`;
+}
+
 /** Back→front slot order (including Any who filled vacancies), then leftover Any / unmatched. */
 export function orderGoingForRoster(
   going: GoingPlayer[],

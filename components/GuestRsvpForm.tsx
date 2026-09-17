@@ -131,7 +131,7 @@ export function PositionChipGrid({
         const gap =
           keys === "PF,SF"
             ? "gap-8 sm:gap-12"
-            : keys === "SG,PG"
+            : keys === "ANY,GK"
               ? "gap-3"
               : "gap-3";
         return (

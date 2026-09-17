@@ -9,8 +9,8 @@ import {
   fillPitch,
   firstName,
   getFormation,
+  overflowBadgeLabel,
   parseFormation,
-  slotOverflowCount,
   type FormationId,
   type GoingPlayer,
   type PitchLine,
@@ -169,7 +169,7 @@ function HalfCourtBoard({
     <div
       data-testid="half-court"
       className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
-      style={{ aspectRatio: "4 / 5" }}
+      style={{ aspectRatio: "400 / 510" }}
     >
       <HalfCourtMarks />
       <div className="absolute inset-0 z-10">
@@ -267,8 +267,8 @@ function PitchSlotView({
     );
   }
 
-  const stacked = slot.players.length >= 2;
-  const overflow = slotOverflowCount(slot.players);
+  const stacked = slot.players.length > 1;
+  const badge = overflowBadgeLabel(slot.players);
   const lead = slot.players[0]!;
 
   return (
@@ -276,24 +276,19 @@ function PitchSlotView({
       type="button"
       data-testid={`slot-filled-${slot.key}`}
       onClick={onOpen}
-      className={`relative flex flex-col items-center justify-center rounded-full bg-accent text-center text-on-accent ${
-        stacked
-          ? "min-h-14 min-w-[4.25rem] px-3 py-2 sm:min-h-16 sm:min-w-[4.75rem]"
-          : "min-h-12 min-w-[3.75rem] px-2.5 py-1.5 sm:min-h-14 sm:min-w-[4.25rem]"
-      }`}
+      className="relative flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full bg-accent px-2.5 py-1.5 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem]"
     >
-      {stacked ? (
+      <span className="max-w-[4.5rem] truncate text-xs font-semibold">
+        {firstName(lead.name)}
+      </span>
+      {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="text-xl font-extrabold leading-none sm:text-2xl"
+          className="absolute -right-0.5 -top-0.5 z-10 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-0.5 text-[10px] font-bold leading-none text-cream ring-2 ring-cream sm:h-7 sm:min-w-7 sm:text-[11px]"
         >
-          +{overflow}
+          {badge}
         </span>
-      ) : (
-        <span className="max-w-[4.5rem] truncate text-xs font-semibold">
-          {firstName(lead.name)}
-        </span>
-      )}
+      ) : null}
       <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
         {slot.key}
       </span>
@@ -440,27 +435,54 @@ function HalfPitchMarks() {
 }
 
 function HalfCourtMarks() {
+  const hoopX = 200;
+  const hoopY = 50;
+  const left = 22;
+  const top = 18;
+  const right = 378;
+  const bottom = 478;
+  const cornerInset = 36;
+  const c1 = left + cornerInset;
+  const c2 = right - cornerInset;
+  const cornerY = top + 108;
+  const r3 = Math.hypot(hoopX - c1, cornerY - hoopY);
+
   return (
     <svg
       aria-hidden
       className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 400 500"
+      viewBox="0 0 400 510"
       preserveAspectRatio="xMidYMid meet"
     >
-      <rect width="400" height="500" fill={CREAM} />
-      <g fill="none" stroke={TEAL} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="18" y="18" width="364" height="464" rx="2" />
-        <path d="M168 30 h64" strokeWidth="3.2" />
-        <circle cx="200" cy="44" r="9" />
-        <path d="M174 32 A 26 26 0 0 1 226 32" />
-        <rect x="152" y="18" width="96" height="152" />
-        <path d="M152 170 A 48 48 0 0 1 248 170" />
-        <circle cx="200" cy="170" r="3" fill={TEAL} stroke="none" />
-        <path d="M152 78 h-14 M248 78 h14 M152 118 h-14 M248 118 h14" />
-        <path d="M46 18 v96" />
-        <path d="M354 18 v96" />
-        <path d="M46 114 A 168 168 0 0 1 354 114" />
-        <path d="M152 482 A 48 48 0 0 0 248 482" />
+      <rect width="400" height="510" fill={CREAM} />
+      <g
+        fill="none"
+        stroke={TEAL}
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x={left} y={top} width={right - left} height={bottom - top} rx="2" />
+        <path d="M172 28 h56" strokeWidth="3.4" />
+        <circle cx={hoopX} cy={hoopY} r="9" />
+        <path d="M176 30 A 24 24 0 0 1 224 30" />
+        <rect x="156" y={top} width="88" height="148" />
+        <circle cx={hoopX} cy="166" r="44" />
+        <circle cx={hoopX} cy="166" r="3" fill={TEAL} stroke="none" />
+        <path d="M156 70 h-12 M244 70 h12 M156 112 h-12 M244 112 h12" />
+        <path d={`M${c1} ${top} V${cornerY}`} />
+        <path d={`M${c2} ${top} V${cornerY}`} />
+        <path
+          data-testid="bb-3pt"
+          d={`M${c1} ${cornerY} A ${r3} ${r3} 0 0 1 ${c2} ${cornerY}`}
+        />
+        <line x1={left} y1={bottom} x2={right} y2={bottom} />
+        <circle
+          data-testid="bb-center-circle"
+          cx={hoopX}
+          cy={bottom}
+          r="52"
+        />
       </g>
     </svg>
   );

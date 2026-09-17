@@ -1,4 +1,9 @@
-export function FootballMark({ className }: { className?: string }) {
+import type { SVGProps } from "react";
+
+export function FootballMark({
+  className,
+  ...rest
+}: { className?: string } & SVGProps<SVGSVGElement>) {
   return (
     <svg
       aria-hidden
@@ -6,17 +11,27 @@ export function FootballMark({ className }: { className?: string }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.7"
       strokeLinejoin="round"
+      strokeLinecap="round"
+      {...rest}
     >
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 6.4 14.2 8.9l.15 2.9-2.35 1.7-2.35-1.7.15-2.9Z" />
-      <path d="M14.2 8.9 17.8 7.5M9.8 8.9 6.2 7.5M12 13.5v3.6M9.6 13.5 7.2 16.8M14.4 13.5 16.8 16.8" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.05 14.55 8.9l-.95 2.95H10.4L9.45 8.9Z" />
+      <path d="M14.55 8.9 18.4 7.35" />
+      <path d="M9.45 8.9 5.6 7.35" />
+      <path d="M13.6 11.85 16.7 14.7 15.55 18.4" />
+      <path d="M10.4 11.85 7.3 14.7 8.45 18.4" />
+      <path d="M12 14.8v4.2" />
+      <path d="M8.45 18.4H15.55" />
     </svg>
   );
 }
 
-export function BasketballMark({ className }: { className?: string }) {
+export function BasketballMark({
+  className,
+  ...rest
+}: { className?: string } & SVGProps<SVGSVGElement>) {
   return (
     <svg
       aria-hidden
@@ -24,14 +39,16 @@ export function BasketballMark({ className }: { className?: string }) {
       className={className}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.7"
       strokeLinecap="round"
       strokeLinejoin="round"
+      {...rest}
     >
-      <rect x="4.5" y="4.5" width="15" height="15" rx="1" />
-      <rect x="9" y="4.5" width="6" height="6.5" />
-      <path d="M9 11a3 3 0 0 0 6 0" />
-      <path d="M6.2 4.5a6.2 6.2 0 0 0 11.6 0" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3v18" />
+      <path d="M3 12h18" />
+      <path d="M5.2 5.6c3.8 2.8 3.8 10 0 12.8" />
+      <path d="M18.8 5.6c-3.8 2.8-3.8 10 0 12.8" />
     </svg>
   );
 }
