@@ -6,7 +6,7 @@ import { GoingList } from "@/components/GoingList";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { SportChip } from "@/components/SportChip";
-import { Wordmark } from "@/components/Wordmark";
+import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
@@ -77,7 +77,10 @@ export default async function OrganiserMatchdayPage({
               <p className="mt-2">
                 <SportChip sport={matchday.sport} testId="sport-label" />
               </p>
-              <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
+              <WhenWhereLine
+                value={matchday.whenWhere}
+                className="mt-1 text-lg text-ink-soft"
+              />
             </div>
             <div className="flex items-center gap-4 pt-2">
               <Link

@@ -72,12 +72,12 @@ export function MatchdayForm({
               {item.id === "football" ? (
                 <FootballMark
                   data-testid="sport-icon-football"
-                  className={`h-6 w-6 ${sport === item.id ? "text-on-accent" : "text-accent"}`}
+                  className="h-6 w-6"
                 />
               ) : (
                 <BasketballMark
                   data-testid="sport-icon-basketball"
-                  className={`h-6 w-6 ${sport === item.id ? "text-on-accent" : "text-accent"}`}
+                  className="h-6 w-6"
                 />
               )}
               {item.label}

@@ -2,9 +2,10 @@ import { AddFriendPanel } from "@/components/AddFriendPanel";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
 import { SportChip } from "@/components/SportChip";
-import { Wordmark } from "@/components/Wordmark";
+import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
+import { formatWhenWhereLine } from "@/lib/when-where";
 import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
@@ -24,7 +25,7 @@ export async function generateMetadata({
     return { title: "Matchday" };
   }
   const title = `Signup now for ${matchday.title} — powered by SKWAD`;
-  const description = matchday.whenWhere;
+  const description = formatWhenWhereLine(matchday.whenWhere);
   return {
     title: { absolute: title },
     description,
@@ -119,10 +120,14 @@ export default async function GuestMatchdayPage({
           <p className="mt-2">
             <SportChip sport={matchday.sport} testId="sport-label" />
           </p>
-          <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
+          <WhenWhereLine
+            value={matchday.whenWhere}
+            className="mt-1 text-lg text-ink-soft"
+          />
         </div>
         <GuestRsvpForm
           publicId={publicId}
+          sport={matchday.sport}
           positions={positions}
           defaultName={existing?.name || rememberedName}
           defaultStatus={existing?.status ?? "GOING"}
@@ -132,6 +137,7 @@ export default async function GuestMatchdayPage({
         {existing ? (
           <AddFriendPanel
             publicId={publicId}
+            sport={matchday.sport}
             positions={positions}
             extras={extras.map((extra) => ({
               id: extra.id,

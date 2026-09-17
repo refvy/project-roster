@@ -12,6 +12,9 @@ export function getAuthSecret() {
 }
 
 export function isAuthDebug() {
+  // Production Vercel must never show the on-page magic-link shortcut,
+  // even if AUTH_DEBUG is still set in the dashboard.
+  if (process.env.VERCEL_ENV === "production") return false;
   const value = process.env.AUTH_DEBUG?.trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes";
 }

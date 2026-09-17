@@ -75,10 +75,10 @@ npm run dev
 
 | Name | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Postgres connection string |
+| `DATABASE_URL` | yes | Postgres connection string. Local default is `127.0.0.1`. Hosted value lives in the **Vercel project env** (not in git). |
 | `AUTH_SECRET` | yes | HMAC for session cookies. `openssl rand -base64 32` |
 | `APP_URL` | yes | Public origin, e.g. `http://localhost:3000` or the Vercel URL. Used for copied share links. |
-| `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). Leave **off** in production so the on-page shortcut stays hidden. |
+| `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). **Unset in Vercel production.** `isAuthDebug()` also returns false when `VERCEL_ENV=production`, so the on-page shortcut cannot leak on the production deployment even if the dashboard var is still set. |
 | `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
 | `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
 
@@ -105,12 +105,24 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR when CI is green so you can dogfood a real magic email to **thedanniest@gmail.com**.
+Redeploy **https://project-roster-tau.vercel.app** from this PR when CI is green.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
-2. Provision Postgres (Vercel Postgres, Neon, or Supabase).
-3. Set environment variables: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), `RESEND_API_KEY`, `EMAIL_FROM` (currently `Skwad <onboarding@resend.dev>` until custom domain DNS is live). Leave `AUTH_DEBUG` unset in production.
+2. Provision Postgres. `DATABASE_URL` is a Vercel project env var — Prisma does not pin Neon vs Vercel Postgres vs Supabase in this repo. Use **separate databases** for production and the `project-roster-tau` dogfood deploy so they cannot clobber each other.
+3. Set environment variables: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), `RESEND_API_KEY`, `EMAIL_FROM` (currently `Skwad <onboarding@resend.dev>` until custom domain DNS is live). **Unset `AUTH_DEBUG` in Vercel production** (the dashboard, not this repo — the agent cannot flip Vercel env).
 4. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
 5. Confirm `/` loads, request a magic link, check email, create a matchday, paste the guest link in a private window.
 
 Custom domain DNS for `EMAIL_FROM` is handled separately — this pass uses Resend’s onboarding sender.
+
+### Database access (Dan, read-only)
+
+Hosted Postgres is whatever is in the Vercel project’s `DATABASE_URL` (not committed). Typical Vercel Postgres is Neon-backed; a Neon or Supabase project works the same with Prisma.
+
+For analysis without write access:
+
+1. In the Neon / Vercel Postgres / Supabase dashboard for that database, create a login that has `CONNECT` + `SELECT` only (no `INSERT`/`UPDATE`/`DELETE`).
+2. Hand Dan a connection string of the form `postgresql://readonly_user:***@HOST/DB?sslmode=require` via a private channel. Never commit it, never paste it into a PR.
+3. Dan points a local Prisma Studio / `psql` at that URL with `prisma studio` or SQL. Production and `project-roster-tau` should each have their own read-only role if he needs both.
+
+The agent cannot see or mint Vercel dashboard credentials.

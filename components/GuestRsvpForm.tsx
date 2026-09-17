@@ -2,11 +2,13 @@
 
 import { useActionState, useState } from "react";
 import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
+import { AthleteNameInput } from "@/components/AthleteNameInput";
 import { FatChoice } from "@/components/FatChoice";
 import { groupedPositionRows, type Position } from "@/lib/positions";
 
 type Props = {
   publicId: string;
+  sport: string;
   positions: Position[];
   defaultName: string;
   defaultStatus: "GOING" | "OUT";
@@ -16,6 +18,7 @@ type Props = {
 
 export function GuestRsvpForm({
   publicId,
+  sport,
   positions,
   defaultName,
   defaultStatus,
@@ -37,18 +40,11 @@ export function GuestRsvpForm({
 
       <h2 className="font-display text-2xl tracking-tight">I’m going</h2>
 
-      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-        Your name
-        <input
-          name="name"
-          required
-          maxLength={40}
-          defaultValue={defaultName}
-          autoComplete="name"
-          placeholder="Nok"
-          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
-        />
-      </label>
+      <AthleteNameInput
+        sport={sport}
+        label="Your name"
+        defaultValue={defaultName}
+      />
 
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-medium text-ink-soft">In or out</legend>

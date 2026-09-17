@@ -7,6 +7,7 @@ import {
   updateFriendRsvp,
   type RsvpState,
 } from "@/app/actions/rsvp";
+import { AthleteNameInput } from "@/components/AthleteNameInput";
 import { FatChoice } from "@/components/FatChoice";
 import { PositionChipGrid } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
@@ -20,10 +21,12 @@ export type ExtraRsvp = {
 
 export function AddFriendPanel({
   publicId,
+  sport,
   positions,
   extras,
 }: {
   publicId: string;
+  sport: string;
   positions: Position[];
   extras: ExtraRsvp[];
 }) {
@@ -36,6 +39,7 @@ export function AddFriendPanel({
       <FriendForm
         key={extras.length}
         publicId={publicId}
+        sport={sport}
         positions={positions}
         action={addFriendRsvp}
         submitLabel="Add"
@@ -50,6 +54,7 @@ export function AddFriendPanel({
               key={extra.id}
               extra={extra}
               publicId={publicId}
+              sport={sport}
               positions={positions}
             />
           ))}
@@ -62,10 +67,12 @@ export function AddFriendPanel({
 function ExtraRow({
   extra,
   publicId,
+  sport,
   positions,
 }: {
   extra: ExtraRsvp;
   publicId: string;
+  sport: string;
   positions: Position[];
 }) {
   const [editing, setEditing] = useState(false);
@@ -74,6 +81,7 @@ function ExtraRow({
       <li className="py-4" data-testid={`extra-${extra.id}`}>
         <FriendForm
           publicId={publicId}
+          sport={sport}
           positions={positions}
           action={updateFriendRsvp}
           extraId={extra.id}
@@ -81,7 +89,7 @@ function ExtraRow({
           submitLabel="Save"
           pendingLabel="Saving…"
           testId={`extra-save-${extra.id}`}
-          nameLabel="Name"
+          nameLabel="Friend's name"
           onDone={() => setEditing(false)}
         />
         <button
@@ -143,6 +151,7 @@ function ExtraRow({
 
 function FriendForm({
   publicId,
+  sport,
   positions,
   action,
   extraId,
@@ -154,6 +163,7 @@ function FriendForm({
   onDone,
 }: {
   publicId: string;
+  sport: string;
   positions: Position[];
   action: (
     prev: RsvpState,
@@ -188,18 +198,13 @@ function FriendForm({
       {extraId ? <input type="hidden" name="extraId" value={extraId} /> : null}
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="position" value={position} />
-      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-        {nameLabel}
-        <input
-          name="name"
-          required
-          maxLength={40}
-          defaultValue={defaults?.name}
-          placeholder="Bee"
-          data-testid={extraId ? "extra-name" : "friend-name"}
-          className="min-h-12 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
-        />
-      </label>
+      <AthleteNameInput
+        sport={sport}
+        label={nameLabel}
+        defaultValue={defaults?.name}
+        testId={extraId ? "extra-name" : "friend-name"}
+        className="min-h-12 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
+      />
       <div className="flex flex-wrap gap-3">
         <FatChoice
           selected={status === "GOING"}

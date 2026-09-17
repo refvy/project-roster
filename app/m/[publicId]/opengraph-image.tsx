@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { sportLabel } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
+import { formatWhenWhereLine } from "@/lib/when-where";
 
 export const alt = "Matchday — powered by SKWAD";
 export const size = { width: 1200, height: 630 };
@@ -24,7 +25,7 @@ export default async function Image({
   const gone = !matchday || Boolean(matchday.deletedAt);
   const title = gone ? "This matchday was deleted" : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
-  const when = gone ? "" : matchday.whenWhere;
+  const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
 
   const [logo, extraBold, medium] = await Promise.all([
     readFile(join(process.cwd(), "public/skwad-header.png")),

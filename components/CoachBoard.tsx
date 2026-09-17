@@ -441,10 +441,17 @@ function HalfCourtMarks() {
   const top = 18;
   const right = 378;
   const bottom = 478;
-  const cornerInset = 38;
+  const keyW = 88;
+  const keyH = 148;
+  const keyX = hoopX - keyW / 2;
+  const keyBottom = top + keyH;
+  const restR = 30;
+  // Short 3pt corners near the baseline, then an arc centred on the hoop
+  // (not a half-circle from baseline to baseline). Arc clears the FT circle.
+  const cornerInset = 30;
   const c1 = left + cornerInset;
   const c2 = right - cornerInset;
-  const cornerY = top + 132;
+  const cornerY = top + 118;
   const r3 = Math.hypot(hoopX - c1, cornerY - hoopY);
 
   return (
@@ -465,13 +472,16 @@ function HalfCourtMarks() {
         <rect x={left} y={top} width={right - left} height={bottom - top} rx="2" />
         <path d="M172 28 h56" strokeWidth="3.4" />
         <circle cx={hoopX} cy={hoopY} r="9" />
-        <path d="M176 30 A 24 24 0 0 1 224 30" />
-        <rect x="156" y={top} width="88" height="148" />
-        <circle cx={hoopX} cy="166" r="44" />
-        <circle cx={hoopX} cy="166" r="3" fill={TEAL} stroke="none" />
-        <path d="M156 70 h-12 M244 70 h12 M156 112 h-12 M244 112 h12" />
-        <path d={`M${c1} ${top} V${cornerY}`} />
-        <path d={`M${c2} ${top} V${cornerY}`} />
+        <path
+          data-testid="bb-restricted"
+          d={`M${hoopX - restR} ${hoopY} A ${restR} ${restR} 0 0 0 ${hoopX + restR} ${hoopY}`}
+        />
+        <rect x={keyX} y={top} width={keyW} height={keyH} />
+        <circle cx={hoopX} cy={keyBottom} r="44" />
+        <circle cx={hoopX} cy={keyBottom} r="3" fill={TEAL} stroke="none" />
+        <path d={`M${keyX} 70 h-12 M${keyX + keyW} 70 h12 M${keyX} 112 h-12 M${keyX + keyW} 112 h12`} />
+        <path data-testid="bb-3pt-left" d={`M${c1} ${top} V${cornerY}`} />
+        <path data-testid="bb-3pt-right" d={`M${c2} ${top} V${cornerY}`} />
         <path
           data-testid="bb-3pt"
           d={`M${c1} ${cornerY} A ${r3} ${r3} 0 0 1 ${c2} ${cornerY}`}

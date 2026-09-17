@@ -1,5 +1,6 @@
 import { logoutAction } from "@/app/actions/auth";
 import { SportChip } from "@/components/SportChip";
+import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
 import { getGuestId, getOrganiser } from "@/lib/auth";
 import Link from "next/link";
@@ -170,9 +171,11 @@ export default async function BoardPage({
                   <p className="mt-2 font-display text-2xl tracking-tight">
                     {matchday.title}
                   </p>
-                  <p className="mt-1 text-sm text-ink-soft">
-                    {matchday.whenWhere} · {matchday.going} going
-                  </p>
+                  <WhenWhereLine
+                    value={matchday.whenWhere}
+                    going={matchday.going}
+                    className="mt-1 text-sm text-ink-soft"
+                  />
                 </Link>
               </li>
             ))}

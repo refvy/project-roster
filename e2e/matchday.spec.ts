@@ -13,10 +13,15 @@ import {
   slotOverflowCount,
 } from "../lib/pitch";
 import {
+  BASKETBALL_FIRST_NAMES,
+  FOOTBALL_FIRST_NAMES,
+} from "../lib/athlete-names";
+import {
   BASKETBALL_POSITIONS,
   FOOTBALL_POSITIONS,
   groupedPositionRows,
 } from "../lib/positions";
+import { formatWhenWhereLine } from "../lib/when-where";
 
 const SCREENSHOT_DIR = "/opt/cursor/artifacts/screenshots";
 
@@ -243,6 +248,17 @@ test.describe("pitch fill", () => {
   });
 });
 
+test.describe("when/where display", () => {
+  test("collapses newlines to a single middle-dot line", () => {
+    expect(formatWhenWhereLine("Sun 17:00\nLumphini pitch 2")).toBe(
+      "Sun 17:00 · Lumphini pitch 2",
+    );
+    expect(formatWhenWhereLine("  Mon 20:00  \n\n  Court 1  ")).toBe(
+      "Mon 20:00 · Court 1",
+    );
+  });
+});
+
 test.describe("matchday board", () => {
   test("football CB on roster, then GK imbalance", async ({ browser }) => {
     const organiser = await browser.newContext();
@@ -277,6 +293,10 @@ test.describe("matchday board", () => {
     const chipGuest = await browser.newContext();
     const chipPage = await chipGuest.newPage();
     await chipPage.goto(shareUrl);
+    await expect(chipPage.getByLabel("Your name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
     const lwChip = await chipPage.getByTestId("position-LW").boundingBox();
     const gkChip = await chipPage.getByTestId("position-GK").boundingBox();
     const anyChip = await chipPage.getByTestId("position-ANY").boundingBox();
@@ -345,6 +365,15 @@ test.describe("matchday board", () => {
     );
     await expect(orgPage.getByTestId("bb-3pt")).toBeVisible();
     await expect(orgPage.getByTestId("bb-center-circle")).toBeVisible();
+    const restricted = await orgPage.getByTestId("bb-restricted").getAttribute("d");
+    expect(restricted).toMatch(/A 30 30 0 0 0 /);
+    const left3 = await orgPage.getByTestId("bb-3pt-left").getAttribute("d");
+    const right3 = await orgPage.getByTestId("bb-3pt-right").getAttribute("d");
+    const arc3 = await orgPage.getByTestId("bb-3pt").getAttribute("d");
+    expect(left3).toMatch(/^M[\d.]+ 18 V/);
+    expect(right3).toMatch(/^M[\d.]+ 18 V/);
+    expect(arc3).toMatch(/ A [\d.]+ [\d.]+ 0 0 1 /);
+    expect(arc3).not.toMatch(/ 18 A /);
 
     const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
@@ -381,6 +410,10 @@ test.describe("matchday board", () => {
       page.locator('meta[property="og:description"]'),
     ).toHaveAttribute("content", "Tue 20:00 · Court 1");
 
+    await expect(page.getByLabel("Your name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${BASKETBALL_FIRST_NAMES.join("|")})$`),
+    );
     await page.getByLabel("Your name").fill("Dan");
     await page.getByTestId("status-going").click();
     await page.getByTestId("position-PG").click();
@@ -450,17 +483,21 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Sunday kickabout");
-    await orgPage.getByLabel("When / where").fill("Sun 17:00");
+    await orgPage.getByLabel("When / where").fill("Sun 17:00\nLumphini");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
+    await expect(orgPage.getByTestId("when-where")).toHaveText("Sun 17:00 · Lumphini");
 
     await orgPage.getByRole("link", { name: /^edit$/i }).click();
+    await expect(orgPage.locator('textarea[name="whenWhere"]')).toHaveValue(
+      "Sun 17:00\nLumphini",
+    );
     await orgPage.getByLabel("Title").fill("Monday 5s");
-    await orgPage.getByLabel("When / where").fill("Mon 20:00 · Court 1");
+    await orgPage.getByLabel("When / where").fill("Mon 20:00\nCourt 1");
     await orgPage.getByTestId("edit-formation-4-1-4-1").click();
     await orgPage.getByRole("button", { name: /^save$/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Monday 5s" })).toBeVisible();
-    await expect(orgPage.getByText(/Mon 20:00 · Court 1/)).toBeVisible();
+    await expect(orgPage.getByTestId("when-where")).toHaveText("Mon 20:00 · Court 1");
     await expect(orgPage.getByTestId("formation-4-1-4-1")).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -576,6 +613,10 @@ test.describe("matchday board", () => {
     await expect(page.getByTestId("rsvp-confirmed")).toBeVisible();
     await expect(page.getByRole("heading", { name: /i.?m going/i })).toBeVisible();
     await expect(page.getByTestId("add-friend")).toBeVisible();
+    await expect(page.getByLabel("Friend's name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
     await expect(
       page.getByRole("heading", { name: /add someone else/i }),
     ).toBeVisible();
