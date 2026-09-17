@@ -352,6 +352,9 @@ test.describe("matchday board", () => {
     await page.goto(shareUrl);
     await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
     await expect(page.getByTestId("sport-label")).toHaveText("Basketball");
+    await expect(page.getByTestId("signup-helper")).toHaveText(
+      "No app. Pick a spot and tap Done.",
+    );
     await expect(page.getByTestId("position-PG")).toBeVisible();
     await expect(page.getByTestId("coach-board")).toHaveCount(0);
     await expect(page.getByTestId("position-C")).toBeVisible();
@@ -421,7 +424,8 @@ test.describe("matchday board", () => {
     const cf = await orgPage.getByTestId("slot-empty-CF-0").boundingBox();
     expect(gk && cf).toBeTruthy();
     expect(gk!.y).toBeGreaterThan(cf!.y);
-    await expect(orgPage.getByTestId("bench")).toContainText("Bench / Any");
+    await expect(orgPage.getByTestId("bench")).toContainText("Bench");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Bench / Any");
     await expect(orgPage.getByTestId("bench")).toContainText(
       "Nobody on the bench yet.",
     );
@@ -687,6 +691,16 @@ test.describe("matchday board", () => {
   test("home tabs Invited and Hosting; OG image", async ({ browser }) => {
     const landing = await browser.newPage();
     await landing.goto("/");
+    await expect(
+      landing.getByRole("heading", {
+        name: "Paste a link. Get your squad signed up.",
+      }),
+    ).toBeVisible();
+    await expect(
+      landing.getByText(
+        "Create friendly matches — football, basketball, and more. Get the squad signed up and manage the roster in one link.",
+      ),
+    ).toBeVisible();
     await expect(landing.locator('meta[property="og:description"]')).toHaveAttribute(
       "content",
       "Paste a link. Get your squad signed up.",
@@ -794,6 +808,9 @@ async function signIn(page: Page, email: string) {
   await expect(page.getByRole("link", { name: "+ New matchday" })).toBeVisible();
   await expect(page.getByTestId("tab-invited")).toBeVisible();
   await expect(page.getByTestId("tab-hosting")).toBeVisible();
+  await expect(
+    page.getByText("No matchdays yet. Create one and copy the invitation link."),
+  ).toBeVisible();
 }
 
 async function shareUrlOf(page: Page) {

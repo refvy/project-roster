@@ -110,6 +110,12 @@ export default async function GuestMatchdayPage({
           <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
             {matchday.title}
           </h1>
+          <p
+            data-testid="signup-helper"
+            className="mt-2 text-sm text-ink-soft"
+          >
+            No app. Pick a spot and tap Done.
+          </p>
           <p className="mt-2">
             <SportChip sport={matchday.sport} testId="sport-label" />
           </p>

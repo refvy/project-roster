@@ -214,7 +214,7 @@ function AnyStrip({
       className="rounded-2xl bg-cream px-4 py-3 ring-1 ring-accent/20"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
-        Bench / Any
+        Bench
       </p>
       {people.length === 0 ? (
         <p className="mt-2 text-sm text-ink-soft">Nobody on the bench yet.</p>

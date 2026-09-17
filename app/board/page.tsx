@@ -150,7 +150,7 @@ export default async function BoardPage({
             {tab === "invited"
               ? "No matchdays you’ve joined yet. Open an invitation link to appear here."
               : organiser
-                ? "No matchdays yet. Create one, copy the link, send it to the ก๊วน."
+                ? "No matchdays yet. Create one and copy the invitation link."
                 : "Sign in with a magic link to host a matchday."}
           </p>
         ) : (

@@ -34,12 +34,11 @@ export default async function HomePage({
           <h1 className="mt-4 max-w-xl font-display text-5xl leading-[1.05] tracking-tight md:text-6xl">
             Paste a link.
             <br />
-            See who’s going.
+            Get your squad signed up.
           </h1>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-soft">
-            Recreational ก๊วน, football first. Guests open a share link, tap
-            Going or Out, pick a position, type a name. Organisers get a live
-            roster — no player accounts, no venue booking.
+            Create friendly matches — football, basketball, and more. Get the
+            squad signed up and manage the roster in one link.
           </p>
         </div>
         <section className="rounded-[2rem] bg-cream-deep/80 p-6 md:p-8">

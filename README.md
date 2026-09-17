@@ -25,7 +25,7 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 - **+ New matchday**; copy **Copy invitation link** (URL muted under the button)
 - Home tabs **Invited** (matches you joined) · **Hosting** (matches you created). SKWAD logo goes here. Managers who also play see both.
 - Live roster of Going players + positions, same back→front order guests see
-- Organiser **Squad** board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (hoop/key at the top, proper 3-point corners + arc, half center circle on the midcourt line; **C** at the rim, **PF · SF** wide, **SG · PG** closer). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Slots: empty = muted abbr; filled = first name + abbr; extras get a corner teal `+N` (cream ring, cap 9+). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench / Any** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag.
+- Organiser **Squad** board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (hoop/key at the top, proper 3-point corners + arc, half center circle on the midcourt line; **C** at the rim, **PF · SF** wide, **SG · PG** closer). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Slots: empty = muted abbr; filled = first name + abbr; extras get a corner teal `+N` (cream ring, cap 9+). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag.
 - Imbalance banner when the side looks skewed
 
 Positions snapshot as JSON on each matchday. Players stay on chips.
@@ -42,7 +42,7 @@ Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, e
 
 ## Squad fill
 
-Organiser **Squad** board. Fill order: **exact position → compatible → Any vacancies**. Compatible when the formation has no exact slot: CAM/CDM → CM; LW ↔ LM; RW ↔ RM. Named-position overflow **stays on that slot**. Empty: muted abbr outline. Filled: first name (~8 chars) + abbr. Extras: corner teal `+N` (cream numeral + 2px cream ring; min 22px; cap **9+**). Tap opens the full list. Leftover **Any** (board full) and unmatched keys sit on **Bench / Any** with a teal Any chip. Empty bench: `Nobody on the bench yet.` **Out · N** is a collapsed row under the bench (hidden when nobody is Out). Football is a ~3:4 portrait half-pitch. Basketball is a cream portrait half-court (C / PF·SF / SG·PG) with 3-point corners + arc and a half center circle on the midcourt line. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Squad fills as players tap Going`.
+Organiser **Squad** board. Fill order: **exact position → compatible → Any vacancies**. Compatible when the formation has no exact slot: CAM/CDM → CM; LW ↔ LM; RW ↔ RM. Named-position overflow **stays on that slot**. Empty: muted abbr outline. Filled: first name (~8 chars) + abbr. Extras: corner teal `+N` (cream numeral + 2px cream ring; min 22px; cap **9+**). Tap opens the full list. Leftover **Any** (board full) and unmatched keys sit on **Bench** with a teal Any chip. Empty bench: `Nobody on the bench yet.` **Out · N** is a collapsed row under the bench (hidden when nobody is Out). Football is a ~3:4 portrait half-pitch. Basketball is a cream portrait half-court (C / PF·SF / SG·PG) with 3-point corners + arc and a half center circle on the midcourt line. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Squad fills as players tap Going`.
 
 ## Imbalance rule
 
@@ -101,7 +101,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so name++N chips, ball sport icons, the fixed basketball 3pt/center circle, Any·GK chip row, and OG copy go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so landing copy, Bench, player helper, and hosting empty state go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).
