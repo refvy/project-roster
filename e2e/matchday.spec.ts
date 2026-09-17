@@ -801,6 +801,7 @@ async function signIn(page: Page, email: string) {
   await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: /magic link/i }).click();
+  await expect(page.getByTestId("magic-link-sent")).toHaveCount(0);
   const magic = page.getByTestId("debug-magic-link");
   await expect(magic).toBeVisible();
   await magic.click();

@@ -9,7 +9,7 @@ export type MagicLinkState = {
   ok: boolean;
   error?: string;
   debugUrl?: string;
-  hint?: string;
+  mailed?: boolean;
 } | null;
 
 export async function requestMagicLink(
@@ -28,7 +28,7 @@ export async function requestMagicLink(
   return {
     ok: true,
     debugUrl: "debugUrl" in result ? result.debugUrl : undefined,
-    hint: "hint" in result ? result.hint : undefined,
+    mailed: "mailed" in result ? result.mailed : undefined,
   };
 }
 

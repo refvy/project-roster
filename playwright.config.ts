@@ -27,6 +27,8 @@ export default defineConfig({
         process.env.AUTH_SECRET || "playwright-auth-secret-32chars-min",
       APP_URL: baseURL,
       AUTH_DEBUG: "true",
+      // Never send live Resend mail from Playwright (local .env must not leak).
+      RESEND_API_KEY: "",
     },
   },
 });

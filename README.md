@@ -78,7 +78,9 @@ npm run dev
 | `DATABASE_URL` | yes | Postgres connection string |
 | `AUTH_SECRET` | yes | HMAC for session cookies. `openssl rand -base64 32` |
 | `APP_URL` | yes | Public origin, e.g. `http://localhost:3000` or the Vercel URL. Used for copied share links. |
-| `AUTH_DEBUG` | dogfood | `true` prints the magic link on the login screen (and in server logs). Use this until email sending is wired. |
+| `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). Leave **off** in production so the on-page shortcut stays hidden. |
+| `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
+| `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
 
 Local example:
 
@@ -87,6 +89,8 @@ DATABASE_URL="postgresql://roster:roster@127.0.0.1:5432/roster"
 AUTH_SECRET="replace-with-a-long-random-string"
 APP_URL="http://localhost:3000"
 AUTH_DEBUG="true"
+RESEND_API_KEY=""
+EMAIL_FROM="Skwad <onboarding@resend.dev>"
 ```
 
 ## Tests
@@ -101,12 +105,12 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so landing copy, Bench, player helper, and hosting empty state go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR when CI is green so you can dogfood a real magic email to **thedanniest@gmail.com**.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).
-3. Set environment variables on the project: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), and `AUTH_DEBUG=true` for the first dogfood deploy so magic links show on screen.
+3. Set environment variables: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), `RESEND_API_KEY`, `EMAIL_FROM` (currently `Skwad <onboarding@resend.dev>` until custom domain DNS is live). Leave `AUTH_DEBUG` unset in production.
 4. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
-5. Confirm `/` loads, request a magic link with `AUTH_DEBUG` on, create a matchday, paste the guest link in a private window.
+5. Confirm `/` loads, request a magic link, check email, create a matchday, paste the guest link in a private window.
 
-Email delivery is intentionally out of MVP1. Leave `AUTH_DEBUG=true` until a provider is added.
+Custom domain DNS for `EMAIL_FROM` is handled separately — this pass uses Resend’s onboarding sender.

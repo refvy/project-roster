@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { hashToken, randomToken, signValue, unsignValue } from "./crypto";
-import { getAppUrl, isAuthDebug } from "./env";
+import { getAppUrl, getResendApiKey, isAuthDebug } from "./env";
+import { sendMagicLinkEmail } from "./mail";
 import { prisma } from "./prisma";
 
 export const SESSION_COOKIE = "roster_session";
@@ -43,16 +44,39 @@ export async function requestMagicLinkForEmail(
     },
   });
 
-  const debugUrl = `${origin.replace(/\/$/, "")}/auth/verify?token=${token}`;
-  if (isAuthDebug()) {
-    console.info(`[AUTH_DEBUG] magic link for ${email}: ${debugUrl}`);
-    return { ok: true as const, debugUrl };
+  const verifyUrl = `${origin.replace(/\/$/, "")}/auth/verify?token=${token}`;
+  const debug = isAuthDebug();
+  if (debug) {
+    console.info(`[AUTH_DEBUG] magic link for ${email}: ${verifyUrl}`);
   }
 
-  console.info(`[auth] magic link issued for ${email} (AUTH_DEBUG off — not displayed)`);
+  let mailed = false;
+  if (getResendApiKey()) {
+    try {
+      await sendMagicLinkEmail({ to: email, url: verifyUrl });
+      mailed = true;
+    } catch (err) {
+      console.error("[auth] failed to send magic link email", err);
+      if (!debug) {
+        return {
+          ok: false as const,
+          error: "Could not send the email. Try again.",
+        };
+      }
+    }
+  }
+
+  if (!mailed && !debug) {
+    return {
+      ok: false as const,
+      error: "Email sending is not configured.",
+    };
+  }
+
   return {
     ok: true as const,
-    hint: "Set AUTH_DEBUG=true to show the link on this page until email is wired.",
+    mailed,
+    debugUrl: debug ? verifyUrl : undefined,
   };
 }
 

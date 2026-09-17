@@ -34,6 +34,11 @@ export function LoginForm() {
           {state.error}
         </p>
       ) : null}
+      {state?.ok && state.mailed ? (
+        <p data-testid="magic-link-sent" className="text-sm text-ink-soft">
+          Check your email for the magic link
+        </p>
+      ) : null}
       {state?.ok && state.debugUrl ? (
         <p className="rounded-2xl bg-accent-soft px-4 py-3 text-sm text-accent-deep">
           AUTH_DEBUG is on.{" "}
@@ -44,11 +49,6 @@ export function LoginForm() {
           >
             Open magic link
           </a>
-        </p>
-      ) : null}
-      {state?.ok && !state.debugUrl ? (
-        <p className="text-sm text-ink-soft">
-          Link issued. {state.hint ?? "Check AUTH_DEBUG if you expected it on screen."}
         </p>
       ) : null}
     </form>
