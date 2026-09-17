@@ -441,10 +441,10 @@ function HalfCourtMarks() {
   const top = 18;
   const right = 378;
   const bottom = 478;
-  const cornerInset = 36;
+  const cornerInset = 38;
   const c1 = left + cornerInset;
   const c2 = right - cornerInset;
-  const cornerY = top + 108;
+  const cornerY = top + 132;
   const r3 = Math.hypot(hoopX - c1, cornerY - hoopY);
 
   return (
