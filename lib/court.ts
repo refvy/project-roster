@@ -62,10 +62,25 @@ export function halfCourtGeometry() {
     cornerY,
     restrictedBulgeY: hoopY + restR,
     ftBulgeY: keyBottom + ftR,
-    restricted: `M${hoopX - restR} ${hoopY} A ${restR} ${restR} 0 0 0 ${hoopX + restR} ${hoopY}`,
-    freeThrow: `M${hoopX - ftR} ${keyBottom} A ${ftR} ${ftR} 0 0 0 ${hoopX + ftR} ${keyBottom}`,
+    // SVG y-down: left→right, sweep 1 (clockwise on screen) bulges +Y.
+    restricted: `M${hoopX - restR} ${hoopY} A ${restR} ${restR} 0 0 1 ${hoopX + restR} ${hoopY}`,
+    freeThrow: `M${hoopX - ftR} ${keyBottom} A ${ftR} ${ftR} 0 0 1 ${hoopX + ftR} ${keyBottom}`,
     threeLeft: `M${c1} ${top} V${Number(cornerY.toFixed(2))}`,
     threeRight: `M${c2} ${top} V${Number(cornerY.toFixed(2))}`,
     threeArc: `M${c1} ${Number(cornerY.toFixed(2))} A ${threeR} ${threeR} 0 0 1 ${c2} ${Number(cornerY.toFixed(2))}`,
   };
+}
+
+/** Left→right horizontal semicircle. Sweep 1 bulges down (+Y); sweep 0 bulges up. */
+export function horizontalArcBulgeY(
+  startY: number,
+  radius: number,
+  sweep: 0 | 1,
+) {
+  return sweep === 1 ? startY + radius : startY - radius;
+}
+
+export function arcSweepFlag(d: string) {
+  const match = /A [\d.]+ [\d.]+ [\d.]+ [\d.]+ ([01]) /.exec(d);
+  return match ? (Number(match[1]) as 0 | 1) : null;
 }

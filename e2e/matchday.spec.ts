@@ -16,7 +16,7 @@ import {
   BASKETBALL_FIRST_NAMES,
   FOOTBALL_FIRST_NAMES,
 } from "../lib/athlete-names";
-import { halfCourtGeometry } from "../lib/court";
+import { arcSweepFlag, halfCourtGeometry, horizontalArcBulgeY } from "../lib/court";
 import { publicAppOrigin } from "../lib/env";
 import {
   BASKETBALL_POSITIONS,
@@ -271,8 +271,12 @@ test.describe("half-court geometry", () => {
     expect(g.cornerY).toBeGreaterThan(g.top + 40);
     expect(g.threeLeft.startsWith(`M${g.c1} ${g.top} V`)).toBe(true);
     expect(g.threeArc).not.toMatch(new RegExp(`M${g.c1} ${g.top} A`));
-    expect(g.restricted).toMatch(/A 28 28 0 0 0 /);
-    expect(g.freeThrow).toMatch(/A 43 43 0 0 0 /);
+    expect(g.restricted).toMatch(/A 28 28 0 0 1 /);
+    expect(g.freeThrow).toMatch(/A 43 43 0 0 1 /);
+    expect(arcSweepFlag(g.restricted)).toBe(1);
+    expect(arcSweepFlag(g.freeThrow)).toBe(1);
+    expect(horizontalArcBulgeY(g.hoopY, g.restR, 1)).toBe(g.restrictedBulgeY);
+    expect(horizontalArcBulgeY(g.keyBottom, g.ftR, 1)).toBe(g.ftBulgeY);
   });
 });
 
