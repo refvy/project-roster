@@ -117,6 +117,8 @@ test.describe("pitch fill", () => {
   });
 
   test("CAM and CDM fill CM slots on 4-3-3", () => {
+    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Terng", positionKey: "CM" },
       { id: "2", name: "Joe", positionKey: "CAM" },
       { id: "3", name: "Wee", positionKey: "CDM" },
     ]);
