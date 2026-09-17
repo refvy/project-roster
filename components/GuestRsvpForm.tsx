@@ -44,6 +44,7 @@ export function GuestRsvpForm({
         sport={sport}
         label="Your name"
         defaultValue={defaultName}
+        testId="guest-name"
       />
 
       <fieldset className="flex flex-col gap-3">

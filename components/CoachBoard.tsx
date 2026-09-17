@@ -17,6 +17,7 @@ import {
   type PitchSlot,
   FOOTBALL_FORMATIONS,
 } from "@/lib/pitch";
+import { halfCourtGeometry } from "@/lib/court";
 import { parseSport } from "@/lib/positions";
 
 const TEAL = "#00D4C8";
@@ -435,24 +436,7 @@ function HalfPitchMarks() {
 }
 
 function HalfCourtMarks() {
-  const hoopX = 200;
-  const hoopY = 50;
-  const left = 22;
-  const top = 18;
-  const right = 378;
-  const bottom = 478;
-  const keyW = 88;
-  const keyH = 148;
-  const keyX = hoopX - keyW / 2;
-  const keyBottom = top + keyH;
-  const restR = 30;
-  // Short 3pt corners near the baseline, then an arc centred on the hoop
-  // (not a half-circle from baseline to baseline). Arc clears the FT circle.
-  const cornerInset = 30;
-  const c1 = left + cornerInset;
-  const c2 = right - cornerInset;
-  const cornerY = top + 118;
-  const r3 = Math.hypot(hoopX - c1, cornerY - hoopY);
+  const g = halfCourtGeometry();
 
   return (
     <svg
@@ -469,28 +453,30 @@ function HalfCourtMarks() {
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <rect x={left} y={top} width={right - left} height={bottom - top} rx="2" />
+        <rect
+          x={g.left}
+          y={g.top}
+          width={g.right - g.left}
+          height={g.bottom - g.top}
+          rx="2"
+        />
         <path d="M172 28 h56" strokeWidth="3.4" />
-        <circle cx={hoopX} cy={hoopY} r="9" />
+        <circle cx={g.hoopX} cy={g.hoopY} r="9" />
+        <path data-testid="bb-restricted" d={g.restricted} />
+        <rect x={g.keyX} y={g.top} width={g.keyW} height={g.keyH} />
+        <path data-testid="bb-ft-arc" d={g.freeThrow} />
+        <circle cx={g.hoopX} cy={g.keyBottom} r="3" fill={TEAL} stroke="none" />
         <path
-          data-testid="bb-restricted"
-          d={`M${hoopX - restR} ${hoopY} A ${restR} ${restR} 0 0 0 ${hoopX + restR} ${hoopY}`}
+          d={`M${g.keyX} ${g.top + 52} h-12 M${g.keyX + g.keyW} ${g.top + 52} h12 M${g.keyX} ${g.top + 94} h-12 M${g.keyX + g.keyW} ${g.top + 94} h12`}
         />
-        <rect x={keyX} y={top} width={keyW} height={keyH} />
-        <circle cx={hoopX} cy={keyBottom} r="44" />
-        <circle cx={hoopX} cy={keyBottom} r="3" fill={TEAL} stroke="none" />
-        <path d={`M${keyX} 70 h-12 M${keyX + keyW} 70 h12 M${keyX} 112 h-12 M${keyX + keyW} 112 h12`} />
-        <path data-testid="bb-3pt-left" d={`M${c1} ${top} V${cornerY}`} />
-        <path data-testid="bb-3pt-right" d={`M${c2} ${top} V${cornerY}`} />
-        <path
-          data-testid="bb-3pt"
-          d={`M${c1} ${cornerY} A ${r3} ${r3} 0 0 1 ${c2} ${cornerY}`}
-        />
-        <line x1={left} y1={bottom} x2={right} y2={bottom} />
+        <path data-testid="bb-3pt-left" d={g.threeLeft} />
+        <path data-testid="bb-3pt-right" d={g.threeRight} />
+        <path data-testid="bb-3pt" d={g.threeArc} />
+        <line x1={g.left} y1={g.bottom} x2={g.right} y2={g.bottom} />
         <circle
           data-testid="bb-center-circle"
-          cx={hoopX}
-          cy={bottom}
+          cx={g.hoopX}
+          cy={g.bottom}
           r="52"
         />
       </g>

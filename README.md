@@ -77,7 +77,7 @@ npm run dev
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Postgres connection string. Local default is `127.0.0.1`. Hosted value lives in the **Vercel project env** (not in git). |
 | `AUTH_SECRET` | yes | HMAC for session cookies. `openssl rand -base64 32` |
-| `APP_URL` | yes | Public origin, e.g. `http://localhost:3000` or the Vercel URL. Used for copied share links. |
+| `APP_URL` | yes | Public origin for magic-link verify URLs and copied share links. Production: **`https://getskwad.com`** (not the `project-roster-tau.vercel.app` alias). |
 | `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). **Unset in Vercel production.** `isAuthDebug()` also returns false when `VERCEL_ENV=production`, so the on-page shortcut cannot leak on the production deployment even if the dashboard var is still set. |
 | `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
 | `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
@@ -105,15 +105,14 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR when CI is green.
+Redeploy **production** so **https://getskwad.com** picks this PR up. Do not dogfood guest magic/share links off `project-roster-tau.vercel.app`.
 
-1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
-2. Provision Postgres. `DATABASE_URL` is a Vercel project env var — Prisma does not pin Neon vs Vercel Postgres vs Supabase in this repo. Use **separate databases** for production and the `project-roster-tau` dogfood deploy so they cannot clobber each other.
-3. Set environment variables: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL` (the production `https://…` URL), `RESEND_API_KEY`, `EMAIL_FROM` (currently `Skwad <onboarding@resend.dev>` until custom domain DNS is live). **Unset `AUTH_DEBUG` in Vercel production** (the dashboard, not this repo — the agent cannot flip Vercel env).
-4. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
-5. Confirm `/` loads, request a magic link, check email, create a matchday, paste the guest link in a private window.
+1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com / skwad.link, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`.
+2. Preview/tau may stay on a separate DB. Production `DATABASE_URL` must not be the tau database.
+3. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
+4. Confirm https://getskwad.com loads, request a magic link, open it on getskwad.com, create a matchday, paste the guest link (host getskwad.com or skwad.link) in a private window.
 
-Custom domain DNS for `EMAIL_FROM` is handled separately — this pass uses Resend’s onboarding sender.
+Custom domain DNS for `EMAIL_FROM` is handled separately — this pass uses Resend’s onboarding sender until that is live.
 
 ### Database access (Dan, read-only)
 

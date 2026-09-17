@@ -3,6 +3,15 @@ export function getAppUrl() {
   return raw.replace(/\/$/, "");
 }
 
+/** Magic-link and share URLs. Production always uses APP_URL (getskwad.com), never a Vercel alias. */
+export function publicAppOrigin(requestOrigin?: string) {
+  if (process.env.VERCEL_ENV === "production") {
+    return getAppUrl();
+  }
+  const fallback = requestOrigin?.trim().replace(/\/$/, "");
+  return fallback || getAppUrl();
+}
+
 export function getAuthSecret() {
   const secret = process.env.AUTH_SECRET?.trim();
   if (!secret) {

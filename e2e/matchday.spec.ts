@@ -16,6 +16,8 @@ import {
   BASKETBALL_FIRST_NAMES,
   FOOTBALL_FIRST_NAMES,
 } from "../lib/athlete-names";
+import { halfCourtGeometry } from "../lib/court";
+import { publicAppOrigin } from "../lib/env";
 import {
   BASKETBALL_POSITIONS,
   FOOTBALL_POSITIONS,
@@ -259,6 +261,51 @@ test.describe("when/where display", () => {
   });
 });
 
+test.describe("half-court geometry", () => {
+  test("restricted under the rim inside the key; FT arc outside toward midcourt; 3pt from short corners", () => {
+    const g = halfCourtGeometry();
+    expect(g.restrictedBulgeY).toBeGreaterThan(g.hoopY);
+    expect(g.restrictedBulgeY).toBeLessThan(g.keyBottom);
+    expect(g.ftBulgeY).toBeGreaterThan(g.keyBottom);
+    expect(g.restR).toBeLessThan(g.ftR);
+    expect(g.cornerY).toBeGreaterThan(g.top + 40);
+    expect(g.threeLeft.startsWith(`M${g.c1} ${g.top} V`)).toBe(true);
+    expect(g.threeArc).not.toMatch(new RegExp(`M${g.c1} ${g.top} A`));
+    expect(g.restricted).toMatch(/A 28 28 0 0 0 /);
+    expect(g.freeThrow).toMatch(/A 43 43 0 0 0 /);
+  });
+});
+
+test.describe("athlete placeholders", () => {
+  test("twenty first names per sport, never Bee or Nok", () => {
+    expect(FOOTBALL_FIRST_NAMES).toHaveLength(20);
+    expect(BASKETBALL_FIRST_NAMES).toHaveLength(20);
+    expect(FOOTBALL_FIRST_NAMES).not.toContain("Bee");
+    expect(FOOTBALL_FIRST_NAMES).not.toContain("Nok");
+    expect(BASKETBALL_FIRST_NAMES).not.toContain("Bee");
+    expect(BASKETBALL_FIRST_NAMES).not.toContain("Nok");
+  });
+});
+
+test.describe("public origin", () => {
+  test("production magic links use APP_URL, not a Vercel alias", () => {
+    const prevV = process.env.VERCEL_ENV;
+    const prevA = process.env.APP_URL;
+    process.env.VERCEL_ENV = "production";
+    process.env.APP_URL = "https://getskwad.com";
+    try {
+      expect(publicAppOrigin("https://project-roster-tau.vercel.app")).toBe(
+        "https://getskwad.com",
+      );
+    } finally {
+      if (prevV === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = prevV;
+      if (prevA === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = prevA;
+    }
+  });
+});
+
 test.describe("matchday board", () => {
   test("football CB on roster, then GK imbalance", async ({ browser }) => {
     const organiser = await browser.newContext();
@@ -296,6 +343,10 @@ test.describe("matchday board", () => {
     await expect(chipPage.getByLabel("Your name")).toHaveAttribute(
       "placeholder",
       new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(chipPage.getByLabel("Your name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
     );
     const lwChip = await chipPage.getByTestId("position-LW").boundingBox();
     const gkChip = await chipPage.getByTestId("position-GK").boundingBox();
@@ -365,15 +416,27 @@ test.describe("matchday board", () => {
     );
     await expect(orgPage.getByTestId("bb-3pt")).toBeVisible();
     await expect(orgPage.getByTestId("bb-center-circle")).toBeVisible();
-    const restricted = await orgPage.getByTestId("bb-restricted").getAttribute("d");
-    expect(restricted).toMatch(/A 30 30 0 0 0 /);
-    const left3 = await orgPage.getByTestId("bb-3pt-left").getAttribute("d");
-    const right3 = await orgPage.getByTestId("bb-3pt-right").getAttribute("d");
-    const arc3 = await orgPage.getByTestId("bb-3pt").getAttribute("d");
-    expect(left3).toMatch(/^M[\d.]+ 18 V/);
-    expect(right3).toMatch(/^M[\d.]+ 18 V/);
-    expect(arc3).toMatch(/ A [\d.]+ [\d.]+ 0 0 1 /);
-    expect(arc3).not.toMatch(/ 18 A /);
+    const marks = halfCourtGeometry();
+    await expect(orgPage.getByTestId("bb-restricted")).toHaveAttribute(
+      "d",
+      marks.restricted,
+    );
+    await expect(orgPage.getByTestId("bb-ft-arc")).toHaveAttribute(
+      "d",
+      marks.freeThrow,
+    );
+    await expect(orgPage.getByTestId("bb-3pt-left")).toHaveAttribute(
+      "d",
+      marks.threeLeft,
+    );
+    await expect(orgPage.getByTestId("bb-3pt-right")).toHaveAttribute(
+      "d",
+      marks.threeRight,
+    );
+    await expect(orgPage.getByTestId("bb-3pt")).toHaveAttribute(
+      "d",
+      marks.threeArc,
+    );
 
     const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
@@ -413,6 +476,10 @@ test.describe("matchday board", () => {
     await expect(page.getByLabel("Your name")).toHaveAttribute(
       "placeholder",
       new RegExp(`^(${BASKETBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(page.getByLabel("Your name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
     );
     await page.getByLabel("Your name").fill("Dan");
     await page.getByTestId("status-going").click();
@@ -616,6 +683,10 @@ test.describe("matchday board", () => {
     await expect(page.getByLabel("Friend's name")).toHaveAttribute(
       "placeholder",
       new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(page.getByLabel("Friend's name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
     );
     await expect(
       page.getByRole("heading", { name: /add someone else/i }),

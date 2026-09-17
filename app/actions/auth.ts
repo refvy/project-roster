@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requestMagicLinkForEmail, logoutOrganiser } from "@/lib/auth";
-import { getAppUrl } from "@/lib/env";
+import { publicAppOrigin } from "@/lib/env";
 
 export type MagicLinkState = {
   ok: boolean;
@@ -20,7 +20,8 @@ export async function requestMagicLink(
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
-  const origin = host ? `${proto}://${host}` : getAppUrl();
+  const requestOrigin = host ? `${proto}://${host}` : undefined;
+  const origin = publicAppOrigin(requestOrigin);
   const result = await requestMagicLinkForEmail(email, origin);
   if (!result.ok) {
     return { ok: false, error: result.error };
