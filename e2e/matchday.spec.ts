@@ -437,6 +437,7 @@ test.describe("matchday board", () => {
       "d",
       marks.threeArc,
     );
+    await saveShot(court, "basketball-halfcourt.png");
 
     const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
@@ -481,6 +482,10 @@ test.describe("matchday board", () => {
       "placeholder",
       /^(Bee|Nok)$/i,
     );
+    await saveShot(page.getByTestId("guest-name"), "athlete-placeholder.png");
+    await page.screenshot({
+      path: join(SCREENSHOT_DIR, "athlete-placeholder-page.png"),
+    });
     await page.getByLabel("Your name").fill("Dan");
     await page.getByTestId("status-going").click();
     await page.getByTestId("position-PG").click();
@@ -491,7 +496,7 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await expect(orgPage.getByTestId("roster")).toContainText("Dan");
     await expect(orgPage.getByTestId("roster")).toContainText("PG");
-    await saveShot(court, "basketball-halfcourt.png");
+    await saveShot(court, "basketball-halfcourt-going.png");
 
     await organiser.close();
   });
