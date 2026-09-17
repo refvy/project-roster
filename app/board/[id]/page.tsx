@@ -5,12 +5,13 @@ import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { SportChip } from "@/components/SportChip";
 import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
 import { orderGoingForRoster } from "@/lib/pitch";
-import { parsePositions, sportLabel } from "@/lib/positions";
+import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -73,11 +74,8 @@ export default async function OrganiserMatchdayPage({
               <h1 className="font-display text-4xl tracking-tight md:text-5xl">
                 {matchday.title}
               </h1>
-              <p
-                data-testid="sport-label"
-                className="mt-2 text-sm text-ink-soft"
-              >
-                {sportLabel(matchday.sport)}
+              <p className="mt-2">
+                <SportChip sport={matchday.sport} testId="sport-label" />
               </p>
               <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
             </div>

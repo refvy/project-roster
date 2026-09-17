@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { saveMatchdayFormation } from "@/app/actions/matchday";
 import {
   BASKETBALL_LINES,
+  BASKETBALL_SLOT_LAYOUT,
   describePitchNeed,
   fillPitch,
   firstName,
@@ -55,7 +56,12 @@ export function CoachBoard({
   return (
     <section data-testid="coach-board" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="font-display text-2xl tracking-tight">Pitch</h2>
+        <h2
+          data-testid="squad-heading"
+          className="font-display text-2xl tracking-tight"
+        >
+          Squad
+        </h2>
         {!isBasketball ? (
           <div className="flex flex-wrap gap-2">
             {FOOTBALL_FORMATIONS.map((item) => (
@@ -158,29 +164,37 @@ function HalfCourtBoard({
   lines: PitchLine[];
   onOpenSlot: (slot: { key: string; players: GoingPlayer[] }) => void;
 }) {
+  const slots = lines.flatMap((line) => line.slots);
   return (
     <div
       data-testid="half-court"
-      className="relative mx-auto w-full max-w-lg overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
-      style={{ aspectRatio: "15 / 14" }}
+      className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
+      style={{ aspectRatio: "4 / 5" }}
     >
       <HalfCourtMarks />
-      <div className="absolute inset-0 z-10 flex flex-col-reverse justify-between px-6 py-5 sm:px-8 sm:py-6">
-        {lines.map((line, lineIndex) => (
-          <div
-            key={`${line.area}-${lineIndex}`}
-            className="flex items-center justify-evenly gap-2"
-          >
-            {line.slots.map((slot, slotIndex) => (
+      <div className="absolute inset-0 z-10">
+        {slots.map((slot, slotIndex) => {
+          const pos = BASKETBALL_SLOT_LAYOUT[slot.key] ?? {
+            top: "50%",
+            left: "50%",
+          };
+          return (
+            <div
+              key={`${slot.key}-${slotIndex}`}
+              data-testid={`bb-slot-${slot.key}`}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ top: pos.top, left: pos.left }}
+            >
               <PitchSlotView
-                key={`${slot.key}-${slotIndex}`}
                 slot={slot}
                 index={slotIndex}
-                onOpen={() => onOpenSlot({ key: slot.key, players: slot.players })}
+                onOpen={() =>
+                  onOpenSlot({ key: slot.key, players: slot.players })
+                }
               />
-            ))}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -253,27 +267,33 @@ function PitchSlotView({
     );
   }
 
-  const lead = slot.players[0]!;
+  const stacked = slot.players.length >= 2;
   const overflow = slotOverflowCount(slot.players);
+  const lead = slot.players[0]!;
 
   return (
     <button
       type="button"
       data-testid={`slot-filled-${slot.key}`}
       onClick={onOpen}
-      className="relative flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full bg-accent px-2.5 py-1.5 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem]"
+      className={`relative flex flex-col items-center justify-center rounded-full bg-accent text-center text-on-accent ${
+        stacked
+          ? "min-h-14 min-w-[4.25rem] px-3 py-2 sm:min-h-16 sm:min-w-[4.75rem]"
+          : "min-h-12 min-w-[3.75rem] px-2.5 py-1.5 sm:min-h-14 sm:min-w-[4.25rem]"
+      }`}
     >
-      <span className="max-w-[4.5rem] truncate text-xs font-semibold">
-        {firstName(lead.name)}
-      </span>
-      {overflow > 0 ? (
+      {stacked ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="absolute -right-1 -top-1 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-bold leading-none text-accent-deep ring-1 ring-accent/40"
+          className="text-xl font-extrabold leading-none sm:text-2xl"
         >
           +{overflow}
         </span>
-      ) : null}
+      ) : (
+        <span className="max-w-[4.5rem] truncate text-xs font-semibold">
+          {firstName(lead.name)}
+        </span>
+      )}
       <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
         {slot.key}
       </span>
@@ -424,22 +444,23 @@ function HalfCourtMarks() {
     <svg
       aria-hidden
       className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 500 470"
+      viewBox="0 0 400 500"
       preserveAspectRatio="xMidYMid meet"
     >
-      <rect width="500" height="470" fill={CREAM} />
-      <g fill="none" stroke={TEAL} strokeWidth="2" strokeLinecap="round">
-        <rect x="16" y="16" width="468" height="438" rx="2" />
-        <line x1="16" y1="16" x2="484" y2="16" />
-        <rect x="175" y="16" width="150" height="175" />
-        <path d="M 175 191 A 75 75 0 0 0 325 191" />
-        <circle cx="250" cy="191" r="75" />
-        <circle cx="250" cy="48" r="7" />
-        <line x1="232" y1="16" x2="232" y2="36" />
-        <line x1="268" y1="16" x2="268" y2="36" />
-        <path d="M 88 16 A 175 175 0 0 0 412 16" />
-        <line x1="16" y1="454" x2="484" y2="454" />
-        <circle cx="250" cy="454" r="55" />
+      <rect width="400" height="500" fill={CREAM} />
+      <g fill="none" stroke={TEAL} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="18" y="18" width="364" height="464" rx="2" />
+        <path d="M168 30 h64" strokeWidth="3.2" />
+        <circle cx="200" cy="44" r="9" />
+        <path d="M174 32 A 26 26 0 0 1 226 32" />
+        <rect x="152" y="18" width="96" height="152" />
+        <path d="M152 170 A 48 48 0 0 1 248 170" />
+        <circle cx="200" cy="170" r="3" fill={TEAL} stroke="none" />
+        <path d="M152 78 h-14 M248 78 h14 M152 118 h-14 M248 118 h14" />
+        <path d="M46 18 v96" />
+        <path d="M354 18 v96" />
+        <path d="M46 114 A 168 168 0 0 1 354 114" />
+        <path d="M152 482 A 48 48 0 0 0 248 482" />
       </g>
     </svg>
   );

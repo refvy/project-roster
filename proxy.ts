@@ -3,7 +3,9 @@ import { SESSION_COOKIE } from "@/lib/auth";
 
 export function proxy(request: NextRequest) {
   const session = request.cookies.get(SESSION_COOKIE);
-  if (request.nextUrl.pathname.startsWith("/board") && !session) {
+  const path = request.nextUrl.pathname.replace(/\/+$/, "") || "/";
+  const boardHome = path === "/board";
+  if (path.startsWith("/board") && !boardHome && !session) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
@@ -12,5 +14,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/board/:path*"],
+  matcher: ["/board", "/board/:path*"],
 };

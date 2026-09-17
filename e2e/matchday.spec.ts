@@ -1,6 +1,10 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describeImbalance } from "../lib/imbalance";
 import {
+  BASKETBALL_LINES,
+  BASKETBALL_SLOT_LAYOUT,
   fillPitch,
   firstName,
   getFormation,
@@ -10,7 +14,10 @@ import {
 import {
   BASKETBALL_POSITIONS,
   FOOTBALL_POSITIONS,
+  groupedPositionRows,
 } from "../lib/positions";
+
+const SCREENSHOT_DIR = "/opt/cursor/artifacts/screenshots";
 
 test.describe("imbalance rule", () => {
   test("two GKs and a CB: Too many GKs", () => {
@@ -110,8 +117,6 @@ test.describe("pitch fill", () => {
   });
 
   test("CAM and CDM fill CM slots on 4-3-3", () => {
-    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
-      { id: "1", name: "Terng", positionKey: "CM" },
       { id: "2", name: "Joe", positionKey: "CAM" },
       { id: "3", name: "Wee", positionKey: "CDM" },
     ]);
@@ -187,6 +192,43 @@ test.describe("pitch fill", () => {
     expect(any.map((p) => p.name)).toEqual(["Bee"]);
     expect(bench.map((p) => p.name)).toEqual(["Bee"]);
   });
+
+  test("basketball lines are C, PF/SF wide, SG/PG closer", () => {
+    expect(BASKETBALL_LINES.map((line) => line.keys)).toEqual([
+      ["C"],
+      ["PF", "SF"],
+      ["SG", "PG"],
+    ]);
+    const pf = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PF!.left);
+    const sf = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SF!.left);
+    const sg = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SG!.left);
+    const pg = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PG!.left);
+    const cTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.C!.top);
+    const wingTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PF!.top);
+    const guardTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SG!.top);
+    expect(cTop).toBeLessThan(wingTop);
+    expect(wingTop).toBeLessThan(guardTop);
+    expect(Math.abs(sf - pf)).toBeGreaterThan(Math.abs(pg - sg));
+  });
+
+  test("position chips group like the board", () => {
+    expect(
+      groupedPositionRows(BASKETBALL_POSITIONS).map((row) =>
+        row.map((p) => p.key),
+      ),
+    ).toEqual([["C"], ["PF", "SF"], ["SG", "PG"], ["ANY"]]);
+    expect(
+      groupedPositionRows(FOOTBALL_POSITIONS).map((row) =>
+        row.map((p) => p.key),
+      ),
+    ).toEqual([
+      ["GK"],
+      ["LB", "CB", "RB"],
+      ["CDM", "CM", "CAM"],
+      ["LW", "CF", "RW"],
+      ["ANY"],
+    ]);
+  });
 });
 
 test.describe("matchday board", () => {
@@ -207,7 +249,7 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
     await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
 
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
     expect(shareUrl).toMatch(/\/m\//);
     await orgPage.getByTestId("copy-link").click();
 
@@ -241,10 +283,36 @@ test.describe("matchday board", () => {
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Tuesday run" })).toBeVisible();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Basketball");
+    await expect(orgPage.getByTestId("squad-heading")).toHaveText("Squad");
+    await expect(orgPage.getByRole("heading", { name: "Pitch" })).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toHaveText(
+      "Copy invitation link",
+    );
     await expect(orgPage.getByTestId("half-court")).toBeVisible();
     await expect(orgPage.getByTestId("half-pitch")).toHaveCount(0);
 
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const court = orgPage.getByTestId("half-court");
+    const courtBox = await court.boundingBox();
+    expect(courtBox).toBeTruthy();
+    const ratio = courtBox!.width / courtBox!.height;
+    expect(ratio).toBeGreaterThan(0.7);
+    expect(ratio).toBeLessThan(0.9);
+
+    const c = await orgPage.getByTestId("bb-slot-C").boundingBox();
+    const pf = await orgPage.getByTestId("bb-slot-PF").boundingBox();
+    const sf = await orgPage.getByTestId("bb-slot-SF").boundingBox();
+    const sg = await orgPage.getByTestId("bb-slot-SG").boundingBox();
+    const pg = await orgPage.getByTestId("bb-slot-PG").boundingBox();
+    expect(c && pf && sf && sg && pg).toBeTruthy();
+    expect(c!.y).toBeLessThan(pf!.y);
+    expect(Math.abs(pf!.y - sf!.y)).toBeLessThan(12);
+    expect(sg!.y).toBeGreaterThan(pf!.y);
+    expect(Math.abs(sg!.y - pg!.y)).toBeLessThan(12);
+    expect(centerX(sf!) - centerX(pf!)).toBeGreaterThan(
+      centerX(pg!) - centerX(sg!),
+    );
+
+    const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
     const page = await guest.newPage();
     await page.goto(shareUrl);
@@ -255,6 +323,26 @@ test.describe("matchday board", () => {
     await expect(page.getByTestId("position-C")).toBeVisible();
     await expect(page.getByTestId("position-GK")).toHaveCount(0);
     await expect(page.getByTestId("position-CB")).toHaveCount(0);
+    const chipC = await page.getByTestId("position-C").boundingBox();
+    const chipPf = await page.getByTestId("position-PF").boundingBox();
+    const chipSf = await page.getByTestId("position-SF").boundingBox();
+    const chipSg = await page.getByTestId("position-SG").boundingBox();
+    const chipPg = await page.getByTestId("position-PG").boundingBox();
+    expect(chipC && chipPf && chipSf && chipSg && chipPg).toBeTruthy();
+    expect(chipC!.y).toBeLessThan(chipPf!.y);
+    expect(Math.abs(chipPf!.y - chipSf!.y)).toBeLessThan(12);
+    expect(chipSg!.y).toBeGreaterThan(chipPf!.y);
+    expect(centerX(chipSf!) - centerX(chipPf!)).toBeGreaterThan(
+      centerX(chipPg!) - centerX(chipSg!),
+    );
+
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Tuesday run — powered by SKWAD",
+    );
+    await expect(
+      page.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Tap Going. Pick your spot. No app.");
 
     await page.getByLabel("Your name").fill("Dan");
     await page.getByTestId("status-going").click();
@@ -266,6 +354,7 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await expect(orgPage.getByTestId("roster")).toContainText("Dan");
     await expect(orgPage.getByTestId("roster")).toContainText("PG");
+    await saveShot(court, "basketball-halfcourt.png");
 
     await organiser.close();
   });
@@ -282,6 +371,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Thu 20:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-1-4-1").click();
+    await expect(orgPage.getByTestId("squad-heading")).toHaveText("Squad");
     await expect(orgPage.getByTestId("coach-board").getByText(/Need /)).toHaveCount(
       0,
     );
@@ -302,10 +392,10 @@ test.describe("matchday board", () => {
       "Nobody on the bench yet.",
     );
     await expect(orgPage.getByTestId("coach-banner")).toContainText(
-      /Pitch fills as players tap Going/i,
+      /Squad fills as players tap Going/i,
     );
 
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
     await guestGoing(browser, shareUrl, "Nok", "CB");
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-1-4-1").click();
@@ -350,7 +440,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("Title").fill("To delete");
     await orgPage.getByLabel("When / where").fill("Fri 19:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
 
     orgPage.once("dialog", (dialog) => dialog.accept());
     await orgPage.getByTestId("delete-matchday").click();
@@ -380,7 +470,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Sat 16:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-1-4-1").click();
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
 
     await guestGoing(browser, shareUrl, "Nok", "CB");
     await guestGoing(browser, shareUrl, "Bee", "ANY");
@@ -411,7 +501,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("Title").fill("Any strip");
     await orgPage.getByLabel("When / where").fill("Sat 10:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
     await guestGoing(browser, shareUrl, "Bee", "ANY");
     await orgPage.reload();
     await expect(orgPage.getByTestId("bench")).toContainText(
@@ -436,7 +526,7 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("Title").fill("Bring a friend");
     await orgPage.getByLabel("When / where").fill("Sun 11:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
 
     const guest = await browser.newContext();
     const page = await guest.newPage();
@@ -487,7 +577,7 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
-  test("compact LW shows one name +N; CAM/CDM sit on CM; Out collapses", async ({
+  test("hero +N chip has no name when count≥2; CAM/CDM sit on CM; Out collapses", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -501,7 +591,7 @@ test.describe("matchday board", () => {
     await orgPage.getByTestId("formation-4-3-3").click();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
     await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
-    const shareUrl = await orgPage.getByTestId("share-url").inputValue();
+    const shareUrl = await shareUrlOf(orgPage);
 
     await guestGoing(browser, shareUrl, "Tim", "LW");
     await guestGoing(browser, shareUrl, "Dan", "LW");
@@ -512,10 +602,12 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-3-3").click();
     const slot = orgPage.getByTestId("slot-filled-LW");
-    await expect(slot).toContainText("Tim");
+    await expect(slot).not.toContainText("Tim");
     await expect(slot).not.toContainText("Dan");
     await expect(slot).not.toContainText("Mit");
+    await expect(slot).toContainText("LW");
     await expect(orgPage.getByTestId("slot-overflow-LW")).toHaveText("+2");
+    await saveShot(slot, "hero-plus-n.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
@@ -548,6 +640,85 @@ test.describe("matchday board", () => {
 
     await organiser.close();
   });
+
+  test("home tabs Invited and Hosting; OG image", async ({ browser }) => {
+    const host = await browser.newContext();
+    const hostPage = await host.newPage();
+    await signIn(hostPage, `mark+host+${Date.now()}@example.com`);
+    await expect(
+      hostPage.getByRole("link", { name: "+ New matchday" }),
+    ).toBeVisible();
+    await expect(hostPage.getByTestId("tab-invited")).toBeVisible();
+    await expect(hostPage.getByTestId("tab-hosting")).toBeVisible();
+    await expect(hostPage.getByTestId("tab-hosting")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    await hostPage.getByRole("link", { name: "+ New matchday" }).click();
+    await hostPage.getByLabel("Title").fill("Hosted game");
+    await hostPage.getByLabel("When / where").fill("Sat 18:00");
+    await hostPage.getByRole("button", { name: /create matchday/i }).click();
+    const hostedShare = await shareUrlOf(hostPage);
+
+    const player = await browser.newContext();
+    const playerPage = await player.newPage();
+    await signIn(playerPage, `mark+play+${Date.now()}@example.com`);
+    await playerPage.getByRole("link", { name: "+ New matchday" }).click();
+    await playerPage.getByLabel("Title").fill("My hosting");
+    await playerPage.getByLabel("When / where").fill("Sun 12:00");
+    await playerPage.getByRole("button", { name: /create matchday/i }).click();
+    await playerPage.goto("/board");
+    await expect(playerPage.getByRole("link", { name: "My hosting" })).toBeVisible();
+    await playerPage.getByTestId("tab-invited").click();
+    await expect(playerPage.getByRole("link", { name: "My hosting" })).toHaveCount(
+      0,
+    );
+
+    await playerPage.goto(hostedShare);
+    await playerPage.getByLabel("Your name").fill("Nok");
+    await playerPage.getByTestId("status-going").click();
+    await playerPage.getByTestId("position-CB").click();
+    await playerPage.getByTestId("rsvp-submit").click();
+    await expect(playerPage.getByTestId("rsvp-confirmed")).toContainText(
+      /going/i,
+    );
+    await playerPage.getByRole("link", { name: "Skwad" }).click();
+    await expect(playerPage).toHaveURL(/\/board/);
+    await expect(playerPage.getByTestId("tab-hosting")).toBeVisible();
+    await playerPage.getByTestId("tab-invited").click();
+    await expect(playerPage.getByTestId("tab-invited")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(
+      playerPage.getByRole("link", { name: "Hosted game" }),
+    ).toBeVisible();
+    await expect(
+      playerPage.getByRole("link", { name: "My hosting" }),
+    ).toHaveCount(0);
+    await playerPage.getByTestId("tab-hosting").click();
+    await expect(
+      playerPage.getByRole("link", { name: "My hosting" }),
+    ).toBeVisible();
+    await expect(
+      playerPage.getByRole("link", { name: "Hosted game" }),
+    ).toHaveCount(0);
+    await saveShot(playerPage.getByTestId("home-tabs"), "home-tabs.png");
+    await playerPage.screenshot({
+      path: join(SCREENSHOT_DIR, "home-tabs-page.png"),
+      fullPage: true,
+    });
+
+    const og = await playerPage.request.get(`${hostedShare}/opengraph-image`);
+    expect(og.ok()).toBeTruthy();
+    expect(og.headers()["content-type"]).toMatch(/image\/png/);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-image.png"), await og.body());
+
+    await player.close();
+    await host.close();
+  });
 });
 
 async function signIn(page: Page, email: string) {
@@ -559,6 +730,26 @@ async function signIn(page: Page, email: string) {
   await expect(magic).toBeVisible();
   await magic.click();
   await expect(page).toHaveURL(/\/board/, { timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "+ New matchday" })).toBeVisible();
+  await expect(page.getByTestId("tab-invited")).toBeVisible();
+  await expect(page.getByTestId("tab-hosting")).toBeVisible();
+}
+
+async function shareUrlOf(page: Page) {
+  const raw = await page.getByTestId("share-url").textContent();
+  return (raw ?? "").replace(/\s+/g, "").trim();
+}
+
+function centerX(box: { x: number; width: number }) {
+  return box.x + box.width / 2;
+}
+
+async function saveShot(
+  locator: { screenshot: (opts: { path: string }) => Promise<Buffer> },
+  filename: string,
+) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
 }
 
 async function guestGoing(

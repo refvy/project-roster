@@ -10,9 +10,9 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 1. Open the share link
 2. Going or Out
-3. Fat position chips from the matchday sport:
-   - Football: GK · RB · CB · LB · RW · LW · CM · CAM · CDM · CF · Any
-   - Basketball: PG · SG · SF · PF · C · Any
+3. Fat position chips from the matchday sport, arranged like the board:
+   - Football (back→front): GK / LB CB RB / CDM CM CAM / LW CF RW / Any
+   - Basketball: C / PF · SF / SG · PG / Any
 4. Type a name (remembered in a cookie)
 5. See who’s Going, sorted back→front for that match’s formation, then Any / extras
 6. After **I’m going**, **Add someone else** on the same link (name + Going/Out + position). Extras show `added by {you}`; you can edit/delete only people you added
@@ -22,9 +22,10 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 - Create a matchday: sport (Football | Basketball, default Football), title, when/where as text (no venue booking)
 - Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
-- Copy the share link
+- **+ New matchday**; copy **Copy invitation link** (URL muted under the button)
+- Home tabs **Invited** (matches you joined) · **Hosting** (matches you created). SKWAD logo goes here. Managers who also play see both.
 - Live roster of Going players + positions, same back→front order guests see
-- Organiser-only board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (key + arc, same teal line weight). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Compact slots: **one** first name + teal `+N` (N = extra people). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench / Any** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag, no player-facing pitch.
+- Organiser **Squad** board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (hoop/key at the top, half-court circle at the bottom; **C** at the rim, **PF · SF** wide, **SG · PG** closer). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Slots: empty = muted abbr; 1 player = first name + abbr; 2+ = hero teal `+N` (N = extras) with abbr, no name. Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench / Any** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag.
 - Imbalance banner when the side looks skewed
 
 Positions snapshot as JSON on each matchday. Players stay on chips.
@@ -33,15 +34,15 @@ Positions snapshot as JSON on each matchday. Players stay on chips.
 
 All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle.
 
-Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Locked logo (Steve): white SKWAD, chevron A, notched teal capsule — header `public/skwad-header.png`, icon `app/icon.png`, OG `app/opengraph-image.png`. Type: **Outfit** only — ExtraBold titles (`tracking-tight`), Medium/Regular body. No serif.
+Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Locked logo (Steve): white SKWAD, chevron A, notched teal capsule — header `public/skwad-header.png`, icon `app/icon.png`. Match share OG is signup-page style (cream, SKWAD capsule, MATCHDAY, title, sport, time). Type: **Outfit** only — ExtraBold titles (`tracking-tight`), Medium/Regular body. No serif.
 
 ## What it is not
 
 Venues, ratings, matchmaking, chat, payments, charging players, photo uploads, embedded maps, player apps/accounts, drag-and-drop tactics, Footballizer chrome.
 
-## Pitch fill
+## Squad fill
 
-Organiser-only. Fill order: **exact position → compatible → Any vacancies**. Compatible when the formation has no exact slot: CAM/CDM → CM; LW ↔ LM; RW ↔ RM. Named-position overflow **stays on that slot** as a teal `+N` (N = total − 1). Each chip shows **one** first name (~8 chars) and the slot abbr. Tap opens the full list. Leftover **Any** (pitch full) and unmatched keys sit on **Bench / Any** with a teal Any chip. Empty bench: `Nobody on the bench yet.` Empty slot: muted abbr only. **Out · N** is a collapsed row under the bench (hidden when nobody is Out). Football is a ~3:4 portrait half-pitch. Basketball is a cream schematic half-court. If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Pitch fills as players tap Going`.
+Organiser **Squad** board. Fill order: **exact position → compatible → Any vacancies**. Compatible when the formation has no exact slot: CAM/CDM → CM; LW ↔ LM; RW ↔ RM. Named-position overflow **stays on that slot**. Empty: muted abbr outline. One player: first name (~8 chars) + abbr. Two or more: hero teal `+N` (N = total − 1) + abbr, **no name**. Tap opens the full list. Leftover **Any** (board full) and unmatched keys sit on **Bench / Any** with a teal Any chip. Empty bench: `Nobody on the bench yet.` **Out · N** is a collapsed row under the bench (hidden when nobody is Out). Football is a ~3:4 portrait half-pitch. Basketball is a cream portrait half-court (C / PF·SF / SG·PG). If 2+ slots are empty and someone is Going: `3 slots open · light on defence`. If nobody is Going: `Squad fills as players tap Going`.
 
 ## Imbalance rule
 
@@ -90,7 +91,7 @@ AUTH_DEBUG="true"
 
 ## Tests
 
-Playwright covers: compact slot (one name + `+N`); CAM/CDM on CM in 4-3-3; Out · N collapsed and hidden when empty; sport chip on the dashboard and muted sport under the title; Football CB roster → Too many GKs; ~3:4 half-pitch; muted empty slots; Basketball PG + half-court; edit/delete; guest Going list; I’m going / Add someone else.
+Playwright covers: `+ New matchday`; **Copy invitation link**; Squad (not Pitch); hero `+N` with no name when count≥2; Invited/Hosting tabs; OG title/description; basketball C/PF/SF/SG/PG layout; CAM/CDM on CM in 4-3-3; Out · N; sport chips; Football CB roster → Too many GKs; ~3:4 half-pitch; muted empty slots; guest Going list; I’m going / Add someone else.
 
 ```bash
 npx prisma migrate deploy
@@ -100,7 +101,7 @@ npm test
 
 ## Deploy to Vercel (Mark)
 
-Redeploy **https://project-roster-tau.vercel.app** from this PR so compact +N slots, CAM/CDM→CM fill, Out · N, and sport chips go live.
+Redeploy **https://project-roster-tau.vercel.app** from this PR so `+ New matchday`, Copy invitation link, Squad, hero +N chips, basketball half-court layout, Invited/Hosting tabs, and match OG cards go live.
 
 1. Create a Vercel project from this GitHub repo (already up at `project-roster-tau`).
 2. Provision Postgres (Vercel Postgres, Neon, or Supabase).

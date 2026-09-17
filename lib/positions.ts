@@ -30,13 +30,47 @@ export const FOOTBALL_POSITIONS: Position[] = [
 ];
 
 export const BASKETBALL_POSITIONS: Position[] = [
-  { key: "PG", label: "PG", role: "field", group: "guards" },
-  { key: "SG", label: "SG", role: "field", group: "guards" },
-  { key: "SF", label: "SF", role: "field", group: "wings" },
-  { key: "PF", label: "PF", role: "field", group: "bigs" },
   { key: "C", label: "C", role: "field", group: "bigs" },
+  { key: "PF", label: "PF", role: "field", group: "bigs" },
+  { key: "SF", label: "SF", role: "field", group: "wings" },
+  { key: "SG", label: "SG", role: "field", group: "guards" },
+  { key: "PG", label: "PG", role: "field", group: "guards" },
   { key: "ANY", label: "Any", role: "flex", group: "flex" },
 ];
+
+/** Chip rows matching the board: basketball C / PF SF / SG PG; football back→front. */
+const BASKETBALL_CHIP_ROWS = [["C"], ["PF", "SF"], ["SG", "PG"], ["ANY"]];
+const FOOTBALL_CHIP_ROWS = [
+  ["GK"],
+  ["LB", "CB", "RB"],
+  ["CDM", "CM", "CAM"],
+  ["LW", "CF", "RW"],
+  ["ANY"],
+];
+
+export function groupedPositionRows(positions: Position[]): Position[][] {
+  const byKey = new Map(positions.map((position) => [position.key, position]));
+  const basketball = byKey.has("C") && byKey.has("PG") && !byKey.has("GK");
+  const plan = basketball ? BASKETBALL_CHIP_ROWS : FOOTBALL_CHIP_ROWS;
+  const used = new Set(plan.flat());
+  const rows = plan
+    .map((keys) =>
+      keys
+        .map((key) => byKey.get(key))
+        .filter((item): item is Position => Boolean(item)),
+    )
+    .filter((row) => row.length > 0);
+  const leftover = positions.filter((position) => !used.has(position.key));
+  if (leftover.length > 0) {
+    const any = leftover.filter((position) => position.key === "ANY");
+    const rest = leftover.filter((position) => position.key !== "ANY");
+    if (rest.length > 0) rows.push(rest);
+    if (any.length > 0 && !rows.some((row) => row.some((p) => p.key === "ANY"))) {
+      rows.push(any);
+    }
+  }
+  return rows;
+}
 
 export function parseSport(value: unknown): SportId {
   return value === "basketball" ? "basketball" : "football";

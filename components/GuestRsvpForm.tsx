@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
-import type { Position } from "@/lib/positions";
+import { FatChoice } from "@/components/FatChoice";
+import { groupedPositionRows, type Position } from "@/lib/positions";
 
 type Props = {
   publicId: string;
@@ -74,18 +75,12 @@ export function GuestRsvpForm({
           <legend className="mb-1 text-sm font-medium text-ink-soft">
             Position
           </legend>
-          <div className="flex flex-wrap gap-3">
-            {positions.map((item) => (
-              <FatChoice
-                key={item.key}
-                selected={position === item.key}
-                onClick={() => setPosition(item.key)}
-                testId={`position-${item.key}`}
-              >
-                {item.label}
-              </FatChoice>
-            ))}
-          </div>
+          <PositionChipGrid
+            positions={positions}
+            selected={position}
+            onSelect={setPosition}
+            testIdPrefix="position"
+          />
         </fieldset>
       ) : null}
 
@@ -117,30 +112,47 @@ export function GuestRsvpForm({
   );
 }
 
-export function FatChoice({
+export function PositionChipGrid({
+  positions,
   selected,
-  onClick,
-  children,
-  testId,
+  onSelect,
+  testIdPrefix,
 }: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  testId: string;
+  positions: Position[];
+  selected: string;
+  onSelect: (key: string) => void;
+  testIdPrefix: string;
 }) {
+  const rows = groupedPositionRows(positions);
   return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`inline-flex min-h-14 min-w-[4.5rem] items-center justify-center rounded-full border-2 px-6 text-lg font-semibold tracking-wide transition ${
-        selected
-          ? "border-accent bg-accent text-on-accent"
-          : "border-ink/15 bg-surface text-ink hover:border-accent/40"
-      }`}
-    >
-      {children}
-    </button>
+    <div className="flex flex-col gap-3" data-testid="position-chips">
+      {rows.map((row) => {
+        const keys = row.map((item) => item.key).join(",");
+        const gap =
+          keys === "PF,SF"
+            ? "gap-8 sm:gap-12"
+            : keys === "SG,PG"
+              ? "gap-3"
+              : "gap-3";
+        return (
+          <div
+            key={keys}
+            data-testid={`position-row-${row[0]?.key ?? keys}`}
+            className={`flex flex-wrap justify-center ${gap}`}
+          >
+            {row.map((item) => (
+              <FatChoice
+                key={item.key}
+                selected={selected === item.key}
+                onClick={() => onSelect(item.key)}
+                testId={`${testIdPrefix}-${item.key}`}
+              >
+                {item.label}
+              </FatChoice>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }

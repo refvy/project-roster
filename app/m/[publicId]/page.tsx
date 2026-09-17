@@ -1,12 +1,46 @@
 import { AddFriendPanel } from "@/components/AddFriendPanel";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
+import { SportChip } from "@/components/SportChip";
 import { Wordmark } from "@/components/Wordmark";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
-import { parsePositions, sportLabel } from "@/lib/positions";
+import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ publicId: string }>;
+}): Promise<Metadata> {
+  const { publicId } = await params;
+  const matchday = await prisma.matchday.findUnique({
+    where: { publicId },
+    select: { title: true, deletedAt: true },
+  });
+  if (!matchday || matchday.deletedAt) {
+    return { title: "Matchday" };
+  }
+  const title = `Signup now for ${matchday.title} — powered by SKWAD`;
+  const description = "Tap Going. Pick your spot. No app.";
+  return {
+    title: { absolute: title },
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: "Skwad",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 export default async function GuestMatchdayPage({
   params,
@@ -24,7 +58,7 @@ export default async function GuestMatchdayPage({
     return (
       <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
         <header>
-          <Wordmark />
+          <Wordmark href="/board" />
         </header>
         <main className="mt-16" data-testid="matchday-gone">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
@@ -66,7 +100,7 @@ export default async function GuestMatchdayPage({
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
       <header>
-        <Wordmark href={`/m/${publicId}`} />
+        <Wordmark href="/board" />
       </header>
       <main className="mt-12 flex flex-col gap-10">
         <div>
@@ -76,8 +110,8 @@ export default async function GuestMatchdayPage({
           <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
             {matchday.title}
           </h1>
-          <p data-testid="sport-label" className="mt-2 text-sm text-ink-soft">
-            {sportLabel(matchday.sport)}
+          <p className="mt-2">
+            <SportChip sport={matchday.sport} testId="sport-label" />
           </p>
           <p className="mt-1 text-lg text-ink-soft">{matchday.whenWhere}</p>
         </div>

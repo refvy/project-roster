@@ -84,10 +84,20 @@ export const FOOTBALL_FORMATIONS: {
 ];
 
 export const BASKETBALL_LINES: { area: PitchLine["area"]; keys: string[] }[] = [
-  { area: "guards", keys: ["PG", "SG"] },
-  { area: "wings", keys: ["SF"] },
-  { area: "the paint", keys: ["PF", "C"] },
+  { area: "the paint", keys: ["C"] },
+  { area: "wings", keys: ["PF", "SF"] },
+  { area: "guards", keys: ["SG", "PG"] },
 ];
+
+/** Percent positions on the half-court: C at the rim, PF/SF wide, SG/PG closer. */
+export const BASKETBALL_SLOT_LAYOUT: Record<string, { top: string; left: string }> =
+  {
+    C: { top: "18%", left: "50%" },
+    PF: { top: "34%", left: "16%" },
+    SF: { top: "34%", left: "84%" },
+    SG: { top: "54%", left: "34%" },
+    PG: { top: "54%", left: "66%" },
+  };
 
 export function getFormation(id: FormationId) {
   const found = FOOTBALL_FORMATIONS.find((item) => item.id === id);
@@ -226,7 +236,7 @@ export function describePitchNeed(
   lines: PitchLine[],
   goingCount: number,
 ): string | null {
-  if (goingCount === 0) return "Pitch fills as players tap Going";
+  if (goingCount === 0) return "Squad fills as players tap Going";
   const empty = emptySlotCount(lines);
   if (empty < 2) return null;
 

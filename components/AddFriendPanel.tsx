@@ -7,7 +7,8 @@ import {
   updateFriendRsvp,
   type RsvpState,
 } from "@/app/actions/rsvp";
-import { FatChoice } from "@/components/GuestRsvpForm";
+import { FatChoice } from "@/components/FatChoice";
+import { PositionChipGrid } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
 
 export type ExtraRsvp = {
@@ -216,18 +217,12 @@ function FriendForm({
         </FatChoice>
       </div>
       {status === "GOING" ? (
-        <div className="flex flex-wrap gap-3">
-          {positions.map((item) => (
-            <FatChoice
-              key={item.key}
-              selected={position === item.key}
-              onClick={() => setPosition(item.key)}
-              testId={`${testId}-position-${item.key}`}
-            >
-              {item.label}
-            </FatChoice>
-          ))}
-        </div>
+        <PositionChipGrid
+          positions={positions}
+          selected={position}
+          onSelect={setPosition}
+          testIdPrefix={`${testId}-position`}
+        />
       ) : null}
       {state?.error ? (
         <p className="text-sm font-medium text-danger" role="alert">

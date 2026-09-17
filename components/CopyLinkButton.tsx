@@ -16,22 +16,21 @@ export function CopyLinkButton({ url }: { url: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <input
-        data-testid="share-url"
-        readOnly
-        value={url}
-        aria-label="Share link"
-        className="min-h-14 flex-1 rounded-2xl border border-ink/10 bg-surface px-4 font-mono text-sm text-ink"
-      />
+    <div className="flex flex-col items-start gap-2">
       <button
         type="button"
         data-testid="copy-link"
         onClick={copy}
-        className="min-h-14 shrink-0 rounded-full bg-accent px-6 text-sm font-semibold text-on-accent hover:bg-accent-deep"
+        className="inline-flex min-h-14 items-center rounded-full bg-accent px-6 text-sm font-semibold text-on-accent hover:bg-accent-deep"
       >
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Copied" : "Copy invitation link"}
       </button>
+      <p
+        data-testid="share-url"
+        className="max-w-full break-all text-sm text-ink-soft"
+      >
+        {url}
+      </p>
     </div>
   );
 }
