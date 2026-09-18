@@ -1016,7 +1016,7 @@ async function saveChipShot(locator: Locator, filename: string) {
   });
 }
 
-/** +N sits on the teal top-right (mostly on-pill). Centered name; slight overlap OK. */
+/** +N center sits on the teal top-right rim (~half on-pill). Centered name; slight overlap OK. */
 async function assertOverflowOnPill(
   page: Page,
   slotKey: string,
@@ -1033,6 +1033,14 @@ async function assertOverflowOnPill(
   const nameCx = nameBox!.x + nameBox!.width / 2;
   const slotCx = slotBox!.x + slotBox!.width / 2;
   expect(Math.abs(nameCx - slotCx)).toBeLessThan(8);
+  const badgeCx = badgeBox!.x + badgeBox!.width / 2;
+  const badgeCy = badgeBox!.y + badgeBox!.height / 2;
+  const alongX = (badgeCx - slotBox!.x) / slotBox!.width;
+  const alongY = (badgeCy - slotBox!.y) / slotBox!.height;
+  expect(alongX).toBeGreaterThan(0.72);
+  expect(alongX).toBeLessThan(0.98);
+  expect(alongY).toBeGreaterThan(0.02);
+  expect(alongY).toBeLessThan(0.32);
   const overlapX =
     Math.min(badgeBox!.x + badgeBox!.width, slotBox!.x + slotBox!.width) -
     Math.max(badgeBox!.x, slotBox!.x);
@@ -1040,13 +1048,8 @@ async function assertOverflowOnPill(
     Math.min(badgeBox!.y + badgeBox!.height, slotBox!.y + slotBox!.height) -
     Math.max(badgeBox!.y, slotBox!.y);
   const onPill = Math.max(0, overlapX) * Math.max(0, overlapY);
-  expect(onPill / (badgeBox!.width * badgeBox!.height)).toBeGreaterThanOrEqual(
-    0.6,
-  );
-  expect(badgeBox!.x + badgeBox!.width / 2).toBeGreaterThan(slotCx);
-  expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
-    slotBox!.y + slotBox!.height / 2,
-  );
+  const ratio = onPill / (badgeBox!.width * badgeBox!.height);
+  expect(ratio).toBeGreaterThanOrEqual(0.35);
 }
 
 async function fontSizeOf(locator: Locator) {
