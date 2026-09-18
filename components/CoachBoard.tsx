@@ -292,7 +292,7 @@ function PitchSlotView({
       {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="chip-overflow absolute -right-1.5 -top-1 z-10 text-[1.25rem] sm:-right-2 sm:-top-1.5 sm:text-[1.45rem]"
+          className="chip-overflow absolute -right-1.5 -top-0.5 z-10 text-[1.25rem] sm:-right-2 sm:-top-1 sm:text-[1.45rem]"
         >
           {badge}
         </span>

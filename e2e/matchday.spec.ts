@@ -842,6 +842,7 @@ test.describe("matchday board", () => {
     expect(gkNameBox && gkBadgeBox).toBeTruthy();
     expect(boxesOverlap(gkNameBox!, inflateBox(gkBadgeBox!, 6))).toBe(false);
     await saveChipShot(gk, "crowded-chip-jet.png");
+    await saveShot(orgPage.getByTestId("half-pitch"), "crowded-pitch-mobile.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
@@ -1018,19 +1019,27 @@ async function saveShot(
   await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
 }
 
-/** 3× chip crop so the name / abbr / +N hierarchy is readable in review. */
+/** Chip crop with padding so rim-nudged +N is not clipped. */
 async function saveChipShot(locator: Locator, filename: string) {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
-  await locator.evaluate((el) => {
-    (el as HTMLElement).style.zoom = "3";
-  });
-  try {
-    await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
-  } finally {
-    await locator.evaluate((el) => {
-      (el as HTMLElement).style.zoom = "";
-    });
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error(`no bounding box for ${filename}`);
   }
+  const pad = 28;
+  const page = locator.page();
+  const vp = page.viewportSize() ?? { width: 1280, height: 720 };
+  const x = Math.max(0, box.x - pad);
+  const y = Math.max(0, box.y - pad);
+  await page.screenshot({
+    path: join(SCREENSHOT_DIR, filename),
+    clip: {
+      x,
+      y,
+      width: Math.min(vp.width - x, box.width + pad * 2),
+      height: Math.min(vp.height - y, box.height + pad * 2),
+    },
+  });
 }
 
 async function fontSizeOf(locator: Locator) {
