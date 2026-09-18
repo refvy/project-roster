@@ -279,7 +279,7 @@ function PitchSlotView({
       onClick={onOpen}
       className={
         crowded
-          ? "relative flex min-h-14 min-w-14 flex-col items-start justify-center overflow-visible rounded-full bg-accent py-2 pl-3 pr-11 text-left sm:min-h-16 sm:min-w-16 sm:pl-3.5 sm:pr-11"
+          ? "relative flex min-h-14 min-w-14 flex-col items-start justify-center overflow-visible rounded-full bg-accent py-2 pl-3 pr-7 text-left sm:min-h-16 sm:min-w-16 sm:pl-3.5 sm:pr-7"
           : "relative flex min-h-14 min-w-14 flex-col items-center justify-center overflow-visible rounded-full bg-accent px-3 py-2 text-center sm:min-h-16 sm:min-w-16"
       }
     >
@@ -292,7 +292,7 @@ function PitchSlotView({
       {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="chip-overflow absolute -right-1.5 -top-0.5 z-10 text-[1.25rem] sm:-right-2 sm:-top-1 sm:text-[1.45rem]"
+          className="chip-overflow absolute right-0 top-0 z-10 translate-x-1/2 -translate-y-1/2 text-[1.25rem]"
         >
           {badge}
         </span>

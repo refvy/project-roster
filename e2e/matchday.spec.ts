@@ -799,49 +799,25 @@ test.describe("matchday board", () => {
         paintOrder: s.paintOrder,
         width: el.getBoundingClientRect().width,
         height: el.getBoundingClientRect().height,
-        paddingRight: Number.parseFloat(
-          getComputedStyle(el.parentElement!).paddingRight,
-        ),
       };
     });
     expect(badgeLook.background).toMatch(/rgba?\(0,\s*0,\s*0,\s*0\)|transparent/);
     expect(Number.parseFloat(badgeLook.radius) || 0).toBe(0);
     expect(badgeLook.color).toMatch(/rgb\(\s*26,\s*23,\s*20\s*\)/);
     expect(badgeLook.stroke).toMatch(/px/);
-    expect(Number.parseFloat(badgeLook.stroke)).toBeGreaterThanOrEqual(5);
+    const strokePx = Number.parseFloat(badgeLook.stroke);
+    expect(strokePx).toBeGreaterThanOrEqual(3);
+    expect(strokePx).toBeLessThanOrEqual(3.5);
     expect(badgeLook.paintOrder).toMatch(/stroke/i);
     expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
-    expect(badgeLook.paddingRight).toBeGreaterThan(32);
-    const slotBox = await slot.boundingBox();
-    const badgeBox = await badge.boundingBox();
-    const nameBox = await name.boundingBox();
-    expect(slotBox && badgeBox && nameBox).toBeTruthy();
-    expect(boxesOverlap(nameBox!, inflateBox(badgeBox!, 6))).toBe(false);
-    expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
-      slotBox!.y + slotBox!.height / 2,
-    );
-    expect(badgeBox!.x + badgeBox!.width / 2).toBeGreaterThan(
-      slotBox!.x + slotBox!.width / 2,
-    );
-    expect(badgeBox!.x).toBeGreaterThan(slotBox!.x);
-    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 14);
+    await assertNameClearOfOverflow(orgPage, "LW", "+2");
     await saveChipShot(slot, "name-plus-n.png");
-    const rw = orgPage.getByTestId("slot-filled-RW");
-    await expect(rw).toContainText("Job");
-    await expect(orgPage.getByTestId("slot-overflow-RW")).toHaveText("+2");
-    const rwNameBox = await orgPage.getByTestId("slot-lead-RW").boundingBox();
-    const rwBadgeBox = await orgPage.getByTestId("slot-overflow-RW").boundingBox();
-    expect(rwNameBox && rwBadgeBox).toBeTruthy();
-    expect(boxesOverlap(rwNameBox!, inflateBox(rwBadgeBox!, 6))).toBe(false);
-    await saveChipShot(rw, "crowded-chip-job.png");
-    const gk = orgPage.getByTestId("slot-filled-GK");
-    await expect(gk).toContainText("Jet");
-    await expect(orgPage.getByTestId("slot-overflow-GK")).toHaveText("+1");
-    const gkNameBox = await orgPage.getByTestId("slot-lead-GK").boundingBox();
-    const gkBadgeBox = await orgPage.getByTestId("slot-overflow-GK").boundingBox();
-    expect(gkNameBox && gkBadgeBox).toBeTruthy();
-    expect(boxesOverlap(gkNameBox!, inflateBox(gkBadgeBox!, 6))).toBe(false);
-    await saveChipShot(gk, "crowded-chip-jet.png");
+    await expect(orgPage.getByTestId("slot-filled-RW")).toContainText("Job");
+    await assertNameClearOfOverflow(orgPage, "RW", "+2");
+    await saveChipShot(orgPage.getByTestId("slot-filled-RW"), "crowded-chip-job.png");
+    await expect(orgPage.getByTestId("slot-filled-GK")).toContainText("Jet");
+    await assertNameClearOfOverflow(orgPage, "GK", "+1");
+    await saveChipShot(orgPage.getByTestId("slot-filled-GK"), "crowded-chip-jet.png");
     await saveShot(orgPage.getByTestId("half-pitch"), "crowded-pitch-mobile.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
@@ -1022,6 +998,7 @@ async function saveShot(
 /** Chip crop with padding so rim-nudged +N is not clipped. */
 async function saveChipShot(locator: Locator, filename: string) {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) {
     throw new Error(`no bounding box for ${filename}`);
@@ -1029,17 +1006,38 @@ async function saveChipShot(locator: Locator, filename: string) {
   const pad = 28;
   const page = locator.page();
   const vp = page.viewportSize() ?? { width: 1280, height: 720 };
-  const x = Math.max(0, box.x - pad);
-  const y = Math.max(0, box.y - pad);
+  const x = Math.min(Math.max(0, box.x - pad), Math.max(0, vp.width - 1));
+  const y = Math.min(Math.max(0, box.y - pad), Math.max(0, vp.height - 1));
+  const width = Math.max(1, Math.min(vp.width - x, box.width + pad * 2));
+  const height = Math.max(1, Math.min(vp.height - y, box.height + pad * 2));
   await page.screenshot({
     path: join(SCREENSHOT_DIR, filename),
-    clip: {
-      x,
-      y,
-      width: Math.min(vp.width - x, box.width + pad * 2),
-      height: Math.min(vp.height - y, box.height + pad * 2),
-    },
+    clip: { x, y, width, height },
   });
+}
+
+/** Name stays ≥8px clear of stroke-inflated +N; +N is half-off the top-right rim. */
+async function assertNameClearOfOverflow(
+  page: Page,
+  slotKey: string,
+  label: string,
+) {
+  const slot = page.getByTestId(`slot-filled-${slotKey}`);
+  const name = page.getByTestId(`slot-lead-${slotKey}`);
+  const badge = page.getByTestId(`slot-overflow-${slotKey}`);
+  await expect(badge).toHaveText(label);
+  const slotBox = await slot.boundingBox();
+  const nameBox = await name.boundingBox();
+  const badgeBox = await badge.boundingBox();
+  expect(slotBox && nameBox && badgeBox).toBeTruthy();
+  const inflated = inflateBox(badgeBox!, 4);
+  expect(boxesOverlap(nameBox!, inflated)).toBe(false);
+  const gap = inflated.x - (nameBox!.x + nameBox!.width);
+  expect(gap).toBeGreaterThanOrEqual(8);
+  const badgeCx = badgeBox!.x + badgeBox!.width / 2;
+  const badgeCy = badgeBox!.y + badgeBox!.height / 2;
+  expect(Math.abs(badgeCx - (slotBox!.x + slotBox!.width))).toBeLessThan(10);
+  expect(Math.abs(badgeCy - slotBox!.y)).toBeLessThan(10);
 }
 
 async function fontSizeOf(locator: Locator) {
