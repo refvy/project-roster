@@ -280,15 +280,14 @@ function PitchSlotView({
     >
       <span
         data-testid={`slot-lead-${slot.key}`}
-        className="font-display max-w-[4.75rem] truncate text-base leading-none text-ink sm:text-lg"
+        className="font-display max-w-[4.75rem] truncate whitespace-nowrap text-lg leading-none tracking-tight text-ink"
       >
         {firstName(lead.name)}
       </span>
       {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          data-badge={badge}
-          className="chip-overflow absolute right-[0.45rem] top-[0.28rem] z-10 text-[1.15rem] sm:right-[0.55rem] sm:top-[0.32rem] sm:text-[1.35rem]"
+          className="chip-overflow absolute right-[0.55rem] top-[0.4rem] z-10 text-[1.25rem] sm:right-[0.65rem] sm:top-[0.45rem] sm:text-[1.45rem]"
         >
           {badge}
         </span>

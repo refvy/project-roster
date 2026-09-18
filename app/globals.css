@@ -55,7 +55,9 @@ body {
   letter-spacing: -0.025em;
 }
 
-/* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge. */
+/* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge.
+   paint-order draws the white stroke first, then the black fill on top so
+   a thick outline cannot cover the numeral. */
 .chip-overflow {
   display: block;
   pointer-events: none;
@@ -64,13 +66,6 @@ body {
   letter-spacing: -0.06em;
   line-height: 0.8;
   color: var(--ink);
-}
-
-.chip-overflow::before {
-  content: attr(data-badge);
-  position: absolute;
-  left: 0;
-  top: 0;
-  color: #fff;
-  -webkit-text-stroke: 6px #fff;
+  -webkit-text-stroke: 3px #fff;
+  paint-order: stroke fill;
 }

@@ -553,7 +553,7 @@ test.describe("matchday board", () => {
     const occupiedNameSize = await fontSizeOf(orgPage.getByTestId("slot-lead-CB"));
     const occupiedAbbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-CB"));
     expect(occupiedNameSize).toBeGreaterThan(occupiedAbbrSize);
-    await saveShot(orgPage.getByTestId("slot-filled-CB"), "occupied-chip.png");
+    await saveChipShot(orgPage.getByTestId("slot-filled-CB"), "occupied-chip.png");
     await expect(orgPage.getByTestId("roster")).toContainText("Nok");
 
     await organiser.close();
@@ -784,12 +784,18 @@ test.describe("matchday board", () => {
       return {
         background: s.backgroundColor,
         radius: s.borderRadius,
+        color: s.color,
+        stroke: s.getPropertyValue("-webkit-text-stroke"),
+        paintOrder: s.paintOrder,
         width: el.getBoundingClientRect().width,
         height: el.getBoundingClientRect().height,
       };
     });
     expect(badgeLook.background).toMatch(/rgba?\(0,\s*0,\s*0,\s*0\)|transparent/);
     expect(Number.parseFloat(badgeLook.radius) || 0).toBe(0);
+    expect(badgeLook.color).toMatch(/rgb\(\s*26,\s*23,\s*20\s*\)/);
+    expect(badgeLook.stroke).toMatch(/px/);
+    expect(badgeLook.paintOrder).toMatch(/stroke/i);
     expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
     const slotBox = await slot.boundingBox();
     const badgeBox = await badge.boundingBox();
@@ -802,7 +808,7 @@ test.describe("matchday board", () => {
     );
     expect(badgeBox!.x).toBeGreaterThan(slotBox!.x);
     expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 4);
-    await saveShot(slot, "name-plus-n.png");
+    await saveChipShot(slot, "name-plus-n.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
@@ -977,6 +983,21 @@ async function saveShot(
 ) {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
   await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
+}
+
+/** 3× chip crop so the name / abbr / +N hierarchy is readable in review. */
+async function saveChipShot(locator: Locator, filename: string) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await locator.evaluate((el) => {
+    (el as HTMLElement).style.zoom = "3";
+  });
+  try {
+    await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
+  } finally {
+    await locator.evaluate((el) => {
+      (el as HTMLElement).style.zoom = "";
+    });
+  }
 }
 
 async function fontSizeOf(locator: Locator) {
