@@ -54,3 +54,23 @@ body {
   font-weight: 800;
   letter-spacing: -0.025em;
 }
+
+/* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge. */
+.chip-overflow {
+  display: block;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.8;
+  color: var(--ink);
+}
+
+.chip-overflow::before {
+  content: attr(data-badge);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #fff;
+  -webkit-text-stroke: 6px #fff;
+}

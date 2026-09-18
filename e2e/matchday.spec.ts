@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeImbalance } from "../lib/imbalance";
@@ -547,6 +547,13 @@ test.describe("matchday board", () => {
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-1-4-1").click();
     await expect(orgPage.getByTestId("slot-filled-CB")).toContainText("Nok");
+    await expect(orgPage.getByTestId("slot-lead-CB")).toHaveText("Nok");
+    await expect(orgPage.getByTestId("slot-abbr-CB")).toHaveText("CB");
+    await expect(orgPage.getByTestId("slot-overflow-CB")).toHaveCount(0);
+    const occupiedNameSize = await fontSizeOf(orgPage.getByTestId("slot-lead-CB"));
+    const occupiedAbbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-CB"));
+    expect(occupiedNameSize).toBeGreaterThan(occupiedAbbrSize);
+    await saveShot(orgPage.getByTestId("slot-filled-CB"), "occupied-chip.png");
     await expect(orgPage.getByTestId("roster")).toContainText("Nok");
 
     await organiser.close();
@@ -736,7 +743,7 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
-  test("crowded chip keeps the name and a corner +N badge; CAM/CDM sit on CM; Out collapses", async ({
+  test("crowded chip keeps the name with stroked +N on the pill; CAM/CDM sit on CM; Out collapses", async ({
     browser,
   }) => {
     const organiser = await browser.newContext();
@@ -765,16 +772,36 @@ test.describe("matchday board", () => {
     await expect(slot).not.toContainText("Dan");
     await expect(slot).not.toContainText("Mit");
     await expect(slot).toContainText("LW");
+    const nameSize = await fontSizeOf(orgPage.getByTestId("slot-lead-LW"));
+    const abbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-LW"));
+    expect(nameSize).toBeGreaterThan(abbrSize);
     const badge = orgPage.getByTestId("slot-overflow-LW");
     await expect(badge).toHaveText("+2");
+    await expect(badge).not.toHaveClass(/rounded-full/);
+    await expect(badge).not.toHaveClass(/\bring-/);
+    const badgeLook = await badge.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        background: s.backgroundColor,
+        radius: s.borderRadius,
+        width: el.getBoundingClientRect().width,
+        height: el.getBoundingClientRect().height,
+      };
+    });
+    expect(badgeLook.background).toMatch(/rgba?\(0,\s*0,\s*0,\s*0\)|transparent/);
+    expect(Number.parseFloat(badgeLook.radius) || 0).toBe(0);
+    expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
     const slotBox = await slot.boundingBox();
     const badgeBox = await badge.boundingBox();
     expect(slotBox && badgeBox).toBeTruthy();
-    expect(Math.min(badgeBox!.width, badgeBox!.height)).toBeGreaterThanOrEqual(
-      22,
+    expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
+      slotBox!.y + slotBox!.height / 2,
     );
-    expect(badgeBox!.y).toBeLessThan(slotBox!.y + slotBox!.height / 2);
-    expect(badgeBox!.x).toBeGreaterThan(slotBox!.x + slotBox!.width / 2);
+    expect(badgeBox!.x + badgeBox!.width / 2).toBeGreaterThan(
+      slotBox!.x + slotBox!.width / 2,
+    );
+    expect(badgeBox!.x).toBeGreaterThan(slotBox!.x);
+    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 4);
     await saveShot(slot, "name-plus-n.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
@@ -950,6 +977,10 @@ async function saveShot(
 ) {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
   await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
+}
+
+async function fontSizeOf(locator: Locator) {
+  return locator.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
 }
 
 async function guestGoing(

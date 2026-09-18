@@ -268,7 +268,6 @@ function PitchSlotView({
     );
   }
 
-  const stacked = slot.players.length > 1;
   const badge = overflowBadgeLabel(slot.players);
   const lead = slot.players[0]!;
 
@@ -277,20 +276,27 @@ function PitchSlotView({
       type="button"
       data-testid={`slot-filled-${slot.key}`}
       onClick={onOpen}
-      className="relative flex min-h-12 min-w-[3.75rem] flex-col items-center justify-center rounded-full bg-accent px-2.5 py-1.5 text-center text-on-accent sm:min-h-14 sm:min-w-[4.25rem]"
+      className="relative flex min-h-14 min-w-14 flex-col items-center justify-center overflow-visible rounded-full bg-accent px-3 py-2 text-center sm:min-h-16 sm:min-w-16"
     >
-      <span className="max-w-[4.5rem] truncate text-xs font-semibold">
+      <span
+        data-testid={`slot-lead-${slot.key}`}
+        className="font-display max-w-[4.75rem] truncate text-base leading-none text-ink sm:text-lg"
+      >
         {firstName(lead.name)}
       </span>
       {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="absolute -right-0.5 -top-0.5 z-10 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-0.5 text-[10px] font-bold leading-none text-cream ring-2 ring-cream sm:h-7 sm:min-w-7 sm:text-[11px]"
+          data-badge={badge}
+          className="chip-overflow absolute right-[0.45rem] top-[0.28rem] z-10 text-[1.15rem] sm:right-[0.55rem] sm:top-[0.32rem] sm:text-[1.35rem]"
         >
           {badge}
         </span>
       ) : null}
-      <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
+      <span
+        data-testid={`slot-abbr-${slot.key}`}
+        className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink sm:text-[11px]"
+      >
         {slot.key}
       </span>
     </button>
