@@ -746,7 +746,10 @@ test.describe("matchday board", () => {
   test("crowded chip keeps the name with stroked +N on the pill; CAM/CDM sit on CM; Out collapses", async ({
     browser,
   }) => {
-    const organiser = await browser.newContext();
+    const organiser = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+    });
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+stack+${Date.now()}@example.com`);
 
@@ -767,6 +770,8 @@ test.describe("matchday board", () => {
     await guestGoing(browser, shareUrl, "Sam", "RW");
     await guestGoing(browser, shareUrl, "Joe", "CAM");
     await guestGoing(browser, shareUrl, "Wee", "CDM");
+    await guestGoing(browser, shareUrl, "Jet", "GK");
+    await guestGoing(browser, shareUrl, "Ben", "GK");
 
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-3-3").click();
@@ -803,15 +808,15 @@ test.describe("matchday board", () => {
     expect(Number.parseFloat(badgeLook.radius) || 0).toBe(0);
     expect(badgeLook.color).toMatch(/rgb\(\s*26,\s*23,\s*20\s*\)/);
     expect(badgeLook.stroke).toMatch(/px/);
+    expect(Number.parseFloat(badgeLook.stroke)).toBeGreaterThanOrEqual(5);
     expect(badgeLook.paintOrder).toMatch(/stroke/i);
     expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
-    expect(badgeLook.paddingRight).toBeGreaterThanOrEqual(28);
-    expect(badgeLook.paddingRight).toBeLessThanOrEqual(32);
+    expect(badgeLook.paddingRight).toBeGreaterThan(32);
     const slotBox = await slot.boundingBox();
     const badgeBox = await badge.boundingBox();
     const nameBox = await name.boundingBox();
     expect(slotBox && badgeBox && nameBox).toBeTruthy();
-    expect(boxesOverlap(nameBox!, inflateBox(badgeBox!, 3))).toBe(false);
+    expect(boxesOverlap(nameBox!, inflateBox(badgeBox!, 6))).toBe(false);
     expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
       slotBox!.y + slotBox!.height / 2,
     );
@@ -819,7 +824,7 @@ test.describe("matchday board", () => {
       slotBox!.x + slotBox!.width / 2,
     );
     expect(badgeBox!.x).toBeGreaterThan(slotBox!.x);
-    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 6);
+    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 14);
     await saveChipShot(slot, "name-plus-n.png");
     const rw = orgPage.getByTestId("slot-filled-RW");
     await expect(rw).toContainText("Job");
@@ -827,8 +832,16 @@ test.describe("matchday board", () => {
     const rwNameBox = await orgPage.getByTestId("slot-lead-RW").boundingBox();
     const rwBadgeBox = await orgPage.getByTestId("slot-overflow-RW").boundingBox();
     expect(rwNameBox && rwBadgeBox).toBeTruthy();
-    expect(boxesOverlap(rwNameBox!, inflateBox(rwBadgeBox!, 3))).toBe(false);
+    expect(boxesOverlap(rwNameBox!, inflateBox(rwBadgeBox!, 6))).toBe(false);
     await saveChipShot(rw, "crowded-chip-job.png");
+    const gk = orgPage.getByTestId("slot-filled-GK");
+    await expect(gk).toContainText("Jet");
+    await expect(orgPage.getByTestId("slot-overflow-GK")).toHaveText("+1");
+    const gkNameBox = await orgPage.getByTestId("slot-lead-GK").boundingBox();
+    const gkBadgeBox = await orgPage.getByTestId("slot-overflow-GK").boundingBox();
+    expect(gkNameBox && gkBadgeBox).toBeTruthy();
+    expect(boxesOverlap(gkNameBox!, inflateBox(gkBadgeBox!, 6))).toBe(false);
+    await saveChipShot(gk, "crowded-chip-jet.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
