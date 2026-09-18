@@ -810,13 +810,13 @@ test.describe("matchday board", () => {
     expect(strokePx).toBeLessThanOrEqual(3.5);
     expect(badgeLook.paintOrder).toMatch(/stroke/i);
     expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
-    await assertNameClearOfOverflow(orgPage, "LW", "+2");
+    await assertOverflowOnPill(orgPage, "LW", "+2");
     await saveChipShot(slot, "name-plus-n.png");
     await expect(orgPage.getByTestId("slot-filled-RW")).toContainText("Job");
-    await assertNameClearOfOverflow(orgPage, "RW", "+2");
+    await assertOverflowOnPill(orgPage, "RW", "+2");
     await saveChipShot(orgPage.getByTestId("slot-filled-RW"), "crowded-chip-job.png");
     await expect(orgPage.getByTestId("slot-filled-GK")).toContainText("Jet");
-    await assertNameClearOfOverflow(orgPage, "GK", "+1");
+    await assertOverflowOnPill(orgPage, "GK", "+1");
     await saveChipShot(orgPage.getByTestId("slot-filled-GK"), "crowded-chip-jet.png");
     await saveShot(orgPage.getByTestId("half-pitch"), "crowded-pitch-mobile.png");
     const cmText = (
@@ -1016,8 +1016,8 @@ async function saveChipShot(locator: Locator, filename: string) {
   });
 }
 
-/** Name stays ≥8px clear of stroke-inflated +N; +N is half-off the top-right rim. */
-async function assertNameClearOfOverflow(
+/** +N sits on the teal top-right (mostly on-pill). Centered name; slight overlap OK. */
+async function assertOverflowOnPill(
   page: Page,
   slotKey: string,
   label: string,
@@ -1030,42 +1030,27 @@ async function assertNameClearOfOverflow(
   const nameBox = await name.boundingBox();
   const badgeBox = await badge.boundingBox();
   expect(slotBox && nameBox && badgeBox).toBeTruthy();
-  const inflated = inflateBox(badgeBox!, 4);
-  expect(boxesOverlap(nameBox!, inflated)).toBe(false);
-  const gap = inflated.x - (nameBox!.x + nameBox!.width);
-  expect(gap).toBeGreaterThanOrEqual(8);
-  const badgeCx = badgeBox!.x + badgeBox!.width / 2;
-  const badgeCy = badgeBox!.y + badgeBox!.height / 2;
-  expect(Math.abs(badgeCx - (slotBox!.x + slotBox!.width))).toBeLessThan(10);
-  expect(Math.abs(badgeCy - slotBox!.y)).toBeLessThan(10);
+  const nameCx = nameBox!.x + nameBox!.width / 2;
+  const slotCx = slotBox!.x + slotBox!.width / 2;
+  expect(Math.abs(nameCx - slotCx)).toBeLessThan(8);
+  const overlapX =
+    Math.min(badgeBox!.x + badgeBox!.width, slotBox!.x + slotBox!.width) -
+    Math.max(badgeBox!.x, slotBox!.x);
+  const overlapY =
+    Math.min(badgeBox!.y + badgeBox!.height, slotBox!.y + slotBox!.height) -
+    Math.max(badgeBox!.y, slotBox!.y);
+  const onPill = Math.max(0, overlapX) * Math.max(0, overlapY);
+  expect(onPill / (badgeBox!.width * badgeBox!.height)).toBeGreaterThanOrEqual(
+    0.6,
+  );
+  expect(badgeBox!.x + badgeBox!.width / 2).toBeGreaterThan(slotCx);
+  expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
+    slotBox!.y + slotBox!.height / 2,
+  );
 }
 
 async function fontSizeOf(locator: Locator) {
   return locator.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
-}
-
-function inflateBox(
-  box: { x: number; y: number; width: number; height: number },
-  pad: number,
-) {
-  return {
-    x: box.x - pad,
-    y: box.y - pad,
-    width: box.width + pad * 2,
-    height: box.height + pad * 2,
-  };
-}
-
-function boxesOverlap(
-  a: { x: number; y: number; width: number; height: number },
-  b: { x: number; y: number; width: number; height: number },
-) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
 }
 
 async function guestGoing(
