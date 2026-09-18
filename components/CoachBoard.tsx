@@ -270,24 +270,29 @@ function PitchSlotView({
 
   const badge = overflowBadgeLabel(slot.players);
   const lead = slot.players[0]!;
+  const crowded = Boolean(badge);
 
   return (
     <button
       type="button"
       data-testid={`slot-filled-${slot.key}`}
       onClick={onOpen}
-      className="relative flex min-h-14 min-w-14 flex-col items-center justify-center overflow-visible rounded-full bg-accent px-3 py-2 text-center sm:min-h-16 sm:min-w-16"
+      className={
+        crowded
+          ? "relative flex min-h-14 min-w-14 flex-col items-start justify-center overflow-visible rounded-full bg-accent py-2 pl-3 pr-8 text-left sm:min-h-16 sm:min-w-16 sm:pl-3.5 sm:pr-8"
+          : "relative flex min-h-14 min-w-14 flex-col items-center justify-center overflow-visible rounded-full bg-accent px-3 py-2 text-center sm:min-h-16 sm:min-w-16"
+      }
     >
       <span
         data-testid={`slot-lead-${slot.key}`}
-        className="font-display max-w-[4.75rem] truncate whitespace-nowrap text-lg leading-none tracking-tight text-ink"
+        className="font-display whitespace-nowrap text-lg leading-none tracking-tight text-ink"
       >
         {firstName(lead.name)}
       </span>
       {badge ? (
         <span
           data-testid={`slot-overflow-${slot.key}`}
-          className="chip-overflow absolute right-[0.55rem] top-[0.4rem] z-10 text-[1.25rem] sm:right-[0.65rem] sm:top-[0.45rem] sm:text-[1.45rem]"
+          className="chip-overflow absolute -right-0.5 top-0.5 z-10 text-[1.25rem] sm:-right-0.5 sm:top-1 sm:text-[1.45rem]"
         >
           {badge}
         </span>

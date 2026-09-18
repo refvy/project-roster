@@ -759,22 +759,27 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
     const shareUrl = await shareUrlOf(orgPage);
 
-    await guestGoing(browser, shareUrl, "Tim", "LW");
     await guestGoing(browser, shareUrl, "Dan", "LW");
+    await guestGoing(browser, shareUrl, "Tim", "LW");
     await guestGoing(browser, shareUrl, "Mit", "LW");
+    await guestGoing(browser, shareUrl, "Job", "RW");
+    await guestGoing(browser, shareUrl, "Pat", "RW");
+    await guestGoing(browser, shareUrl, "Sam", "RW");
     await guestGoing(browser, shareUrl, "Joe", "CAM");
     await guestGoing(browser, shareUrl, "Wee", "CDM");
 
     await orgPage.reload();
     await orgPage.getByTestId("formation-4-3-3").click();
     const slot = orgPage.getByTestId("slot-filled-LW");
-    await expect(slot).toContainText("Tim");
-    await expect(slot).not.toContainText("Dan");
+    await expect(slot).toContainText("Dan");
+    await expect(slot).not.toContainText("Tim");
     await expect(slot).not.toContainText("Mit");
     await expect(slot).toContainText("LW");
-    const nameSize = await fontSizeOf(orgPage.getByTestId("slot-lead-LW"));
+    const name = orgPage.getByTestId("slot-lead-LW");
+    const nameSize = await fontSizeOf(name);
     const abbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-LW"));
     expect(nameSize).toBeGreaterThan(abbrSize);
+    expect(nameSize).toBeGreaterThanOrEqual(18);
     const badge = orgPage.getByTestId("slot-overflow-LW");
     await expect(badge).toHaveText("+2");
     await expect(badge).not.toHaveClass(/rounded-full/);
@@ -789,6 +794,9 @@ test.describe("matchday board", () => {
         paintOrder: s.paintOrder,
         width: el.getBoundingClientRect().width,
         height: el.getBoundingClientRect().height,
+        paddingRight: Number.parseFloat(
+          getComputedStyle(el.parentElement!).paddingRight,
+        ),
       };
     });
     expect(badgeLook.background).toMatch(/rgba?\(0,\s*0,\s*0,\s*0\)|transparent/);
@@ -797,9 +805,13 @@ test.describe("matchday board", () => {
     expect(badgeLook.stroke).toMatch(/px/);
     expect(badgeLook.paintOrder).toMatch(/stroke/i);
     expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
+    expect(badgeLook.paddingRight).toBeGreaterThanOrEqual(28);
+    expect(badgeLook.paddingRight).toBeLessThanOrEqual(32);
     const slotBox = await slot.boundingBox();
     const badgeBox = await badge.boundingBox();
-    expect(slotBox && badgeBox).toBeTruthy();
+    const nameBox = await name.boundingBox();
+    expect(slotBox && badgeBox && nameBox).toBeTruthy();
+    expect(boxesOverlap(nameBox!, inflateBox(badgeBox!, 3))).toBe(false);
     expect(badgeBox!.y + badgeBox!.height / 2).toBeLessThan(
       slotBox!.y + slotBox!.height / 2,
     );
@@ -807,8 +819,16 @@ test.describe("matchday board", () => {
       slotBox!.x + slotBox!.width / 2,
     );
     expect(badgeBox!.x).toBeGreaterThan(slotBox!.x);
-    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 4);
+    expect(badgeBox!.y).toBeGreaterThan(slotBox!.y - 6);
     await saveChipShot(slot, "name-plus-n.png");
+    const rw = orgPage.getByTestId("slot-filled-RW");
+    await expect(rw).toContainText("Job");
+    await expect(orgPage.getByTestId("slot-overflow-RW")).toHaveText("+2");
+    const rwNameBox = await orgPage.getByTestId("slot-lead-RW").boundingBox();
+    const rwBadgeBox = await orgPage.getByTestId("slot-overflow-RW").boundingBox();
+    expect(rwNameBox && rwBadgeBox).toBeTruthy();
+    expect(boxesOverlap(rwNameBox!, inflateBox(rwBadgeBox!, 3))).toBe(false);
+    await saveChipShot(rw, "crowded-chip-job.png");
     const cmText = (
       await orgPage.getByTestId("slot-filled-CM").allTextContents()
     ).join(" ");
@@ -1002,6 +1022,30 @@ async function saveChipShot(locator: Locator, filename: string) {
 
 async function fontSizeOf(locator: Locator) {
   return locator.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
+}
+
+function inflateBox(
+  box: { x: number; y: number; width: number; height: number },
+  pad: number,
+) {
+  return {
+    x: box.x - pad,
+    y: box.y - pad,
+    width: box.width + pad * 2,
+    height: box.height + pad * 2,
+  };
+}
+
+function boxesOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
 }
 
 async function guestGoing(
