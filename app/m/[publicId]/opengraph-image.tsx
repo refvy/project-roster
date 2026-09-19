@@ -16,9 +16,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** Dan locked mock: lime CTA band. Not an app chrome token. */
-const OG_LIME = "#C5F04D";
-
 export default async function Image({
   params,
 }: {
@@ -43,9 +40,8 @@ export default async function Image({
         : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
   const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
-  const pulse = live && matchday ? matchdaySharePulse(matchday) : null;
-  const stamp = pulse?.stamp ?? null;
-  const ctaTitle = pulse?.title ?? null;
+  const stamp =
+    live && matchday ? matchdaySharePulse(matchday).stamp : null;
 
   const [logo, extraBold, medium] = await Promise.all([
     readFile(join(process.cwd(), "public/skwad-header.png")),
@@ -60,33 +56,29 @@ export default async function Image({
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
+          position: "relative",
           background: "#f7f4ef",
         }}
       >
         <div
           style={{
             width: "100%",
+            height: "100%",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "flex-start",
+            justifyContent: "center",
             alignItems: "flex-start",
-            flexGrow: 1,
-            position: "relative",
-            paddingTop: 56,
-            paddingBottom: 28,
-            paddingLeft: 72,
-            paddingRight: 72,
+            padding: "80px 96px",
           }}
         >
           <img
             src={`data:image/png;base64,${logo.toString("base64")}`}
-            height={64}
+            height={72}
             alt="SKWAD"
           />
           <div
             style={{
-              marginTop: 36,
+              marginTop: 72,
               color: "#00D4C8",
               fontFamily: "Outfit",
               fontSize: 22,
@@ -99,14 +91,14 @@ export default async function Image({
           </div>
           <div
             style={{
-              marginTop: 12,
+              marginTop: 16,
               color: "#1a1714",
               fontFamily: "Outfit",
-              fontSize: title.length > 28 ? 48 : 60,
+              fontSize: title.length > 28 ? 56 : 72,
               fontWeight: 800,
               letterSpacing: "-0.03em",
               lineHeight: 1.05,
-              maxWidth: stamp ? 760 : 1000,
+              maxWidth: stamp ? 720 : 1000,
             }}
           >
             {title}
@@ -114,10 +106,10 @@ export default async function Image({
           {sport ? (
             <div
               style={{
-                marginTop: 18,
+                marginTop: 28,
                 color: "#5e584f",
                 fontFamily: "Outfit",
-                fontSize: 28,
+                fontSize: 32,
                 fontWeight: 500,
               }}
             >
@@ -127,65 +119,18 @@ export default async function Image({
           {when ? (
             <div
               style={{
-                marginTop: 6,
+                marginTop: 8,
                 color: "#5e584f",
                 fontFamily: "Outfit",
-                fontSize: 28,
+                fontSize: 32,
                 fontWeight: 500,
               }}
             >
               {when}
             </div>
           ) : null}
-          {stamp ? <OgStamp stamp={stamp} /> : null}
         </div>
-        {ctaTitle ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              width: "100%",
-              backgroundColor: OG_LIME,
-              minHeight: 230,
-              paddingTop: 44,
-              paddingBottom: 48,
-              paddingLeft: 72,
-              paddingRight: 72,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                color: "#1a1714",
-                fontFamily: "Outfit",
-                fontSize: ctaTitle.length > 52 ? 34 : 40,
-                fontWeight: 800,
-                letterSpacing: "-0.03em",
-                lineHeight: 1.15,
-                maxWidth: 1056,
-              }}
-            >
-              {ctaTitle}
-            </div>
-            {when ? (
-              <div
-                style={{
-                  display: "flex",
-                  marginTop: 12,
-                  color: "#3f3b36",
-                  fontFamily: "Outfit",
-                  fontSize: 26,
-                  fontWeight: 500,
-                  lineHeight: 1.25,
-                  maxWidth: 1056,
-                }}
-              >
-                {truncateOgLine(when, 78)}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {stamp ? <OgStamp stamp={stamp} /> : null}
       </div>
     ),
     {
@@ -198,12 +143,7 @@ export default async function Image({
   );
 }
 
-function truncateOgLine(value: string, max: number) {
-  if (value.length <= max) return value;
-  return `${value.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
-}
-
-/** Dan locked mock: white fill + thick coral/teal border, slight tilt, cream behind. */
+/** White fill + thick coral/teal border. +25% vs first stamp pass; tilts/colors unchanged. */
 function OgStamp({ stamp }: { stamp: StampView }) {
   const twoLines = Boolean(stamp.line2);
   return (
@@ -217,14 +157,14 @@ function OgStamp({ stamp }: { stamp: StampView }) {
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: stamp.fill,
-        borderWidth: 14,
+        borderWidth: 18,
         borderStyle: "solid",
         borderColor: stamp.border,
-        borderRadius: 36,
-        paddingTop: twoLines ? 20 : 26,
-        paddingBottom: twoLines ? 22 : 26,
-        paddingLeft: 30,
-        paddingRight: 30,
+        borderRadius: 45,
+        paddingTop: twoLines ? 25 : 33,
+        paddingBottom: twoLines ? 28 : 33,
+        paddingLeft: 38,
+        paddingRight: 38,
         transform: `rotate(${stamp.tiltDeg}deg)`,
       }}
     >
@@ -233,7 +173,7 @@ function OgStamp({ stamp }: { stamp: StampView }) {
           display: "flex",
           color: stamp.line1.color,
           fontFamily: "Outfit",
-          fontSize: stamp.line1.text.length > 9 ? 40 : 52,
+          fontSize: stamp.line1.text.length > 9 ? 50 : 65,
           fontWeight: 800,
           letterSpacing: "-0.04em",
           lineHeight: 0.95,
@@ -246,10 +186,10 @@ function OgStamp({ stamp }: { stamp: StampView }) {
         <div
           style={{
             display: "flex",
-            marginTop: 8,
+            marginTop: 10,
             color: stamp.line2.color,
             fontFamily: "Outfit",
-            fontSize: 36,
+            fontSize: 45,
             fontWeight: 800,
             letterSpacing: "-0.04em",
             lineHeight: 0.95,
