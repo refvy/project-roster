@@ -16,6 +16,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/** Dan locked mock: lime CTA band. Not an app chrome token. */
+const OG_LIME = "#C5F04D";
+
 export default async function Image({
   params,
 }: {
@@ -40,10 +43,9 @@ export default async function Image({
         : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
   const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
-  const stamp =
-    live && matchday
-      ? matchdaySharePulse(matchday).stamp
-      : null;
+  const pulse = live && matchday ? matchdaySharePulse(matchday) : null;
+  const stamp = pulse?.stamp ?? null;
+  const ctaTitle = pulse?.title ?? null;
 
   const [logo, extraBold, medium] = await Promise.all([
     readFile(join(process.cwd(), "public/skwad-header.png")),
@@ -58,29 +60,33 @@ export default async function Image({
           width: "100%",
           height: "100%",
           display: "flex",
-          position: "relative",
+          flexDirection: "column",
           background: "#f7f4ef",
         }}
       >
         <div
           style={{
             width: "100%",
-            height: "100%",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
+            justifyContent: "flex-start",
             alignItems: "flex-start",
-            padding: "80px 96px",
+            flexGrow: 1,
+            position: "relative",
+            paddingTop: 56,
+            paddingBottom: 28,
+            paddingLeft: 72,
+            paddingRight: 72,
           }}
         >
           <img
             src={`data:image/png;base64,${logo.toString("base64")}`}
-            height={72}
+            height={64}
             alt="SKWAD"
           />
           <div
             style={{
-              marginTop: 72,
+              marginTop: 36,
               color: "#00D4C8",
               fontFamily: "Outfit",
               fontSize: 22,
@@ -93,14 +99,14 @@ export default async function Image({
           </div>
           <div
             style={{
-              marginTop: 16,
+              marginTop: 12,
               color: "#1a1714",
               fontFamily: "Outfit",
-              fontSize: title.length > 28 ? 56 : 72,
+              fontSize: title.length > 28 ? 48 : 60,
               fontWeight: 800,
               letterSpacing: "-0.03em",
               lineHeight: 1.05,
-              maxWidth: stamp ? 780 : 1000,
+              maxWidth: stamp ? 760 : 1000,
             }}
           >
             {title}
@@ -108,10 +114,10 @@ export default async function Image({
           {sport ? (
             <div
               style={{
-                marginTop: 28,
+                marginTop: 18,
                 color: "#5e584f",
                 fontFamily: "Outfit",
-                fontSize: 32,
+                fontSize: 28,
                 fontWeight: 500,
               }}
             >
@@ -121,18 +127,64 @@ export default async function Image({
           {when ? (
             <div
               style={{
-                marginTop: 8,
+                marginTop: 6,
                 color: "#5e584f",
                 fontFamily: "Outfit",
-                fontSize: 32,
+                fontSize: 28,
                 fontWeight: 500,
               }}
             >
               {when}
             </div>
           ) : null}
+          {stamp ? <OgStamp stamp={stamp} /> : null}
         </div>
-        {stamp ? <OgStamp stamp={stamp} /> : null}
+        {ctaTitle ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              width: "100%",
+              backgroundColor: OG_LIME,
+              paddingTop: 36,
+              paddingBottom: 40,
+              paddingLeft: 72,
+              paddingRight: 72,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                color: "#1a1714",
+                fontFamily: "Outfit",
+                fontSize: ctaTitle.length > 52 ? 34 : 40,
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                lineHeight: 1.15,
+                maxWidth: 1056,
+              }}
+            >
+              {ctaTitle}
+            </div>
+            {when ? (
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: 12,
+                  color: "#3f3b36",
+                  fontFamily: "Outfit",
+                  fontSize: 26,
+                  fontWeight: 500,
+                  lineHeight: 1.25,
+                  maxWidth: 1056,
+                }}
+              >
+                {truncateOgLine(when, 78)}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     ),
     {
@@ -145,6 +197,11 @@ export default async function Image({
   );
 }
 
+function truncateOgLine(value: string, max: number) {
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
+}
+
 /** Dan locked mock: white fill + thick coral/teal border, slight tilt, cream behind. */
 function OgStamp({ stamp }: { stamp: StampView }) {
   const twoLines = Boolean(stamp.line2);
@@ -152,8 +209,8 @@ function OgStamp({ stamp }: { stamp: StampView }) {
     <div
       style={{
         position: "absolute",
-        top: 64,
-        right: 72,
+        top: 48,
+        right: 56,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
