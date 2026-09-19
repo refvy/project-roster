@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions/auth";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { ShareUpdateButton } from "@/components/ShareUpdateButton";
 import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
@@ -119,7 +120,12 @@ export default async function OrganiserMatchdayPage({
           </div>
         </div>
 
-        <CopyLinkButton url={shareUrl} />
+        <div className="flex flex-col gap-4">
+          <CopyLinkButton url={shareUrl} />
+          {matchday.status === "LIVE" ? (
+            <ShareUpdateButton matchdayId={matchday.id} />
+          ) : null}
+        </div>
 
         <CoachBoard
           matchdayId={matchday.id}

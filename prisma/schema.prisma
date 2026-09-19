@@ -53,6 +53,8 @@ model Matchday {
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
   status      MatchdayStatus @default(LIVE)
+  /// LINE cache-bust token. Share update and the 5am BKK cron bump this.
+  ogBust      String    @default("0")
   rsvps       Rsvp[]
 
   @@index([organiserId])

@@ -22,7 +22,7 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 - Create a matchday: sport (Football | Basketball, default Football), title, when/where as text (no venue booking)
 - Edit title / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
-- **+ New matchday**; copy **Copy invitation link** (URL muted under the button)
+- **+ New matchday**; copy **Copy invitation link** (URL muted under the button). On a live match, **Share update** copies the same link with `?v=` plus title + count pulse so LINE recrawls the OG card.
 - Home tabs **Invited** (matches you joined) · **Hosting** (matches you created). SKWAD logo goes here. Managers who also play see both.
 - Live roster of Going players + positions, same back→front order guests see
 - Organiser **Squad** board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (hoop/key at the top, proper 3-point corners + arc, half center circle on the midcourt line; **C** at the rim, **PF · SF** wide, **SG · PG** closer). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Slots: empty = muted abbr; filled = first name + abbr; extras get a corner teal `+N` (cream ring, cap 9+). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag.
@@ -34,7 +34,7 @@ Positions snapshot as JSON on each matchday. Players stay on chips.
 
 All colour lives in the `:root` block of `app/globals.css`. Swap that block to restyle.
 
-Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Locked logo (Steve): white SKWAD, chevron A, notched teal capsule — header `public/skwad-header.png`, icon `app/icon.png`. Match share OG: cream card, SKWAD capsule, title; **description is the match when/where**. Landing and /board OG tagline: **Paste a link. Get your squad signed up.** Type: **Outfit** only — ExtraBold titles (`tracking-tight`), Medium/Regular body. No serif.
+Current skin: cream / warm-white ground, dark ink, **Signal teal** (`#00D4C8` family) for the Skwad lockup, Going, selected chips, and CTAs. Locked logo (Steve): white SKWAD, chevron A, notched teal capsule — header `public/skwad-header.png`, icon `app/icon.png`. Match share OG: cream MATCHDAY card, SKWAD capsule, title, when/where. Live RSVP counts overlay a **white-fill sale stamp** (Dan lock): thick coral `#FF5A3D` **NEED / n MORE** at −12° when Going is under formation capacity (football 11 / basketball 5 slots); thick teal `#00D4C8` **n GOING** at +12° once full, with muted gray `#6B7280` **n OUT** when anyone is Out. Not a solid coral/teal pill. Title (stable): **Signup now for {title} — powered by SKWAD**. Description pulses **n Going · n Out · {imbalance} · {when/where}** (omit Out at 0; first invite with nobody RSVP’d stays when/where). Landing and /board OG tagline: **Paste a link. Get your squad signed up.** Type: **Outfit** only — ExtraBold titles (`tracking-tight`), Medium/Regular body. No serif.
 
 ## What it is not
 
@@ -81,6 +81,7 @@ npm run dev
 | `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). **Unset in Vercel production.** `isAuthDebug()` also returns false when `VERCEL_ENV=production`, so the on-page shortcut cannot leak on the production deployment even if the dashboard var is still set. |
 | `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
 | `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
+| `CRON_SECRET` | production cron | Bearer token Vercel sends to `/api/cron/og-refresh`. Daily **5am Asia/Bangkok** (`0 22 * * *` UTC) bumps `ogBust` on LIVE matchdays so the next LINE paste can recrawl. Does not ping LINE. Unset locally — Playwright uses `AUTH_DEBUG`. |
 
 Local example:
 
@@ -95,7 +96,7 @@ EMAIL_FROM="Skwad <onboarding@resend.dev>"
 
 ## Tests
 
-Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG description = when/where; landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
+Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG title stays **Signup now for {title}**; first-invite description is when/where; after RSVPs the body pulses Going / Out / imbalance; Share update copies `?v=`; OG stamp cases (Low / Enough / Enough+Out); landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
 
 ```bash
 npx prisma migrate deploy
@@ -107,7 +108,7 @@ npm test
 
 Redeploy **production** so **https://getskwad.com** picks this PR up. Do not dogfood guest magic/share links off `project-roster-tau.vercel.app`.
 
-1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com / skwad.link, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`.
+1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com / skwad.link, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`. Set `CRON_SECRET` (any long random string) so the 5am BKK OG refresh cron is authorized.
 2. Preview/tau may stay on a separate DB. Production `DATABASE_URL` must not be the tau database.
 3. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
 4. Confirm https://getskwad.com loads, request a magic link, open it on getskwad.com, create a matchday, paste the guest link (host getskwad.com or skwad.link) in a private window.

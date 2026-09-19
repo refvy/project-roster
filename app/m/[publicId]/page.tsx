@@ -7,9 +7,9 @@ import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
-import { formatWhenWhereLine } from "@/lib/when-where";
 import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
+import { matchdaySharePulse, ogImageUrl } from "@/lib/share-pulse";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -21,7 +21,7 @@ export async function generateMetadata({
   const { publicId } = await params;
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
-    select: { title: true, deletedAt: true, whenWhere: true, status: true },
+    include: { rsvps: { select: { status: true, positionKey: true } } },
   });
   if (!matchday || matchday.deletedAt) {
     return { title: "Matchday" };
@@ -32,8 +32,10 @@ export async function generateMetadata({
   if (matchday.status === "COMPLETED") {
     return { title: { absolute: "Match completed" } };
   }
-  const title = `Signup now for ${matchday.title} — powered by SKWAD`;
-  const description = formatWhenWhereLine(matchday.whenWhere);
+  const pulse = matchdaySharePulse(matchday);
+  const title = pulse.title;
+  const description = pulse.body;
+  const image = ogImageUrl(publicId, matchday.ogBust);
   return {
     title: { absolute: title },
     description,
@@ -42,11 +44,20 @@ export async function generateMetadata({
       description,
       siteName: "Skwad",
       type: "website",
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: "Matchday — powered by SKWAD",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [image],
     },
   };
 }

@@ -24,6 +24,18 @@ import {
   groupedPositionRows,
 } from "../lib/positions";
 import { formatWhenWhereLine } from "../lib/when-where";
+import {
+  inviteShareUrl,
+  matchdaySharePulse,
+  ogImageUrl,
+  pulseBody,
+  shareUpdateText,
+  shareUpdateUrl,
+  squadCapacity,
+  stampKind,
+  stampView,
+  signupTitle,
+} from "../lib/share-pulse";
 
 const SCREENSHOT_DIR = "/opt/cursor/artifacts/screenshots";
 
@@ -307,6 +319,132 @@ test.describe("public origin", () => {
       if (prevA === undefined) delete process.env.APP_URL;
       else process.env.APP_URL = prevA;
     }
+  });
+});
+
+test.describe("share pulse", () => {
+  test("capacity is formation slot count", () => {
+    expect(squadCapacity("football", "4-3-3")).toBe(11);
+    expect(squadCapacity("football", "3-5-2")).toBe(11);
+    expect(squadCapacity("basketball", "4-3-3")).toBe(5);
+  });
+
+  test("title is stable signup copy", () => {
+    expect(signupTitle("3 เส้า v SISB v STA")).toBe(
+      "Signup now for 3 เส้า v SISB v STA — powered by SKWAD",
+    );
+  });
+
+  test("Low stamp: white fill, coral NEED / n MORE, −12°", () => {
+    expect(stampKind(8, 2, 11)).toBe("low");
+    const stamp = stampView(9, 0, 11);
+    expect(stamp).toMatchObject({
+      kind: "low",
+      tiltDeg: -12,
+      border: "#FF5A3D",
+      fill: "#ffffff",
+      line1: { text: "NEED", color: "#FF5A3D" },
+      line2: { text: "2 MORE", color: "#FF5A3D" },
+    });
+  });
+
+  test("Enough + Out: teal border, black n GOING, gray n OUT, +12°", () => {
+    expect(stampKind(11, 2, 11)).toBe("enough-out");
+    const stamp = stampView(8, 2, 8);
+    expect(stamp).toMatchObject({
+      kind: "enough-out",
+      tiltDeg: 12,
+      border: "#00D4C8",
+      fill: "#ffffff",
+      line1: { text: "8 GOING", color: "#1a1714" },
+      line2: { text: "2 OUT", color: "#6B7280" },
+    });
+  });
+
+  test("Enough with no Out omits the Out line", () => {
+    expect(stampKind(5, 0, 5)).toBe("enough");
+    const stamp = stampView(5, 0, 5);
+    expect(stamp).toMatchObject({
+      kind: "enough",
+      tiltDeg: 12,
+      border: "#00D4C8",
+      fill: "#ffffff",
+      line1: { text: "5 GOING", color: "#1a1714" },
+      line2: null,
+    });
+  });
+
+  test("no stamp until a Going or Out exists", () => {
+    expect(stampKind(0, 0, 11)).toBeNull();
+    expect(stampView(0, 0, 11)).toBeNull();
+  });
+
+  test("body pulses Going, Out, imbalance, when/where", () => {
+    expect(
+      pulseBody({
+        going: 0,
+        out: 0,
+        imbalance: null,
+        whenWhere: "Tue 20:00 · Court 1",
+      }),
+    ).toBe("Tue 20:00 · Court 1");
+    expect(
+      pulseBody({
+        going: 8,
+        out: 0,
+        imbalance: "need a CB",
+        whenWhere: "Sat 18:00",
+      }),
+    ).toBe("8 Going · need a CB · Sat 18:00");
+    expect(
+      pulseBody({
+        going: 8,
+        out: 2,
+        imbalance: "need a CB",
+        whenWhere: "Sat 18:00",
+      }),
+    ).toBe("8 Going · 2 Out · need a CB · Sat 18:00");
+  });
+
+  test("Share update URL adds ?v=; invite URL stays clean", () => {
+    expect(inviteShareUrl("https://getskwad.com", "abc")).toBe(
+      "https://getskwad.com/m/abc",
+    );
+    expect(shareUpdateUrl("https://getskwad.com", "abc", "1710000000")).toBe(
+      "https://getskwad.com/m/abc?v=1710000000",
+    );
+    expect(ogImageUrl("abc", "1710000000")).toBe(
+      "/m/abc/opengraph-image?v=1710000000",
+    );
+    expect(
+      shareUpdateText(
+        "Signup now for Pulse — powered by SKWAD",
+        "2 Going · Sat 18:00",
+        "https://getskwad.com/m/abc?v=1",
+      ),
+    ).toBe(
+      "Signup now for Pulse — powered by SKWAD\n2 Going · Sat 18:00\nhttps://getskwad.com/m/abc?v=1",
+    );
+  });
+
+  test("matchdaySharePulse wires stamp + body", () => {
+    const low = matchdaySharePulse({
+      title: "Sunday",
+      sport: "football",
+      formation: "4-3-3",
+      whenWhere: "Sun 17:00",
+      positions: FOOTBALL_POSITIONS,
+      rsvps: [
+        { status: "GOING", positionKey: "GK" },
+        { status: "GOING", positionKey: "GK" },
+        { status: "OUT", positionKey: null },
+      ],
+    });
+    expect(low.title).toBe("Signup now for Sunday — powered by SKWAD");
+    expect(low.stamp?.kind).toBe("low");
+    expect(low.body).toContain("2 Going · 1 Out");
+    expect(low.body).toContain("Too many GKs");
+    expect(low.body).toContain("Sun 17:00");
   });
 });
 
@@ -1089,6 +1227,133 @@ test.describe("matchday board", () => {
 
     await player.close();
     await host.close();
+  });
+
+  test("Share update copies ?v=; OG stamps Low / Enough / Enough+Out", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+pulse+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Pulse game");
+    await orgPage.getByLabel("When / where").fill("Sat 18:00 · Court 2");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByTestId("share-update")).toBeVisible();
+    const shareUrl = await shareUrlOf(orgPage);
+    expect(shareUrl).toMatch(/\/m\/[^/?]+$/);
+    expect(shareUrl).not.toContain("?v=");
+
+    const guestPage = await browser.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Pulse game — powered by SKWAD",
+    );
+    await expect(
+      guestPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Sat 18:00 · Court 2");
+    await guestPage.close();
+
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestGoing(browser, shareUrl, "Bee", "GK");
+    await guestOut(browser, shareUrl, "Nok");
+
+    const pulsed = await browser.newPage();
+    await pulsed.goto(shareUrl);
+    await expect(pulsed.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Pulse game — powered by SKWAD",
+    );
+    await expect(
+      pulsed.locator('meta[property="og:description"]'),
+    ).toHaveAttribute(
+      "content",
+      "2 Going · 1 Out · Too many GKs · need a CB · Sat 18:00 · Court 2",
+    );
+    const ogImage = pulsed.locator('meta[property="og:image"]');
+    await expect(ogImage).toHaveAttribute("content", /opengraph-image\?v=/);
+    const lowOg = await pulsed.request.get(`${shareUrl}/opengraph-image`);
+    expect(lowOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-stamp-low.png"), await lowOg.body());
+    await pulsed.close();
+
+    await orgPage.reload();
+    await orgPage.getByTestId("share-update").click();
+    await expect(orgPage.getByTestId("share-update")).toHaveText("Copied");
+    const updateUrl = await orgPage.getByTestId("share-update-url").textContent();
+    expect(updateUrl ?? "").toMatch(/\?v=\d+/);
+    expect(updateUrl ?? "").toContain(shareUrl);
+    const copied = await orgPage.getByTestId("share-update-text").textContent();
+    expect(copied).toContain("Signup now for Pulse game — powered by SKWAD");
+    expect(copied).toContain(
+      "2 Going · 1 Out · Too many GKs · need a CB · Sat 18:00 · Court 2",
+    );
+    expect(copied).toContain("?v=");
+    expect(await shareUrlOf(orgPage)).toBe(shareUrl);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByTestId("sport-basketball").click();
+    await orgPage.getByLabel("Title").fill("Enough run");
+    await orgPage.getByLabel("When / where").fill("Tue 20:00 · Court 1");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const enoughUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, enoughUrl, "Dan", "C");
+    await guestGoing(browser, enoughUrl, "Pat", "PF");
+    await guestGoing(browser, enoughUrl, "Sam", "SF");
+    await guestGoing(browser, enoughUrl, "Joe", "SG");
+    await guestGoing(browser, enoughUrl, "Wee", "PG");
+
+    const enoughPage = await browser.newPage();
+    await enoughPage.goto(enoughUrl);
+    await expect(
+      enoughPage.locator('meta[property="og:title"]'),
+    ).toHaveAttribute(
+      "content",
+      "Signup now for Enough run — powered by SKWAD",
+    );
+    await expect(
+      enoughPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "5 Going · Tue 20:00 · Court 1");
+    const enoughOg = await enoughPage.request.get(
+      `${enoughUrl}/opengraph-image`,
+    );
+    expect(enoughOg.ok()).toBeTruthy();
+    writeFileSync(
+      join(SCREENSHOT_DIR, "og-stamp-enough.png"),
+      await enoughOg.body(),
+    );
+    await enoughPage.close();
+
+    await guestOut(browser, enoughUrl, "Aek");
+    const outPage = await browser.newPage();
+    await outPage.goto(enoughUrl);
+    await expect(
+      outPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "5 Going · 1 Out · Tue 20:00 · Court 1");
+    const outOg = await outPage.request.get(`${enoughUrl}/opengraph-image`);
+    expect(outOg.ok()).toBeTruthy();
+    writeFileSync(
+      join(SCREENSHOT_DIR, "og-stamp-enough-out.png"),
+      await outOg.body(),
+    );
+    await outPage.close();
+
+    await orgPage.getByTestId("complete-matchday").click();
+    await orgPage.getByTestId("complete-matchday-confirm").click();
+    await orgPage.getByRole("link", { name: "Enough run" }).click();
+    await expect(orgPage.getByTestId("completed-chip")).toBeVisible();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
+
+    const cron = await orgPage.request.get("/api/cron/og-refresh");
+    expect(cron.ok()).toBeTruthy();
+    const cronBody = (await cron.json()) as { ok: boolean };
+    expect(cronBody.ok).toBe(true);
+
+    await organiser.close();
   });
 });
 
