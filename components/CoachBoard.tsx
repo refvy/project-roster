@@ -29,12 +29,14 @@ export function CoachBoard({
   formation: savedFormation,
   going,
   out = [],
+  readOnly = false,
 }: {
   matchdayId: string;
   sport: string;
   formation: string;
   going: GoingPlayer[];
   out?: { id: string; name: string }[];
+  readOnly?: boolean;
 }) {
   const isBasketball = parseSport(sport) === "basketball";
   const [formationId, setFormationId] = useState<FormationId>(
@@ -63,7 +65,7 @@ export function CoachBoard({
         >
           Squad
         </h2>
-        {!isBasketball ? (
+        {!isBasketball && !readOnly ? (
           <div className="flex flex-wrap gap-2">
             {FOOTBALL_FORMATIONS.map((item) => (
               <button
@@ -90,7 +92,7 @@ export function CoachBoard({
         ) : null}
       </div>
 
-      {need ? (
+      {need && !readOnly ? (
         <p
           data-testid="coach-banner"
           className="rounded-2xl bg-accent-soft px-4 py-3 text-sm font-medium text-accent-deep"

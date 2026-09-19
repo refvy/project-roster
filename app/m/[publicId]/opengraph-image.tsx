@@ -30,11 +30,14 @@ export default async function Image({
 
   const gone = !matchday || Boolean(matchday.deletedAt);
   const cancelled = !gone && matchday.status === "CANCELLED";
+  const completed = !gone && matchday.status === "COMPLETED";
   const title = gone
     ? "This matchday was deleted"
     : cancelled
       ? "This match was cancelled"
-      : matchday.title;
+      : completed
+        ? "Match completed"
+        : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
   const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
 

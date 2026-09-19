@@ -13,7 +13,7 @@ type MatchdayRow = {
   whenWhere: string;
   sport: string;
   going: number;
-  cancelled: boolean;
+  status: "LIVE" | "CANCELLED" | "COMPLETED";
 };
 
 export default async function BoardPage({
@@ -66,7 +66,7 @@ export default async function BoardPage({
     whenWhere: matchday.whenWhere,
     sport: matchday.sport,
     going: matchday._count.rsvps,
-    cancelled: matchday.status === "CANCELLED",
+    status: matchday.status,
   }));
   const invitedRows: MatchdayRow[] = invitedRecords.map((matchday) => ({
     id: matchday.id,
@@ -75,7 +75,7 @@ export default async function BoardPage({
     whenWhere: matchday.whenWhere,
     sport: matchday.sport,
     going: matchday._count.rsvps,
-    cancelled: matchday.status === "CANCELLED",
+    status: matchday.status,
   }));
 
   const rows = tab === "invited" ? invitedRows : hostingRows;
@@ -169,17 +169,25 @@ export default async function BoardPage({
                   }
                   data-testid="matchday-card"
                   className={`block cursor-pointer rounded-2xl px-3 py-5 transition hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_10px_28px_-18px_rgb(26,23,20,0.45)] active:translate-y-0 active:bg-cream-deep ${
-                    matchday.cancelled ? "opacity-50" : ""
+                    matchday.status !== "LIVE" ? "opacity-60" : ""
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <SportChip sport={matchday.sport} />
-                    {matchday.cancelled ? (
+                    {matchday.status === "CANCELLED" ? (
                       <span
                         data-testid="cancelled-chip"
                         className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
                       >
                         Cancelled
+                      </span>
+                    ) : null}
+                    {matchday.status === "COMPLETED" ? (
+                      <span
+                        data-testid="completed-chip"
+                        className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-deep"
+                      >
+                        Completed
                       </span>
                     ) : null}
                   </div>

@@ -1,4 +1,5 @@
 import { AddFriendPanel } from "@/components/AddFriendPanel";
+import { CoachBoard } from "@/components/CoachBoard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
 import { SportChip } from "@/components/SportChip";
@@ -27,6 +28,9 @@ export async function generateMetadata({
   }
   if (matchday.status === "CANCELLED") {
     return { title: { absolute: "This match was cancelled" } };
+  }
+  if (matchday.status === "COMPLETED") {
+    return { title: { absolute: "Match completed" } };
   }
   const title = `Signup now for ${matchday.title} — powered by SKWAD`;
   const description = formatWhenWhereLine(matchday.whenWhere);
@@ -105,12 +109,6 @@ export default async function GuestMatchdayPage({
     );
   }
 
-  const positions = parsePositions(matchday.positions);
-  const guestId = await getGuestId();
-  const rememberedName = await getRememberedGuestName();
-  const existing = guestId
-    ? matchday.rsvps.find((rsvp) => rsvp.guestId === guestId) ?? null
-    : null;
   const going = orderGoingForRoster(
     matchday.rsvps
       .filter((rsvp) => rsvp.status === "GOING")
@@ -123,6 +121,56 @@ export default async function GuestMatchdayPage({
     matchday.sport,
     matchday.formation,
   );
+
+  if (matchday.status === "COMPLETED") {
+    return (
+      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
+        <header>
+          <Wordmark href="/board" />
+        </header>
+        <main className="mt-12 flex flex-col gap-10" data-testid="matchday-completed">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+              Matchday
+            </p>
+            <h1 className="mt-3 font-display text-4xl tracking-tight">
+              Match completed
+            </h1>
+            <p className="mt-2">
+              <SportChip sport={matchday.sport} testId="sport-label" />
+            </p>
+            <WhenWhereLine
+              value={matchday.whenWhere}
+              className="mt-3 text-lg text-ink/40"
+            />
+          </div>
+          <CoachBoard
+            matchdayId={matchday.id}
+            sport={matchday.sport}
+            formation={matchday.formation}
+            going={going}
+            out={matchday.rsvps
+              .filter((rsvp) => rsvp.status === "OUT")
+              .map((rsvp) => ({ id: rsvp.id, name: rsvp.name }))}
+            readOnly
+          />
+          <section>
+            <h2 className="font-display text-2xl tracking-tight">
+              Going · {going.length}
+            </h2>
+            <GoingList going={going} empty="No one went." />
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  const positions = parsePositions(matchday.positions);
+  const guestId = await getGuestId();
+  const rememberedName = await getRememberedGuestName();
+  const existing = guestId
+    ? matchday.rsvps.find((rsvp) => rsvp.guestId === guestId) ?? null
+    : null;
   const extras = guestId
     ? matchday.rsvps.filter((rsvp) => rsvp.addedByGuestId === guestId)
     : [];

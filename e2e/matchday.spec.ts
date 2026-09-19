@@ -648,6 +648,79 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
+  test("mark completed: guest sees read-only roster; cancel and delete still work", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+done+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Friday kickabout");
+    await orgPage.getByLabel("When / where").fill("Fri 19:00 · Pitch 1");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.getByTestId("complete-matchday").click();
+    await expect(orgPage.getByTestId("complete-match-sheet")).toBeVisible();
+    await orgPage.getByTestId("complete-matchday-confirm").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await expect(orgPage.getByTestId("completed-chip")).toHaveText("Completed");
+    await expect(orgPage.getByTestId("cancelled-chip")).toHaveCount(0);
+    await expect(orgPage.getByRole("link", { name: /Friday kickabout/ })).toBeVisible();
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-completed")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Match completed" })).toBeVisible();
+    await expect(page.getByText("This match was cancelled")).toHaveCount(0);
+    await expect(page.getByTestId("when-where")).toHaveText("Fri 19:00 · Pitch 1");
+    await expect(page.getByTestId("roster")).toContainText("Nok");
+    await expect(page.getByTestId("coach-board")).toBeVisible();
+    await expect(page.getByTestId("formation-4-3-3")).toHaveCount(0);
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await expect(page.getByTestId("status-going")).toHaveCount(0);
+    await expect(page.getByTestId("rsvp-submit")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Still live then cancel");
+    await orgPage.getByLabel("When / where").fill("Sat 09:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const cancelUrl = await shareUrlOf(orgPage);
+    await orgPage.getByTestId("cancel-matchday").click();
+    await orgPage.getByTestId("cancel-matchday-confirm").click();
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeVisible();
+
+    const cancelGuest = await browser.newContext();
+    const cancelPage = await cancelGuest.newPage();
+    await cancelPage.goto(cancelUrl);
+    await expect(cancelPage.getByTestId("matchday-cancelled")).toBeVisible();
+    await expect(cancelPage.getByTestId("roster")).toHaveCount(0);
+    await expect(cancelPage.getByLabel("Your name")).toHaveCount(0);
+    await cancelGuest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Wipe after complete");
+    await orgPage.getByLabel("When / where").fill("Sun 11:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const deleteUrl = await shareUrlOf(orgPage);
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+
+    const goneGuest = await browser.newContext();
+    const gonePage = await goneGuest.newPage();
+    await gonePage.goto(deleteUrl);
+    await expect(gonePage.getByTestId("matchday-gone")).toContainText(/deleted/i);
+    await goneGuest.close();
+    await organiser.close();
+  });
+
   test("delete matchday: guest sees deleted state", async ({ browser }) => {
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();

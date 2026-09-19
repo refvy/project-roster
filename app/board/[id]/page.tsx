@@ -2,6 +2,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
+import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
@@ -84,7 +85,7 @@ export default async function OrganiserMatchdayPage({
                 className="mt-1 text-lg text-ink-soft"
               />
             </div>
-            <div className="flex items-center gap-4 pt-2">
+            <div className="flex flex-wrap items-center gap-4 pt-2">
               {matchday.status === "LIVE" ? (
                 <Link
                   href={`/board/${matchday.id}/edit`}
@@ -92,16 +93,26 @@ export default async function OrganiserMatchdayPage({
                 >
                   Edit
                 </Link>
-              ) : (
+              ) : matchday.status === "CANCELLED" ? (
                 <span
                   data-testid="cancelled-chip"
                   className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
                 >
                   Cancelled
                 </span>
+              ) : (
+                <span
+                  data-testid="completed-chip"
+                  className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-deep"
+                >
+                  Completed
+                </span>
               )}
               {matchday.status === "LIVE" ? (
-                <CancelMatchdayButton matchdayId={matchday.id} />
+                <>
+                  <CompleteMatchdayButton matchdayId={matchday.id} />
+                  <CancelMatchdayButton matchdayId={matchday.id} />
+                </>
               ) : null}
               <DeleteMatchdayButton matchdayId={matchday.id} />
             </div>
@@ -114,6 +125,7 @@ export default async function OrganiserMatchdayPage({
           matchdayId={matchday.id}
           sport={matchday.sport}
           formation={matchday.formation}
+          readOnly={matchday.status !== "LIVE"}
           going={going.map((rsvp) => ({
             id: rsvp.id,
             name: rsvp.name,

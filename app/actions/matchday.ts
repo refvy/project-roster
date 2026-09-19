@@ -145,11 +145,31 @@ export async function cancelMatchday(formData: FormData) {
     where: { id, organiserId: organiser.id, deletedAt: null },
   });
   if (!matchday) redirect("/board");
-  if (matchday.status === "CANCELLED") redirect("/board");
+  if (!isMatchdayLive(matchday)) redirect("/board");
 
   await prisma.matchday.update({
     where: { id: matchday.id },
     data: { status: "CANCELLED" },
+  });
+
+  revalidatePath("/board");
+  revalidatePath(`/board/${matchday.id}`);
+  revalidatePath(`/m/${matchday.publicId}`);
+  redirect("/board");
+}
+
+export async function completeMatchday(formData: FormData) {
+  const organiser = await requireOrganiser();
+  const id = String(formData.get("id") ?? "").trim();
+  const matchday = await prisma.matchday.findFirst({
+    where: { id, organiserId: organiser.id, deletedAt: null },
+  });
+  if (!matchday) redirect("/board");
+  if (!isMatchdayLive(matchday)) redirect(`/board/${matchday.id}`);
+
+  await prisma.matchday.update({
+    where: { id: matchday.id },
+    data: { status: "COMPLETED" },
   });
 
   revalidatePath("/board");
