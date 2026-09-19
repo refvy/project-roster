@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/*
+ * Visual tokens — swap this :root block to restyle.
+ *
+ * Locked skin: cream / warm-white ground, dark ink,
+ * Signal teal accent (#00D4C8 family) for the Skwad lockup, Going, selected chips, CTAs.
+ * Type: Outfit only — ExtraBold titles, Medium/Regular body. No serif, no second display face.
+ * Not cobalt, coral, Volt lime, or WhatsApp green.
+ */
+:root {
+  --cream: #f7f4ef;
+  --cream-deep: #efe9df;
+  --surface: #fffdf9;
+  --ink: #1a1714;
+  --ink-soft: #5e584f;
+  --accent: #00d4c8;
+  --accent-deep: #009e95;
+  --accent-soft: #d4f6f3;
+  --on-accent: #042f2c;
+  --danger: #b42318;
+  --accent-rgb: 0 212 200;
+}
+
+@theme inline {
+  --color-cream: var(--cream);
+  --color-cream-deep: var(--cream-deep);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --shadow-banner: 0 20px 50px -24px rgb(var(--accent-rgb) / 0.55);
+}
+
+html,
+body {
+  background: var(--cream);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+/* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge.
+   paint-order draws the white stroke first, then the black fill on top so
+   a thick outline cannot cover the numeral. */
+.chip-overflow {
+  display: block;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.8;
+  color: var(--ink);
+  -webkit-text-stroke: 3.5px #fff;
+  paint-order: stroke fill;
+}
