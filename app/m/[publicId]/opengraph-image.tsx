@@ -147,8 +147,9 @@ export default async function Image({
               justifyContent: "center",
               width: "100%",
               backgroundColor: OG_LIME,
-              paddingTop: 36,
-              paddingBottom: 40,
+              minHeight: 230,
+              paddingTop: 44,
+              paddingBottom: 48,
               paddingLeft: 72,
               paddingRight: 72,
             }}
