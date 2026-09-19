@@ -1229,7 +1229,7 @@ test.describe("matchday board", () => {
     await host.close();
   });
 
-  test("Share update copies ?v=; OG stamps Low / Enough / Enough+Out", async ({
+  test("Share update copies ?v=; OG Low stamp and pulse body", async ({
     browser,
   }) => {
     test.setTimeout(45_000);
@@ -1242,6 +1242,10 @@ test.describe("matchday board", () => {
     await orgPage.getByLabel("When / where").fill("Sat 18:00 · Court 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByTestId("share-update")).toBeVisible();
+    await orgPage.screenshot({
+      path: join(SCREENSHOT_DIR, "share-update-board.png"),
+      fullPage: true,
+    });
     const shareUrl = await shareUrlOf(orgPage);
     expect(shareUrl).toMatch(/\/m\/[^/?]+$/);
     expect(shareUrl).not.toContain("?v=");

@@ -163,10 +163,10 @@ function OgStamp({ stamp }: { stamp: StampView }) {
         borderStyle: "solid",
         borderColor: stamp.border,
         borderRadius: 36,
-        paddingTop: twoLines ? 18 : 28,
-        paddingBottom: twoLines ? 20 : 28,
-        paddingLeft: 34,
-        paddingRight: 34,
+        paddingTop: twoLines ? 20 : 26,
+        paddingBottom: twoLines ? 22 : 26,
+        paddingLeft: 30,
+        paddingRight: 30,
         transform: `rotate(${stamp.tiltDeg}deg)`,
       }}
     >
@@ -188,10 +188,10 @@ function OgStamp({ stamp }: { stamp: StampView }) {
         <div
           style={{
             display: "flex",
-            marginTop: 4,
+            marginTop: 8,
             color: stamp.line2.color,
             fontFamily: "Outfit",
-            fontSize: 34,
+            fontSize: 36,
             fontWeight: 800,
             letterSpacing: "-0.04em",
             lineHeight: 0.95,
