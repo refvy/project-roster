@@ -589,6 +589,65 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
+  test("cancel match: guest sees cancelled page; live RSVP still works; delete stays gone", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+cancel+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Saturday 5s");
+    await orgPage.getByLabel("When / where").fill("Sat 18:00 · Court 2");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.getByTestId("cancel-matchday").click();
+    await expect(orgPage.getByTestId("cancel-match-sheet")).toBeVisible();
+    await orgPage.getByTestId("cancel-matchday-confirm").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await expect(orgPage.getByTestId("cancelled-chip")).toHaveText("Cancelled");
+    await expect(orgPage.getByRole("link", { name: /Saturday 5s/ })).toBeVisible();
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-cancelled")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "This match was cancelled" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("when-where")).toHaveText("Sat 18:00 · Court 2");
+    await expect(
+      page.getByText("Ask your captain if there’s a new date."),
+    ).toBeVisible();
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await expect(page.getByTestId("status-going")).toHaveCount(0);
+    await expect(page.getByTestId("status-out")).toHaveCount(0);
+    await expect(page.getByTestId("rsvp-submit")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("To delete after cancel");
+    await orgPage.getByLabel("When / where").fill("Sun 10:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const deleteUrl = await shareUrlOf(orgPage);
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+
+    const goneGuest = await browser.newContext();
+    const gonePage = await goneGuest.newPage();
+    await gonePage.goto(deleteUrl);
+    await expect(gonePage.getByTestId("matchday-gone")).toContainText(/deleted/i);
+    await expect(gonePage.getByLabel("Your name")).toHaveCount(0);
+    await goneGuest.close();
+    await organiser.close();
+  });
+
   test("delete matchday: guest sees deleted state", async ({ browser }) => {
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();

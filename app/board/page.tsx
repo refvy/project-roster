@@ -13,6 +13,7 @@ type MatchdayRow = {
   whenWhere: string;
   sport: string;
   going: number;
+  cancelled: boolean;
 };
 
 export default async function BoardPage({
@@ -65,6 +66,7 @@ export default async function BoardPage({
     whenWhere: matchday.whenWhere,
     sport: matchday.sport,
     going: matchday._count.rsvps,
+    cancelled: matchday.status === "CANCELLED",
   }));
   const invitedRows: MatchdayRow[] = invitedRecords.map((matchday) => ({
     id: matchday.id,
@@ -73,6 +75,7 @@ export default async function BoardPage({
     whenWhere: matchday.whenWhere,
     sport: matchday.sport,
     going: matchday._count.rsvps,
+    cancelled: matchday.status === "CANCELLED",
   }));
 
   const rows = tab === "invited" ? invitedRows : hostingRows;
@@ -165,9 +168,21 @@ export default async function BoardPage({
                       : `/m/${matchday.publicId}`
                   }
                   data-testid="matchday-card"
-                  className="block cursor-pointer rounded-2xl px-3 py-5 transition hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_10px_28px_-18px_rgb(26,23,20,0.45)] active:translate-y-0 active:bg-cream-deep"
+                  className={`block cursor-pointer rounded-2xl px-3 py-5 transition hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_10px_28px_-18px_rgb(26,23,20,0.45)] active:translate-y-0 active:bg-cream-deep ${
+                    matchday.cancelled ? "opacity-50" : ""
+                  }`}
                 >
-                  <SportChip sport={matchday.sport} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SportChip sport={matchday.sport} />
+                    {matchday.cancelled ? (
+                      <span
+                        data-testid="cancelled-chip"
+                        className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
+                      >
+                        Cancelled
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="mt-2 font-display text-2xl tracking-tight">
                     {matchday.title}
                   </p>

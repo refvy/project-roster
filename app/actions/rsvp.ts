@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth";
 import { randomToken } from "@/lib/crypto";
 import { isKnownPosition, parsePositions } from "@/lib/positions";
+import { isMatchdayLive } from "@/lib/matchday-status";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
 
@@ -45,6 +46,9 @@ export async function submitRsvp(
   });
   if (!matchday || matchday.deletedAt) {
     return { ok: false, error: "This matchday was deleted." };
+  }
+  if (!isMatchdayLive(matchday)) {
+    return { ok: false, error: "This match was cancelled." };
   }
 
   const positions = parsePositions(matchday.positions);
@@ -101,6 +105,9 @@ export async function addFriendRsvp(
   if (!matchday || matchday.deletedAt) {
     return { ok: false, error: "This matchday was deleted." };
   }
+  if (!isMatchdayLive(matchday)) {
+    return { ok: false, error: "This match was cancelled." };
+  }
 
   const guestId = await getOrCreateGuestId();
   const self = await prisma.rsvp.findUnique({
@@ -149,6 +156,9 @@ export async function updateFriendRsvp(
   if (!matchday || matchday.deletedAt) {
     return { ok: false, error: "This matchday was deleted." };
   }
+  if (!isMatchdayLive(matchday)) {
+    return { ok: false, error: "This match was cancelled." };
+  }
 
   const guestId = await getOrCreateGuestId();
   const extra = await prisma.rsvp.findUnique({ where: { id: extraId } });
@@ -188,7 +198,7 @@ export async function deleteFriendRsvp(formData: FormData) {
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
   });
-  if (!matchday || matchday.deletedAt) return;
+  if (!matchday || matchday.deletedAt || !isMatchdayLive(matchday)) return;
 
   const guestId = await getOrCreateGuestId();
   const extra = await prisma.rsvp.findUnique({ where: { id: extraId } });

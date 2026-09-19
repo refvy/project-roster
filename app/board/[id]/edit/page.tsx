@@ -25,6 +25,9 @@ export default async function EditMatchdayPage({
   ) {
     notFound();
   }
+  if (matchday.status !== "LIVE") {
+    redirect(`/board/${matchday.id}`);
+  }
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">

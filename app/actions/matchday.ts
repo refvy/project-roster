@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getOrganiser } from "@/lib/auth";
 import { publicId } from "@/lib/crypto";
+import { isMatchdayLive } from "@/lib/matchday-status";
 import { parseFormation } from "@/lib/pitch";
 import { parseSport, positionsForSport } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
@@ -77,6 +78,7 @@ export async function updateMatchday(
     where: { id, organiserId: organiser.id, deletedAt: null },
   });
   if (!matchday) redirect("/board");
+  if (!isMatchdayLive(matchday)) redirect(`/board/${matchday.id}`);
 
   await prisma.matchday.update({
     where: { id: matchday.id },
@@ -106,6 +108,7 @@ export async function saveMatchdayFormation(
     where: { id: matchdayId, organiserId: organiser.id, deletedAt: null },
   });
   if (!matchday) return;
+  if (!isMatchdayLive(matchday)) return;
   if (matchday.sport === "basketball") return;
 
   await prisma.matchday.update({
@@ -127,6 +130,26 @@ export async function deleteMatchday(formData: FormData) {
   await prisma.matchday.update({
     where: { id: matchday.id },
     data: { deletedAt: new Date() },
+  });
+
+  revalidatePath("/board");
+  revalidatePath(`/board/${matchday.id}`);
+  revalidatePath(`/m/${matchday.publicId}`);
+  redirect("/board");
+}
+
+export async function cancelMatchday(formData: FormData) {
+  const organiser = await requireOrganiser();
+  const id = String(formData.get("id") ?? "").trim();
+  const matchday = await prisma.matchday.findFirst({
+    where: { id, organiserId: organiser.id, deletedAt: null },
+  });
+  if (!matchday) redirect("/board");
+  if (matchday.status === "CANCELLED") redirect("/board");
+
+  await prisma.matchday.update({
+    where: { id: matchday.id },
+    data: { status: "CANCELLED" },
   });
 
   revalidatePath("/board");

@@ -20,10 +20,13 @@ export async function generateMetadata({
   const { publicId } = await params;
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
-    select: { title: true, deletedAt: true, whenWhere: true },
+    select: { title: true, deletedAt: true, whenWhere: true, status: true },
   });
   if (!matchday || matchday.deletedAt) {
     return { title: "Matchday" };
+  }
+  if (matchday.status === "CANCELLED") {
+    return { title: { absolute: "This match was cancelled" } };
   }
   const title = `Signup now for ${matchday.title} — powered by SKWAD`;
   const description = formatWhenWhereLine(matchday.whenWhere);
@@ -71,6 +74,31 @@ export default async function GuestMatchdayPage({
           </h1>
           <p className="mt-3 text-lg text-ink-soft">
             The share link is no longer active.
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (matchday.status === "CANCELLED") {
+    return (
+      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
+        <header>
+          <Wordmark href="/board" />
+        </header>
+        <main className="mt-16" data-testid="matchday-cancelled">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
+            Matchday
+          </p>
+          <h1 className="mt-3 font-display text-4xl tracking-tight">
+            This match was cancelled
+          </h1>
+          <WhenWhereLine
+            value={matchday.whenWhere}
+            className="mt-3 text-lg text-ink/40"
+          />
+          <p className="mt-4 text-lg text-ink-soft">
+            Ask your captain if there’s a new date.
           </p>
         </main>
       </div>

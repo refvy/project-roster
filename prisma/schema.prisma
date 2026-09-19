@@ -52,9 +52,16 @@ model Matchday {
   positions   Json
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
+  status      MatchdayStatus @default(LIVE)
   rsvps       Rsvp[]
 
   @@index([organiserId])
+}
+
+enum MatchdayStatus {
+  LIVE
+  CANCELLED
+  COMPLETED
 }
 
 enum RsvpStatus {

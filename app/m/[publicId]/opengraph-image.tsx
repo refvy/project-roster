@@ -19,11 +19,22 @@ export default async function Image({
   const { publicId } = await params;
   const matchday = await prisma.matchday.findUnique({
     where: { publicId },
-    select: { title: true, sport: true, whenWhere: true, deletedAt: true },
+    select: {
+      title: true,
+      sport: true,
+      whenWhere: true,
+      deletedAt: true,
+      status: true,
+    },
   });
 
   const gone = !matchday || Boolean(matchday.deletedAt);
-  const title = gone ? "This matchday was deleted" : matchday.title;
+  const cancelled = !gone && matchday.status === "CANCELLED";
+  const title = gone
+    ? "This matchday was deleted"
+    : cancelled
+      ? "This match was cancelled"
+      : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
   const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
 

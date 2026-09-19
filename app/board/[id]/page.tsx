@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions/auth";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
@@ -84,12 +85,24 @@ export default async function OrganiserMatchdayPage({
               />
             </div>
             <div className="flex items-center gap-4 pt-2">
-              <Link
-                href={`/board/${matchday.id}/edit`}
-                className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
-              >
-                Edit
-              </Link>
+              {matchday.status === "LIVE" ? (
+                <Link
+                  href={`/board/${matchday.id}/edit`}
+                  className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+                >
+                  Edit
+                </Link>
+              ) : (
+                <span
+                  data-testid="cancelled-chip"
+                  className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
+                >
+                  Cancelled
+                </span>
+              )}
+              {matchday.status === "LIVE" ? (
+                <CancelMatchdayButton matchdayId={matchday.id} />
+              ) : null}
               <DeleteMatchdayButton matchdayId={matchday.id} />
             </div>
           </div>
