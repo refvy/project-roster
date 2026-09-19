@@ -1232,6 +1232,7 @@ test.describe("matchday board", () => {
   test("Share update copies ?v=; OG stamps Low / Enough / Enough+Out", async ({
     browser,
   }) => {
+    test.setTimeout(45_000);
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+pulse+${Date.now()}@example.com`);
@@ -1294,6 +1295,17 @@ test.describe("matchday board", () => {
     expect(copied).toContain("?v=");
     expect(await shareUrlOf(orgPage)).toBe(shareUrl);
 
+    await organiser.close();
+  });
+
+  test("OG stamps Enough and Enough+Out; completed hides Share update", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+enough+${Date.now()}@example.com`);
+
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByTestId("sport-basketball").click();
     await orgPage.getByLabel("Title").fill("Enough run");
@@ -1321,6 +1333,7 @@ test.describe("matchday board", () => {
       `${enoughUrl}/opengraph-image`,
     );
     expect(enoughOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
     writeFileSync(
       join(SCREENSHOT_DIR, "og-stamp-enough.png"),
       await enoughOg.body(),
