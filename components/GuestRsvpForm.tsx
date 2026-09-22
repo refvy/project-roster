@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
 import { AthleteNameInput } from "@/components/AthleteNameInput";
 import { FatChoice } from "@/components/FatChoice";
@@ -14,6 +14,7 @@ type Props = {
   defaultStatus: "GOING" | "OUT";
   defaultPosition: string | null;
   confirmed?: boolean;
+  onSaved?: () => void;
 };
 
 export function GuestRsvpForm({
@@ -24,6 +25,7 @@ export function GuestRsvpForm({
   defaultStatus,
   defaultPosition,
   confirmed,
+  onSaved,
 }: Props) {
   const [status, setStatus] = useState<"GOING" | "OUT">(defaultStatus);
   const [position, setPosition] = useState(defaultPosition ?? "");
@@ -31,6 +33,10 @@ export function GuestRsvpForm({
     submitRsvp,
     confirmed ? { ok: true } : null,
   );
+
+  useEffect(() => {
+    if (state?.ok) onSaved?.();
+  }, [state?.ok]);
 
   return (
     <form action={action} className="flex flex-col gap-8">

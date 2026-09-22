@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
@@ -33,6 +34,7 @@ export function GuestEventCard({
   position: string | null;
   calendarHref: string | null;
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const statusCopy =
     status === "GOING"
@@ -67,12 +69,14 @@ export function GuestEventCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <p
-          data-testid="rsvp-confirmed"
-          className="rounded-2xl bg-accent-soft px-4 py-3 text-sm font-medium text-accent-deep"
-        >
-          {statusCopy}
-        </p>
+        {editing ? null : (
+          <p
+            data-testid="rsvp-confirmed"
+            className="rounded-2xl bg-accent-soft px-4 py-3 text-sm font-medium text-accent-deep"
+          >
+            {statusCopy}
+          </p>
+        )}
         <button
           type="button"
           data-testid="change-status"
@@ -91,7 +95,10 @@ export function GuestEventCard({
           defaultName={name}
           defaultStatus={status}
           defaultPosition={position}
-          confirmed
+          onSaved={() => {
+            setEditing(false);
+            router.refresh();
+          }}
         />
       ) : null}
 

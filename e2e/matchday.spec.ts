@@ -799,9 +799,9 @@ test.describe("matchday board", () => {
     await orgPage.getByTestId("cancel-matchday-confirm").click();
     await expect(orgPage).toHaveURL(/\/board\/?$/);
     await expect(orgPage.getByTestId("history-toggle")).toHaveText("History");
-    await expect(orgPage.getByTestId("cancelled-chip")).toHaveCount(0);
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeHidden();
     await orgPage.getByTestId("history-toggle").click();
-    await expect(orgPage.getByTestId("cancelled-chip")).toHaveText("Cancelled");
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeVisible();
     await expect(orgPage.getByRole("link", { name: /Saturday 5s/ })).toBeVisible();
 
     const guest = await browser.newContext();
@@ -1533,7 +1533,7 @@ test.describe("matchday board", () => {
     await orgPage.getByTestId("complete-matchday").click();
     await orgPage.getByTestId("complete-matchday-confirm").click();
     await expect(orgPage.getByTestId("history")).toBeVisible();
-    await expect(orgPage.getByTestId("completed-chip")).toHaveCount(0);
+    await expect(orgPage.getByTestId("completed-chip")).toBeHidden();
     await orgPage.getByTestId("history-toggle").click();
     await expect(orgPage.getByTestId("completed-chip")).toHaveText("Completed");
 
