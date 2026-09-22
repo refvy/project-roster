@@ -2,9 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
+import {
+  HOURS_24,
+  MINUTE_STEPS,
+  addOneHour,
+  isQuarterTime,
+  joinTime,
+  splitTime,
+} from "@/lib/time-options";
 import { bangkokTodayDate } from "@/lib/when-where";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const selectClass =
+  "min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4";
 
 function yearMonthOf(iso: string) {
   const [year, month] = iso.split("-").map(Number);
@@ -38,26 +49,34 @@ function isoDate(year: number, month: number, day: number) {
 
 export function DateSheet({
   open,
-  value,
+  date,
+  startTime,
+  endTime,
   onClose,
   onSave,
 }: {
   open: boolean;
-  value: string;
+  date: string;
+  startTime: string;
+  endTime: string;
   onClose: () => void;
-  onSave: (date: string) => void;
+  onSave: (date: string, start: string, end: string) => void;
 }) {
   const [{ year, month }, setCursor] = useState(() =>
-    yearMonthOf(value || bangkokTodayDate()),
+    yearMonthOf(date || bangkokTodayDate()),
   );
-  const [draft, setDraft] = useState(value);
+  const [draftDate, setDraftDate] = useState(date);
+  const [start, setStart] = useState(startTime);
+  const [end, setEnd] = useState(endTime);
   const today = bangkokTodayDate();
 
   useEffect(() => {
     if (!open) return;
-    setDraft(value);
-    setCursor(yearMonthOf(value || bangkokTodayDate()));
-  }, [open, value]);
+    setDraftDate(date);
+    setStart(startTime);
+    setEnd(endTime);
+    setCursor(yearMonthOf(date || bangkokTodayDate()));
+  }, [open, date, startTime, endTime]);
 
   const cells = useMemo(() => {
     const pad = mondayOffset(year, month);
@@ -72,13 +91,31 @@ export function DateSheet({
     return list;
   }, [year, month]);
 
+  const startParts = splitTime(start);
+  const endParts = splitTime(end || (start ? addOneHour(start).time : ""));
+
+  function setStartPart(part: "hour" | "minute", value: string) {
+    if (!value) {
+      setStart("");
+      setEnd("");
+      return;
+    }
+    const nextHour = part === "hour" ? value : startParts.hour || value;
+    const nextMinute =
+      part === "minute" ? value : startParts.minute || "00";
+    const next = joinTime(nextHour, nextMinute);
+    setStart(next);
+    if (end && isQuarterTime(next)) {
+      const [startHour, startMinute] = next.split(":").map(Number);
+      const [endHour, endMinute] = end.split(":").map(Number);
+      if (endHour * 60 + endMinute <= startHour * 60 + startMinute) {
+        setEnd(addOneHour(next).time);
+      }
+    }
+  }
+
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Add date"
-      testId="date-sheet"
-    >
+    <Sheet open={open} onClose={onClose} title="Add date" testId="date-sheet">
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
@@ -116,10 +153,10 @@ export function DateSheet({
               key={cell.iso}
               type="button"
               data-testid={`cal-day-${cell.iso}`}
-              aria-pressed={draft === cell.iso}
-              onClick={() => setDraft(cell.iso)}
+              aria-pressed={draftDate === cell.iso}
+              onClick={() => setDraftDate(cell.iso)}
               className={`min-h-11 rounded-full text-sm font-semibold ${
-                draft === cell.iso
+                draftDate === cell.iso
                   ? "bg-accent text-on-accent"
                   : cell.iso === today
                     ? "ring-2 ring-accent/40"
@@ -133,11 +170,98 @@ export function DateSheet({
           ),
         )}
       </div>
+
+      <fieldset className="mt-6">
+        <legend className="text-sm font-medium text-ink-soft">Start time</legend>
+        <div className="mt-2 flex items-center gap-2">
+          <select
+            data-testid="start-hour"
+            aria-label="Start hour"
+            value={startParts.hour}
+            onChange={(event) => setStartPart("hour", event.target.value)}
+            className={selectClass}
+          >
+            <option value="">–</option>
+            {HOURS_24.map((hour) => (
+              <option key={hour} value={hour}>
+                {hour}
+              </option>
+            ))}
+          </select>
+          <span className="text-xl font-semibold">:</span>
+          <select
+            data-testid="start-minute"
+            aria-label="Start minute"
+            value={startParts.minute}
+            onChange={(event) => setStartPart("minute", event.target.value)}
+            className={selectClass}
+            disabled={!startParts.hour}
+          >
+            {!startParts.minute ? <option value="">–</option> : null}
+            {MINUTE_STEPS.map((minute) => (
+              <option key={minute} value={minute}>
+                {minute}
+              </option>
+            ))}
+          </select>
+        </div>
+      </fieldset>
+
+      {start ? (
+        end ? (
+          <fieldset className="mt-5">
+            <legend className="text-sm font-medium text-ink-soft">End time</legend>
+            <div className="mt-2 flex items-center gap-2">
+              <select
+                data-testid="end-hour"
+                aria-label="End hour"
+                value={endParts.hour}
+                onChange={(event) =>
+                  setEnd(joinTime(event.target.value, endParts.minute || "00"))
+                }
+                className={selectClass}
+              >
+                {HOURS_24.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xl font-semibold">:</span>
+              <select
+                data-testid="end-minute"
+                aria-label="End minute"
+                value={endParts.minute}
+                onChange={(event) =>
+                  setEnd(joinTime(endParts.hour, event.target.value))
+                }
+                className={selectClass}
+              >
+                {MINUTE_STEPS.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </fieldset>
+        ) : (
+          <button
+            type="button"
+            data-testid="add-end-time"
+            onClick={() => setEnd(addOneHour(start).time)}
+            className="mt-5 text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+          >
+            Add end time
+          </button>
+        )
+      ) : null}
+
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           data-testid="date-sheet-clear"
-          onClick={() => onSave("")}
+          onClick={() => onSave("", "", "")}
           className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
         >
           Clear
@@ -145,8 +269,9 @@ export function DateSheet({
         <button
           type="button"
           data-testid="date-sheet-done"
-          onClick={() => onSave(draft)}
-          className="inline-flex min-h-12 items-center rounded-full bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent-deep"
+          disabled={!draftDate}
+          onClick={() => onSave(draftDate, start, start ? end : "")}
+          className="inline-flex min-h-12 items-center rounded-full bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-40"
         >
           Done
         </button>

@@ -63,7 +63,7 @@ export function InvitationCard({
           target="_blank"
           rel="noreferrer"
           data-testid="event-map"
-          className="break-all text-lg font-medium text-accent-deep underline-offset-4 hover:underline"
+          className="block truncate text-lg font-medium text-accent-deep underline-offset-4 hover:underline"
         >
           {truncateMapUrl(map)}
         </a>

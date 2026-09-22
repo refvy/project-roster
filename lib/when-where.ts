@@ -80,6 +80,29 @@ export function formatBangkokDate(utc: Date) {
   return bangkokWhenParts(utc).date;
 }
 
+/** Compact summary: `Sun 28 Sep` (no year). */
+export function formatBangkokDateCompact(utc: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: MATCHDAY_TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).formatToParts(utc);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("weekday")} ${get("day")} ${get("month")}`;
+}
+
+export function formatWhenSummary(date: string, start: string, end: string) {
+  if (!date) return "";
+  const utc = bangkokDateTimeToUtc(date, start || "12:00");
+  if (!utc) return "";
+  const compact = formatBangkokDateCompact(utc);
+  if (!start) return compact;
+  if (end) return `${compact} · ${start}–${end}`;
+  return `${compact} · ${start}`;
+}
+
 export function formatBangkokWhen(utc: Date, endsAt?: Date | null) {
   const { date, time } = bangkokWhenParts(utc);
   if (endsAt) {

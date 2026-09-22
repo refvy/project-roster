@@ -25,7 +25,7 @@ export function snapToQuarter(time: string) {
 
 export function addOneHour(time: string): { time: string; nextDay: boolean } {
   if (!isQuarterTime(time)) {
-    return { time: "18:00", nextDay: false };
+    return { time: "", nextDay: false };
   }
   const [hourRaw, minuteRaw] = time.split(":");
   const total = Number(hourRaw) * 60 + Number(minuteRaw) + 60;
@@ -44,7 +44,8 @@ export function addCalendarDays(date: string, days: number) {
 }
 
 export function splitTime(time: string) {
-  const [hour = "18", minute = "00"] = time.split(":");
+  if (!isQuarterTime(time)) return { hour: "", minute: "" };
+  const [hour, minute] = time.split(":");
   return { hour, minute };
 }
 

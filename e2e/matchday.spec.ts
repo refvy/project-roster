@@ -28,6 +28,7 @@ import {
   displayWhen,
   displayWhere,
   formatBangkokWhen,
+  formatWhenSummary,
   formatWhenWhereLine,
   hasStructuredStart,
   matchdayWhenWhereLine,
@@ -330,6 +331,10 @@ test.describe("when/where display", () => {
     ).toEqual({ text: "TBD", tbd: true });
     expect(hasStructuredStart({ startsAt: start, whenWhere: "" })).toBe(true);
     expect(hasStructuredStart({ startsAt: null, whenWhere: "Sun" })).toBe(false);
+    expect(formatWhenSummary("2026-10-03", "20:00", "22:00")).toBe(
+      "Sat 3 Oct · 20:00–22:00",
+    );
+    expect(formatWhenSummary("2026-10-03", "", "")).toBe("Sat 3 Oct");
     expect(
       shouldCollapseWhenWhere({
         startsAt: start,
@@ -346,10 +351,11 @@ test.describe("when/where display", () => {
     ).toBe(false);
   });
 
-  test("map URL is plain http(s) and truncates on the card", () => {
+  test("map URL is https-only and truncates as domain… on the card", () => {
     const url = "https://maps.app.goo.gl/yvCNh8AbCdEfGh";
     expect(parseMapUrl(url)).toEqual({ ok: true, url });
-    expect(truncateMapUrl(url)).toBe("https://maps.app.goo.gl/yvCNh8…");
+    expect(truncateMapUrl(url)).toBe("maps.app.goo.gl/yvCNh8AbCdEf…");
+    expect(parseMapUrl("http://example.com").ok).toBe(false);
     expect(parseMapUrl("ftp://example.com").ok).toBe(false);
     expect(parseMapUrl("not a url").ok).toBe(false);
     expect(parseMapUrl("")).toEqual({ ok: true, url: null });
@@ -1518,16 +1524,28 @@ test.describe("matchday board", () => {
     );
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
-    await expect(orgPage.getByTestId("add-time-row")).toBeDisabled();
+    await expect(orgPage.getByTestId("add-date-row")).toHaveText("Add date");
+    await expect(orgPage.getByTestId("add-place-row")).toHaveText("Add place");
+    await expect(orgPage.getByTestId("add-time-row")).toHaveCount(0);
     await orgPage.getByLabel("Title").fill("Dated kickabout");
     await orgPage.getByLabel("When / where").fill("30 Sep or 1 Oct if rain");
-    await pickDate(orgPage, "2026-10-03");
-    await pickTime(orgPage, "20:00", "22:00");
+    await pickWhen(orgPage, "2026-10-03", "20:00", "22:00");
+    await expect(orgPage.getByTestId("when-summary")).toHaveText(
+      "Sat 3 Oct · 20:00–22:00",
+    );
+    await expect(orgPage.getByTestId("edit-date")).toHaveText("Edit");
     await pickPlace(
       orgPage,
       "Lumphini pitch 2",
       "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
     );
+    await expect(orgPage.getByTestId("place-summary")).toHaveText(
+      "Lumphini pitch 2",
+    );
+    await expect(orgPage.getByTestId("place-map-chip")).toHaveText(
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
+    );
+    await expect(orgPage.getByTestId("edit-place")).toHaveText("Edit");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Dated kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("when-where")).toHaveText(
@@ -1554,7 +1572,7 @@ test.describe("matchday board", () => {
     );
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
     await expect(page.getByTestId("event-map")).toHaveText(
-      "https://maps.app.goo.gl/yvCNh8…",
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
     );
     await expect(page.getByTestId("event-map")).toHaveAttribute(
       "href",
@@ -1577,7 +1595,7 @@ test.describe("matchday board", () => {
     );
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
     await expect(page.getByTestId("event-map")).toHaveText(
-      "https://maps.app.goo.gl/yvCNh8…",
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
     );
     await expect(page.getByTestId("event-counts")).toHaveText("Going · 1");
     await expect(page.getByTestId("add-to-calendar")).toBeVisible();
@@ -1637,9 +1655,19 @@ test.describe("matchday board", () => {
   });
 });
 
-async function pickDate(page: Page, iso: string) {
-  await page.getByTestId("add-date-row").click();
+async function openDateSheet(page: Page) {
+  const edit = page.getByTestId("edit-date");
+  if ((await edit.count()) > 0) {
+    await edit.click();
+  } else {
+    await page.getByTestId("add-date-row").click();
+  }
+}
+
+async function pickWhen(page: Page, iso: string, start?: string, end?: string) {
+  await openDateSheet(page);
   await expect(page.getByTestId("date-sheet")).toBeVisible();
+  await expect(page.getByTestId("date-sheet")).not.toContainText(/AM|PM/);
   const targetMonth = iso.slice(0, 7);
   for (let i = 0; i < 36; i += 1) {
     const current = await page.getByTestId("cal-month").getAttribute("data-month");
@@ -1655,39 +1683,40 @@ async function pickDate(page: Page, iso: string) {
     targetMonth,
   );
   await page.getByTestId(`cal-day-${iso}`).click();
+  if (start) {
+    const [startHour, startMinute] = start.split(":");
+    await page.getByTestId("start-hour").selectOption(startHour!);
+    await page.getByTestId("start-minute").selectOption(startMinute!);
+    await expect(page.getByTestId("start-minute").locator("option[value='00']")).toHaveCount(1);
+    await expect(page.getByTestId("start-minute").locator("option[value='15']")).toHaveCount(1);
+    await expect(page.getByTestId("start-minute").locator("option[value='30']")).toHaveCount(1);
+    await expect(page.getByTestId("start-minute").locator("option[value='45']")).toHaveCount(1);
+    await expect(page.getByTestId("start-minute").locator('option[value="10"]')).toHaveCount(0);
+    await expect(page.getByTestId("start-hour").locator('option[value="17"]')).toHaveCount(1);
+    if (end) {
+      await page.getByTestId("add-end-time").click();
+      const plusOne = addOneHour(start).time;
+      const [plusHour, plusMinute] = plusOne.split(":");
+      await expect(page.getByTestId("end-hour")).toHaveValue(plusHour!);
+      await expect(page.getByTestId("end-minute")).toHaveValue(plusMinute!);
+      const [endHour, endMinute] = end.split(":");
+      await page.getByTestId("end-hour").selectOption(endHour!);
+      await page.getByTestId("end-minute").selectOption(endMinute!);
+    }
+  } else {
+    await expect(page.getByTestId("add-end-time")).toHaveCount(0);
+  }
   await page.getByTestId("date-sheet-done").click();
   await expect(page.getByTestId("date-sheet")).toHaveCount(0);
 }
 
-async function pickTime(page: Page, start: string, end?: string) {
-  await page.getByTestId("add-time-row").click();
-  await expect(page.getByTestId("time-sheet")).toBeVisible();
-  const minutes = await page.getByTestId("start-minute").locator("option");
-  await expect(minutes).toHaveCount(4);
-  await expect(page.getByTestId("start-minute").locator('option[value="10"]')).toHaveCount(0);
-  await expect(page.getByTestId("start-hour").locator('option[value="17"]')).toHaveCount(1);
-  await expect(page.getByTestId("start-hour").locator('option[value="00"]')).toHaveCount(1);
-  await expect(page.getByTestId("start-hour").locator('option[value="23"]')).toHaveCount(1);
-  await expect(page.getByTestId("time-sheet")).not.toContainText(/AM|PM/);
-  const [startHour, startMinute] = start.split(":");
-  await page.getByTestId("start-hour").selectOption(startHour!);
-  await page.getByTestId("start-minute").selectOption(startMinute!);
-  if (end) {
-    await page.getByTestId("add-end-time").click();
-    const plusOne = addOneHour(start).time;
-    const [plusHour, plusMinute] = plusOne.split(":");
-    await expect(page.getByTestId("end-hour")).toHaveValue(plusHour!);
-    await expect(page.getByTestId("end-minute")).toHaveValue(plusMinute!);
-    const [endHour, endMinute] = end.split(":");
-    await page.getByTestId("end-hour").selectOption(endHour!);
-    await page.getByTestId("end-minute").selectOption(endMinute!);
-  }
-  await page.getByTestId("time-sheet-done").click();
-  await expect(page.getByTestId("time-sheet")).toHaveCount(0);
-}
-
 async function pickPlace(page: Page, venue: string, mapUrl?: string) {
-  await page.getByTestId("add-place-row").click();
+  const edit = page.getByTestId("edit-place");
+  if ((await edit.count()) > 0) {
+    await edit.click();
+  } else {
+    await page.getByTestId("add-place-row").click();
+  }
   await expect(page.getByTestId("place-sheet")).toBeVisible();
   await page.getByTestId("venue-input").fill(venue);
   if (mapUrl) {

@@ -86,6 +86,9 @@ function validateFields(input: {
   }
   const map = parseMapUrl(input.mapUrl);
   if (!map.ok) return { ok: false, error: map.error };
+  if (map.url && !input.venue) {
+    return { ok: false, error: "Add a venue." };
+  }
   if (map.url && map.url.length > 500) {
     return { ok: false, error: "Keep the map link short." };
   }

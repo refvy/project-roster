@@ -3,61 +3,9 @@
 import { useState } from "react";
 import { DateSheet } from "@/components/DateSheet";
 import { PlaceSheet } from "@/components/PlaceSheet";
-import { TimeSheet } from "@/components/TimeSheet";
 import { truncateMapUrl } from "@/lib/map-url";
 import { snapToQuarter } from "@/lib/time-options";
-import { formatBangkokDate, bangkokDateTimeToUtc } from "@/lib/when-where";
-
-function FieldRow({
-  label,
-  value,
-  emptyLabel,
-  testId,
-  disabled,
-  onClick,
-  onClear,
-}: {
-  label: string;
-  value: string;
-  emptyLabel: string;
-  testId: string;
-  disabled?: boolean;
-  onClick: () => void;
-  onClear: () => void;
-}) {
-  const filled = Boolean(value);
-  return (
-    <div className="flex items-stretch border-b border-ink/10">
-      <button
-        type="button"
-        data-testid={testId}
-        disabled={disabled}
-        onClick={onClick}
-        className="flex min-h-16 flex-1 items-center justify-between gap-4 py-3 text-left disabled:opacity-40"
-      >
-        <span className="text-sm font-medium text-ink-soft">{label}</span>
-        <span
-          className={`max-w-[70%] truncate text-right text-lg ${
-            filled ? "font-medium text-ink" : "text-ink/40"
-          }`}
-        >
-          {filled ? value : emptyLabel}
-        </span>
-      </button>
-      {filled ? (
-        <button
-          type="button"
-          data-testid={`${testId}-clear`}
-          aria-label={`Clear ${label.toLowerCase()}`}
-          onClick={onClear}
-          className="px-2 text-lg font-semibold text-ink-soft"
-        >
-          ×
-        </button>
-      ) : null}
-    </div>
-  );
-}
+import { formatWhenSummary } from "@/lib/when-where";
 
 export function DateTimePlaceFields({
   startDate,
@@ -77,13 +25,9 @@ export function DateTimePlaceFields({
   const [end, setEnd] = useState(endTime ? snapToQuarter(endTime) : "");
   const [place, setPlace] = useState(venue ?? "");
   const [map, setMap] = useState(mapUrl ?? "");
-  const [sheet, setSheet] = useState<"date" | "time" | "place" | null>(null);
+  const [sheet, setSheet] = useState<"date" | "place" | null>(null);
 
-  const dateLabel = date
-    ? formatBangkokDate(bangkokDateTimeToUtc(date, "12:00") ?? new Date(`${date}T00:00:00Z`))
-    : "";
-  const timeLabel = start ? (end ? `${start} – ${end}` : start) : "";
-  const placeLabel = place || (map ? truncateMapUrl(map) : "");
+  const whenLabel = formatWhenSummary(date, start, end);
 
   return (
     <>
@@ -96,64 +40,86 @@ export function DateTimePlaceFields({
       <input type="hidden" name="hasTime" value={start ? "1" : ""} />
 
       <div className="rounded-2xl border border-ink/10 bg-surface px-4">
-        <FieldRow
-          label="Date"
-          value={dateLabel}
-          emptyLabel="Add date"
-          testId="add-date-row"
-          onClick={() => setSheet("date")}
-          onClear={() => {
-            setDate("");
-            setStart("");
-            setEnd("");
-          }}
-        />
-        <FieldRow
-          label="Time"
-          value={timeLabel}
-          emptyLabel="Add time"
-          testId="add-time-row"
-          disabled={!date}
-          onClick={() => setSheet("time")}
-          onClear={() => {
-            setStart("");
-            setEnd("");
-          }}
-        />
-        <FieldRow
-          label="Place"
-          value={placeLabel}
-          emptyLabel="Add place"
-          testId="add-place-row"
-          onClick={() => setSheet("place")}
-          onClear={() => {
-            setPlace("");
-            setMap("");
-          }}
-        />
+        <div className="border-b border-ink/10">
+          {whenLabel ? (
+            <div className="flex min-h-16 items-center gap-3 py-3">
+              <p
+                data-testid="when-summary"
+                className="min-w-0 flex-1 truncate text-lg font-medium"
+              >
+                {whenLabel}
+              </p>
+              <button
+                type="button"
+                data-testid="edit-date"
+                onClick={() => setSheet("date")}
+                className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+              >
+                Edit
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="add-date-row"
+              onClick={() => setSheet("date")}
+              className="flex min-h-16 w-full items-center text-left text-lg text-ink/40"
+            >
+              Add date
+            </button>
+          )}
+        </div>
+        <div>
+          {place ? (
+            <div className="flex min-h-16 items-center gap-3 py-3">
+              <div className="min-w-0 flex-1">
+                <p
+                  data-testid="place-summary"
+                  className="truncate text-lg font-medium"
+                >
+                  {place}
+                </p>
+                {map ? (
+                  <p
+                    data-testid="place-map-chip"
+                    className="truncate text-sm text-ink/40"
+                  >
+                    {truncateMapUrl(map)}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                data-testid="edit-place"
+                onClick={() => setSheet("place")}
+                className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+              >
+                Edit
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="add-place-row"
+              onClick={() => setSheet("place")}
+              className="flex min-h-16 w-full items-center text-left text-lg text-ink/40"
+            >
+              Add place
+            </button>
+          )}
+        </div>
       </div>
 
       <DateSheet
         open={sheet === "date"}
-        value={date}
-        onClose={() => setSheet(null)}
-        onSave={(next) => {
-          setDate(next);
-          if (!next) {
-            setStart("");
-            setEnd("");
-          }
-          setSheet(null);
-        }}
-      />
-      <TimeSheet
-        open={sheet === "time"}
+        date={date}
         startTime={start}
         endTime={end}
         onClose={() => setSheet(null)}
-        onSave={(nextStart, nextEnd) => {
+        onSave={(nextDate, nextStart, nextEnd) => {
+          setDate(nextDate);
           setStart(nextStart);
-          setEnd(nextEnd);
+          setEnd(nextDate && nextStart ? nextEnd : "");
           setSheet(null);
         }}
       />
@@ -164,7 +130,7 @@ export function DateTimePlaceFields({
         onClose={() => setSheet(null)}
         onSave={(nextVenue, nextMap) => {
           setPlace(nextVenue);
-          setMap(nextMap);
+          setMap(nextVenue ? nextMap : "");
           setSheet(null);
         }}
       />
