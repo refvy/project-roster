@@ -5,6 +5,7 @@ import { getOrganiser } from "@/lib/auth";
 import { parseFormation } from "@/lib/pitch";
 import { parseSport } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
+import { utcToBangkokParts } from "@/lib/when-where";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -47,7 +48,7 @@ export default async function EditMatchdayPage({
           Edit matchday
         </h1>
         <p className="mt-2 mb-8 text-ink-soft">
-          Title, sport, when/where, and formation. No venue booking.
+          Title, sport, date, place, and formation. No venue booking.
         </p>
         <MatchdayForm
           action={updateMatchday}
@@ -58,6 +59,16 @@ export default async function EditMatchdayPage({
             id: matchday.id,
             title: matchday.title,
             whenWhere: matchday.whenWhere,
+            place: matchday.place ?? "",
+            startDate: matchday.startsAt
+              ? utcToBangkokParts(matchday.startsAt).date
+              : "",
+            startTime: matchday.startsAt
+              ? utcToBangkokParts(matchday.startsAt).time
+              : "",
+            endTime: matchday.endsAt
+              ? utcToBangkokParts(matchday.endsAt).time
+              : "",
             sport: parseSport(matchday.sport),
             formation: parseFormation(matchday.formation),
           }}

@@ -7,7 +7,7 @@ import {
   matchdaySharePulse,
   type StampView,
 } from "@/lib/share-pulse";
-import { formatWhenWhereLine } from "@/lib/when-where";
+import { matchdayWhenWhereLine } from "@/lib/when-where";
 
 export const alt = "Matchday — powered by SKWAD";
 export const size = { width: 1200, height: 630 };
@@ -39,7 +39,7 @@ export default async function Image({
         ? "Match completed"
         : matchday.title;
   const sport = gone ? "" : sportLabel(matchday.sport);
-  const when = gone ? "" : formatWhenWhereLine(matchday.whenWhere);
+  const when = gone ? "" : matchdayWhenWhereLine(matchday).text;
   const stamp =
     live && matchday ? matchdaySharePulse(matchday).stamp : null;
 

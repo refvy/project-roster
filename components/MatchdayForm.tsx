@@ -16,6 +16,10 @@ type Defaults = {
   id?: string;
   title?: string;
   whenWhere?: string;
+  startDate?: string;
+  startTime?: string;
+  endTime?: string;
+  place?: string;
   sport?: SportId;
   formation?: FormationId;
 };
@@ -122,18 +126,62 @@ export function MatchdayForm({
           className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
+          Date
+          <input
+            type="date"
+            name="startDate"
+            data-testid="start-date"
+            defaultValue={defaults?.startDate}
+            className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
+          Start time
+          <input
+            type="time"
+            name="startTime"
+            data-testid="start-time"
+            defaultValue={defaults?.startTime}
+            className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4"
+          />
+        </label>
+      </div>
+      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
+        End time
+        <input
+          type="time"
+          name="endTime"
+          data-testid="end-time"
+          defaultValue={defaults?.endTime}
+          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4 sm:max-w-[12rem]"
+        />
+      </label>
+      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
+        Place
+        <input
+          name="place"
+          maxLength={120}
+          defaultValue={defaults?.place}
+          placeholder="Lumphini pitch 2"
+          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
+        />
+      </label>
       <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
         When / where
         <textarea
           name="whenWhere"
-          required
-          minLength={2}
           maxLength={200}
           rows={3}
           defaultValue={defaults?.whenWhere}
           placeholder="Sun 17:00 · Lumphini pitch 2"
           className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
+        <span className="font-normal text-ink/50">
+          Optional fallback when the date is messy — like 30 Sep or 1 Oct. Empty
+          is TBD.
+        </span>
       </label>
       {state?.error ? (
         <p className="text-sm font-medium text-danger" role="alert">

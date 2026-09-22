@@ -23,7 +23,7 @@ export default async function NewMatchdayPage() {
           New matchday
         </h1>
         <p className="mt-2 mb-8 text-ink-soft">
-          Title, sport, and a when/where line. No venue booking.
+          Title, sport, optional date and place. No venue booking.
         </p>
         <CreateMatchdayForm />
       </main>

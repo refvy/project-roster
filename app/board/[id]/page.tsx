@@ -82,7 +82,9 @@ export default async function OrganiserMatchdayPage({
                 <SportChip sport={matchday.sport} testId="sport-label" />
               </p>
               <WhenWhereLine
-                value={matchday.whenWhere}
+                whenWhere={matchday.whenWhere}
+                startsAt={matchday.startsAt}
+                place={matchday.place}
                 className="mt-1 text-lg text-ink-soft"
               />
             </div>

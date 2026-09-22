@@ -46,7 +46,11 @@ model Matchday {
   organiserId String
   organiser   Organiser @relation(fields: [organiserId], references: [id], onDelete: Cascade)
   title       String
-  whenWhere   String
+  whenWhere   String    @default("")
+  /// Asia/Bangkok wall time stored as UTC. Null = TBD.
+  startsAt    DateTime?
+  endsAt      DateTime?
+  place       String?
   sport       String    @default("football")
   formation   String    @default("4-3-3")
   positions   Json

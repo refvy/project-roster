@@ -11,6 +11,8 @@ type MatchdayRow = {
   publicId: string;
   title: string;
   whenWhere: string;
+  startsAt: Date | null;
+  place: string | null;
   sport: string;
   going: number;
   status: "LIVE" | "CANCELLED" | "COMPLETED";
@@ -59,26 +61,11 @@ export default async function BoardPage({
       })
     : [];
 
-  const hostingRows: MatchdayRow[] = hosted.map((matchday) => ({
-    id: matchday.id,
-    publicId: matchday.publicId,
-    title: matchday.title,
-    whenWhere: matchday.whenWhere,
-    sport: matchday.sport,
-    going: matchday._count.rsvps,
-    status: matchday.status,
-  }));
-  const invitedRows: MatchdayRow[] = invitedRecords.map((matchday) => ({
-    id: matchday.id,
-    publicId: matchday.publicId,
-    title: matchday.title,
-    whenWhere: matchday.whenWhere,
-    sport: matchday.sport,
-    going: matchday._count.rsvps,
-    status: matchday.status,
-  }));
-
+  const hostingRows: MatchdayRow[] = hosted.map(toRow);
+  const invitedRows: MatchdayRow[] = invitedRecords.map(toRow);
   const rows = tab === "invited" ? invitedRows : hostingRows;
+  const active = rows.filter((row) => row.status === "LIVE");
+  const history = rows.filter((row) => row.status !== "LIVE");
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8">
@@ -149,62 +136,116 @@ export default async function BoardPage({
           </Link>
         </nav>
 
-        {rows.length === 0 ? (
-          <p className="mt-10 text-ink-soft">
+        {active.length === 0 ? (
+          <p className="mt-10 text-ink-soft" data-testid="active-empty">
             {tab === "invited"
-              ? "No matchdays you’ve joined yet. Open an invitation link to appear here."
+              ? "No upcoming matches you’ve joined yet. Open an invitation link to appear here."
               : organiser
-                ? "No matchdays yet. Create one and copy the invitation link."
+                ? "No upcoming matches — create one."
                 : "Sign in with a magic link to host a matchday."}
           </p>
         ) : (
-          <ul className="mt-4">
-            {rows.map((matchday) => (
-              <li key={matchday.id} className="border-b border-ink/10">
-                <Link
-                  href={
-                    tab === "hosting"
-                      ? `/board/${matchday.id}`
-                      : `/m/${matchday.publicId}`
-                  }
-                  data-testid="matchday-card"
-                  className={`block cursor-pointer rounded-2xl px-3 py-5 transition hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_10px_28px_-18px_rgb(26,23,20,0.45)] active:translate-y-0 active:bg-cream-deep ${
-                    matchday.status !== "LIVE" ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <SportChip sport={matchday.sport} />
-                    {matchday.status === "CANCELLED" ? (
-                      <span
-                        data-testid="cancelled-chip"
-                        className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
-                      >
-                        Cancelled
-                      </span>
-                    ) : null}
-                    {matchday.status === "COMPLETED" ? (
-                      <span
-                        data-testid="completed-chip"
-                        className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-deep"
-                      >
-                        Completed
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 font-display text-2xl tracking-tight">
-                    {matchday.title}
-                  </p>
-                  <WhenWhereLine
-                    value={matchday.whenWhere}
-                    going={matchday.going}
-                    className="mt-1 text-sm text-ink-soft"
-                  />
-                </Link>
-              </li>
+          <ul className="mt-4" data-testid="active-matchdays">
+            {active.map((matchday) => (
+              <MatchdayItem key={matchday.id} matchday={matchday} tab={tab} />
             ))}
           </ul>
         )}
+
+        {history.length > 0 ? (
+          <details data-testid="history" className="mt-10">
+            <summary
+              data-testid="history-toggle"
+              className="cursor-pointer text-sm font-semibold tracking-wide text-ink-soft"
+            >
+              History
+            </summary>
+            <ul className="mt-2" data-testid="history-matchdays">
+              {history.map((matchday) => (
+                <MatchdayItem key={matchday.id} matchday={matchday} tab={tab} />
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </main>
     </div>
+  );
+}
+
+function toRow(matchday: {
+  id: string;
+  publicId: string;
+  title: string;
+  whenWhere: string;
+  startsAt: Date | null;
+  place: string | null;
+  sport: string;
+  status: "LIVE" | "CANCELLED" | "COMPLETED";
+  _count: { rsvps: number };
+}): MatchdayRow {
+  return {
+    id: matchday.id,
+    publicId: matchday.publicId,
+    title: matchday.title,
+    whenWhere: matchday.whenWhere,
+    startsAt: matchday.startsAt,
+    place: matchday.place,
+    sport: matchday.sport,
+    going: matchday._count.rsvps,
+    status: matchday.status,
+  };
+}
+
+function MatchdayItem({
+  matchday,
+  tab,
+}: {
+  matchday: MatchdayRow;
+  tab: "invited" | "hosting";
+}) {
+  return (
+    <li className="border-b border-ink/10">
+      <Link
+        href={
+          tab === "hosting"
+            ? `/board/${matchday.id}`
+            : `/m/${matchday.publicId}`
+        }
+        data-testid="matchday-card"
+        className={`block cursor-pointer rounded-2xl px-3 py-5 transition hover:-translate-y-0.5 hover:bg-surface hover:shadow-[0_10px_28px_-18px_rgb(26,23,20,0.45)] active:translate-y-0 active:bg-cream-deep ${
+          matchday.status !== "LIVE" ? "opacity-60" : ""
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <SportChip sport={matchday.sport} />
+          {matchday.status === "CANCELLED" ? (
+            <span
+              data-testid="cancelled-chip"
+              className="inline-flex rounded-full border border-ink/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-ink-soft"
+            >
+              Cancelled
+            </span>
+          ) : null}
+          {matchday.status === "COMPLETED" ? (
+            <span
+              data-testid="completed-chip"
+              className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-deep"
+            >
+              Completed
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-2 font-display text-2xl tracking-tight">
+          {matchday.title}
+        </p>
+        <WhenWhereLine
+          whenWhere={matchday.whenWhere}
+          startsAt={matchday.startsAt}
+          place={matchday.place}
+          going={matchday.going}
+          className="mt-1 text-sm text-ink-soft"
+        />
+      </Link>
+    </li>
   );
 }

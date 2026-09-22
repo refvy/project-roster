@@ -15,6 +15,9 @@ import {
   shareUpdateText,
   shareUpdateUrl,
 } from "@/lib/share-pulse";
+import {
+  bangkokDateTimeToUtc,
+} from "@/lib/when-where";
 import type { Prisma } from "@prisma/client";
 
 export type MatchdayFormState = {
@@ -30,20 +33,68 @@ async function requireOrganiser() {
 function readMatchdayFields(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const whenWhere = String(formData.get("whenWhere") ?? "").trim();
+  const place = String(formData.get("place") ?? "").trim();
+  const startDate = String(formData.get("startDate") ?? "").trim();
+  const startTime = String(formData.get("startTime") ?? "").trim();
+  const endTime = String(formData.get("endTime") ?? "").trim();
   const sport = parseSport(formData.get("sport"));
   const formation =
     sport === "basketball" ? "4-3-3" : parseFormation(formData.get("formation"));
-  return { title, whenWhere, sport, formation };
+  return {
+    title,
+    whenWhere,
+    place,
+    startDate,
+    startTime,
+    endTime,
+    sport,
+    formation,
+  };
 }
 
-function validateFields(title: string, whenWhere: string): string | null {
-  if (title.length < 2 || title.length > 80) {
-    return "Give this matchday a short title.";
+function validateFields(input: {
+  title: string;
+  whenWhere: string;
+  startDate: string;
+  startTime: string;
+  endTime: string;
+  place: string;
+}):
+  | { ok: false; error: string }
+  | { ok: true; startsAt: Date | null; endsAt: Date | null } {
+  if (input.title.length < 2 || input.title.length > 80) {
+    return { ok: false, error: "Give this matchday a short title." };
   }
-  if (whenWhere.length < 2 || whenWhere.length > 200) {
-    return "When and where as plain text — no booking needed.";
+  if (input.whenWhere && (input.whenWhere.length < 2 || input.whenWhere.length > 200)) {
+    return { ok: false, error: "When and where as plain text — no booking needed." };
   }
-  return null;
+  if (input.place.length > 120) {
+    return { ok: false, error: "Keep the place short." };
+  }
+
+  let startsAt: Date | null = null;
+  let endsAt: Date | null = null;
+  if (input.startDate || input.startTime) {
+    if (!input.startDate || !input.startTime) {
+      return { ok: false, error: "Date and start time go together — or leave both empty for TBD." };
+    }
+    startsAt = bangkokDateTimeToUtc(input.startDate, input.startTime);
+    if (!startsAt) {
+      return { ok: false, error: "That date and time don’t look right." };
+    }
+    if (input.endTime) {
+      endsAt = bangkokDateTimeToUtc(input.startDate, input.endTime);
+      if (!endsAt) {
+        return { ok: false, error: "That end time doesn’t look right." };
+      }
+      if (endsAt.getTime() <= startsAt.getTime()) {
+        return { ok: false, error: "End time must be after start." };
+      }
+    }
+  } else if (input.endTime) {
+    return { ok: false, error: "Add a date and start time before an end time." };
+  }
+  return { ok: true, startsAt, endsAt };
 }
 
 export async function createMatchday(
@@ -51,19 +102,22 @@ export async function createMatchday(
   formData: FormData,
 ): Promise<NonNullable<MatchdayFormState>> {
   const organiser = await requireOrganiser();
-  const { title, whenWhere, sport, formation } = readMatchdayFields(formData);
-  const error = validateFields(title, whenWhere);
-  if (error) return { error };
+  const fields = readMatchdayFields(formData);
+  const checked = validateFields(fields);
+  if (!checked.ok) return { error: checked.error };
 
   const matchday = await prisma.matchday.create({
     data: {
       publicId: publicId(),
       organiserId: organiser.id,
-      title,
-      whenWhere,
-      sport,
-      formation,
-      positions: positionsForSport(sport) as unknown as Prisma.InputJsonValue,
+      title: fields.title,
+      whenWhere: fields.whenWhere,
+      place: fields.place || null,
+      startsAt: checked.startsAt,
+      endsAt: checked.endsAt,
+      sport: fields.sport,
+      formation: fields.formation,
+      positions: positionsForSport(fields.sport) as unknown as Prisma.InputJsonValue,
     },
   });
 
@@ -77,9 +131,9 @@ export async function updateMatchday(
 ): Promise<NonNullable<MatchdayFormState>> {
   const organiser = await requireOrganiser();
   const id = String(formData.get("id") ?? "").trim();
-  const { title, whenWhere, sport, formation } = readMatchdayFields(formData);
-  const error = validateFields(title, whenWhere);
-  if (error) return { error };
+  const fields = readMatchdayFields(formData);
+  const checked = validateFields(fields);
+  if (!checked.ok) return { error: checked.error };
 
   const matchday = await prisma.matchday.findFirst({
     where: { id, organiserId: organiser.id, deletedAt: null },
@@ -90,11 +144,14 @@ export async function updateMatchday(
   await prisma.matchday.update({
     where: { id: matchday.id },
     data: {
-      title,
-      whenWhere,
-      sport,
-      formation,
-      positions: positionsForSport(sport) as unknown as Prisma.InputJsonValue,
+      title: fields.title,
+      whenWhere: fields.whenWhere,
+      place: fields.place || null,
+      startsAt: checked.startsAt,
+      endsAt: checked.endsAt,
+      sport: fields.sport,
+      formation: fields.formation,
+      positions: positionsForSport(fields.sport) as unknown as Prisma.InputJsonValue,
     },
   });
 

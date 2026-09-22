@@ -1,7 +1,7 @@
 import { describeImbalance } from "./imbalance";
 import { pitchTemplate } from "./pitch";
 import { parsePositions } from "./positions";
-import { formatWhenWhereLine } from "./when-where";
+import { formatWhenWhereLine, matchdayWhenWhereLine } from "./when-where";
 
 /** Dan locked mock (via Steve): white fill + thick coral border, coral copy, tilt −12°. */
 export const STAMP_CORAL = "#FF5A3D";
@@ -35,6 +35,8 @@ export type SharePulseInput = {
   sport: string;
   formation: string;
   whenWhere: string;
+  startsAt?: Date | null;
+  place?: string | null;
   positions: unknown;
   rsvps: { status: "GOING" | "OUT"; positionKey: string | null }[];
 };
@@ -126,8 +128,10 @@ export function pulseBody(input: {
   out: number;
   imbalance: string | null;
   whenWhere: string;
+  whenLine?: string;
 }) {
-  const when = formatWhenWhereLine(input.whenWhere);
+  const when =
+    (input.whenLine ?? formatWhenWhereLine(input.whenWhere)).trim() || "TBD";
   if (input.going === 0 && input.out === 0) {
     return when;
   }
@@ -151,6 +155,7 @@ export function matchdaySharePulse(matchday: SharePulseInput) {
       out,
       imbalance,
       whenWhere: matchday.whenWhere,
+      whenLine: matchdayWhenWhereLine(matchday).text,
     }),
     stamp: stampView(going.length, out, capacity),
     going: going.length,

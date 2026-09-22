@@ -1,5 +1,6 @@
 import { AddFriendPanel } from "@/components/AddFriendPanel";
 import { CoachBoard } from "@/components/CoachBoard";
+import { GuestEventCard } from "@/components/GuestEventCard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
 import { SportChip } from "@/components/SportChip";
@@ -10,6 +11,7 @@ import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import { matchdaySharePulse, ogImageUrl } from "@/lib/share-pulse";
+import { displayWhen, displayWhere, hasStructuredStart } from "@/lib/when-where";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -109,7 +111,9 @@ export default async function GuestMatchdayPage({
             This match was cancelled
           </h1>
           <WhenWhereLine
-            value={matchday.whenWhere}
+            whenWhere={matchday.whenWhere}
+            startsAt={matchday.startsAt}
+            place={matchday.place}
             className="mt-3 text-lg text-ink/40"
           />
           <p className="mt-4 text-lg text-ink-soft">
@@ -151,7 +155,9 @@ export default async function GuestMatchdayPage({
               <SportChip sport={matchday.sport} testId="sport-label" />
             </p>
             <WhenWhereLine
-              value={matchday.whenWhere}
+              whenWhere={matchday.whenWhere}
+              startsAt={matchday.startsAt}
+              place={matchday.place}
               className="mt-3 text-lg text-ink/40"
             />
           </div>
@@ -185,6 +191,54 @@ export default async function GuestMatchdayPage({
   const extras = guestId
     ? matchday.rsvps.filter((rsvp) => rsvp.addedByGuestId === guestId)
     : [];
+  const outCount = matchday.rsvps.filter((rsvp) => rsvp.status === "OUT").length;
+
+  if (existing) {
+    return (
+      <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
+        <header>
+          <Wordmark href="/board" />
+        </header>
+        <main className="mt-12 flex flex-col gap-10">
+          <GuestEventCard
+            publicId={publicId}
+            sport={matchday.sport}
+            positions={positions}
+            title={matchday.title}
+            when={displayWhen(matchday)}
+            where={displayWhere(matchday)}
+            goingCount={going.length}
+            outCount={outCount}
+            name={existing.name}
+            status={existing.status}
+            position={existing.positionKey}
+            calendarHref={
+              hasStructuredStart(matchday)
+                ? `/m/${publicId}/calendar`
+                : null
+            }
+          />
+          <AddFriendPanel
+            publicId={publicId}
+            sport={matchday.sport}
+            positions={positions}
+            extras={extras.map((extra) => ({
+              id: extra.id,
+              name: extra.name,
+              status: extra.status,
+              positionKey: extra.positionKey,
+            }))}
+          />
+          <section>
+            <h2 className="font-display text-2xl tracking-tight">
+              Going · {going.length}
+            </h2>
+            <GoingList going={going} empty="No one Going yet." />
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
@@ -209,7 +263,9 @@ export default async function GuestMatchdayPage({
             <SportChip sport={matchday.sport} testId="sport-label" />
           </p>
           <WhenWhereLine
-            value={matchday.whenWhere}
+            whenWhere={matchday.whenWhere}
+            startsAt={matchday.startsAt}
+            place={matchday.place}
             className="mt-1 text-lg text-ink-soft"
           />
         </div>
@@ -217,24 +273,10 @@ export default async function GuestMatchdayPage({
           publicId={publicId}
           sport={matchday.sport}
           positions={positions}
-          defaultName={existing?.name || rememberedName}
-          defaultStatus={existing?.status ?? "GOING"}
-          defaultPosition={existing?.positionKey ?? null}
-          confirmed={Boolean(existing)}
+          defaultName={rememberedName}
+          defaultStatus="GOING"
+          defaultPosition={null}
         />
-        {existing ? (
-          <AddFriendPanel
-            publicId={publicId}
-            sport={matchday.sport}
-            positions={positions}
-            extras={extras.map((extra) => ({
-              id: extra.id,
-              name: extra.name,
-              status: extra.status,
-              positionKey: extra.positionKey,
-            }))}
-          />
-        ) : null}
         <section>
           <h2 className="font-display text-2xl tracking-tight">
             Going · {going.length}
