@@ -58,15 +58,17 @@ export function InvitationCard({
         {where.text}
       </p>
       {map ? (
-        <a
-          href={map}
-          target="_blank"
-          rel="noreferrer"
-          data-testid="event-map"
-          className="block truncate text-lg font-medium text-accent-deep underline-offset-4 hover:underline"
-        >
-          {truncateMapUrl(map)}
-        </a>
+        <div data-testid="event-map-row" className="min-h-11">
+          <a
+            href={map}
+            target="_blank"
+            rel="noreferrer"
+            data-testid="event-map"
+            className="block truncate text-lg font-medium text-accent-deep underline underline-offset-4"
+          >
+            {truncateMapUrl(map)}
+          </a>
+        </div>
       ) : null}
       {collapseWhenWhere && freeform ? (
         <div className="mt-1">
