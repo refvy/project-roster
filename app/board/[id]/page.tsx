@@ -84,6 +84,9 @@ export default async function OrganiserMatchdayPage({
               <WhenWhereLine
                 whenWhere={matchday.whenWhere}
                 startsAt={matchday.startsAt}
+                endsAt={matchday.endsAt}
+                hasTime={matchday.hasTime}
+                venue={matchday.venue}
                 place={matchday.place}
                 className="mt-1 text-lg text-ink-soft"
               />

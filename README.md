@@ -20,11 +20,11 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 **Organisers (magic-link auth)**
 
-- Create a matchday: sport (Football | Basketball, default Football), title, optional **Date** + start (end optional) and **Place** in Asia/Bangkok. Empty is **TBD**. Keep messy **When / where** text as a fallback (e.g. 30 Sep or 1 Oct).
+- Create a matchday: sport (Football | Basketball, default Football), title, optional **Date** / **Time** / **Place** (Airbnb-style sheets). Date is a calendar picker. Time is 24h, minutes **00 / 15 / 30 / 45**, optional end defaulting to start + 1 hour. Place is **Venue** + plain **Map/link** URL. Empty is **TBD**. Keep messy **When / where** text as a fallback (e.g. 30 Sep or 1 Oct).
 - Edit title / date / place / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
 - **+ New matchday**; copy **Copy invitation link** (URL muted under the button). On a live match, **Share update** copies the same link with `?v=` plus title + count pulse so LINE recrawls the OG card.
 - Home tabs **Invited** (matches you joined) · **Hosting** (matches you created). Each tab shows **Active** (LIVE) matches, then a collapsed **History** of Completed · Cancelled (hidden when empty).
-- After a guest RSVPs, `/m/{id}` becomes an **event card** (title, when, where, Going, Change status). **Add to calendar** (`.ics`) only when a structured start exists.
+- After a guest RSVPs, `/m/{id}` becomes an **event card** (title, when, venue, truncated map link, Going, Change status). Freeform when/where sits behind **More** when structured date/place exist. **Add to calendar** (`.ics`) only when a structured start exists.
 - Live roster of Going players + positions, same back→front order guests see
 - Organiser **Squad** board: football **half-pitch** (~3:4 portrait, cream ground, Signal teal lines — GK just above the goal line, forwards on the centre-circle arc), basketball cream schematic **half-court** (hoop/key at the top, proper 3-point corners + arc, half center circle on the midcourt line; **C** at the rim, **PF · SF** wide, **SG · PG** closer). Formation chips 4-3-3 / 4-4-2 / 4-1-4-1 / 3-5-2. Slots: empty = muted abbr; filled = first name + abbr; extras get a corner teal `+N` (cream ring, cap 9+). Tap for the full list. Fill order: exact → compatible (CAM/CDM → CM; LW ↔ LM; RW ↔ RM) → Any vacancies. **Bench** = leftover Any + unmatched. Collapsed **Out · N** after the bench (hidden when empty). No drag.
 - Imbalance banner when the side looks skewed
@@ -97,7 +97,7 @@ EMAIL_FROM="Skwad <onboarding@resend.dev>"
 
 ## Tests
 
-Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG title stays **Signup now for {title}**; first-invite description is when/where; after RSVPs the body pulses Going / Out / imbalance; Share update copies `?v=`; OG stamp cases (Low / Enough / Enough+Out); History collapse; TBD when/where; post-RSVP event card; Add to calendar only with a structured date; landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
+Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG title stays **Signup now for {title}**; first-invite description is when/where; after RSVPs the body pulses Going / Out / imbalance; Share update copies `?v=`; OG stamp cases (Low / Enough / Enough+Out); History collapse; TBD when/where; Add date/time/place sheets; 15-minute 24h steps; end default +1h; venue + truncated map URL; More collapse; post-RSVP event card; Add to calendar only with a structured date; landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
 
 ```bash
 npx prisma migrate deploy

@@ -15,6 +15,8 @@ import {
   shareUpdateText,
   shareUpdateUrl,
 } from "@/lib/share-pulse";
+import { parseMapUrl } from "@/lib/map-url";
+import { addCalendarDays, isQuarterTime } from "@/lib/time-options";
 import {
   bangkokDateTimeToUtc,
 } from "@/lib/when-where";
@@ -33,7 +35,10 @@ async function requireOrganiser() {
 function readMatchdayFields(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const whenWhere = String(formData.get("whenWhere") ?? "").trim();
-  const place = String(formData.get("place") ?? "").trim();
+  const venue = String(
+    formData.get("venue") ?? formData.get("place") ?? "",
+  ).trim();
+  const mapUrl = String(formData.get("mapUrl") ?? "").trim();
   const startDate = String(formData.get("startDate") ?? "").trim();
   const startTime = String(formData.get("startTime") ?? "").trim();
   const endTime = String(formData.get("endTime") ?? "").trim();
@@ -43,7 +48,8 @@ function readMatchdayFields(formData: FormData) {
   return {
     title,
     whenWhere,
-    place,
+    venue,
+    mapUrl,
     startDate,
     startTime,
     endTime,
@@ -58,43 +64,84 @@ function validateFields(input: {
   startDate: string;
   startTime: string;
   endTime: string;
-  place: string;
+  venue: string;
+  mapUrl: string;
 }):
   | { ok: false; error: string }
-  | { ok: true; startsAt: Date | null; endsAt: Date | null } {
+  | {
+      ok: true;
+      startsAt: Date | null;
+      endsAt: Date | null;
+      hasTime: boolean;
+      mapUrl: string | null;
+    } {
   if (input.title.length < 2 || input.title.length > 80) {
     return { ok: false, error: "Give this matchday a short title." };
   }
   if (input.whenWhere && (input.whenWhere.length < 2 || input.whenWhere.length > 200)) {
     return { ok: false, error: "When and where as plain text — no booking needed." };
   }
-  if (input.place.length > 120) {
-    return { ok: false, error: "Keep the place short." };
+  if (input.venue.length > 120) {
+    return { ok: false, error: "Keep the venue short." };
+  }
+  const map = parseMapUrl(input.mapUrl);
+  if (!map.ok) return { ok: false, error: map.error };
+  if (map.url && map.url.length > 500) {
+    return { ok: false, error: "Keep the map link short." };
   }
 
   let startsAt: Date | null = null;
   let endsAt: Date | null = null;
-  if (input.startDate || input.startTime) {
-    if (!input.startDate || !input.startTime) {
-      return { ok: false, error: "Date and start time go together — or leave both empty for TBD." };
-    }
-    startsAt = bangkokDateTimeToUtc(input.startDate, input.startTime);
-    if (!startsAt) {
-      return { ok: false, error: "That date and time don’t look right." };
-    }
-    if (input.endTime) {
-      endsAt = bangkokDateTimeToUtc(input.startDate, input.endTime);
-      if (!endsAt) {
-        return { ok: false, error: "That end time doesn’t look right." };
+  let hasTime = false;
+  if (input.startDate) {
+    if (input.startTime) {
+      if (!isQuarterTime(input.startTime)) {
+        return {
+          ok: false,
+          error: "Times are on the :00 / :15 / :30 / :45.",
+        };
       }
-      if (endsAt.getTime() <= startsAt.getTime()) {
-        return { ok: false, error: "End time must be after start." };
+      startsAt = bangkokDateTimeToUtc(input.startDate, input.startTime);
+      if (!startsAt) {
+        return { ok: false, error: "That date and time don’t look right." };
+      }
+      hasTime = true;
+      if (input.endTime) {
+        if (!isQuarterTime(input.endTime)) {
+          return {
+            ok: false,
+            error: "Times are on the :00 / :15 / :30 / :45.",
+          };
+        }
+        const startMinutes =
+          Number(input.startTime.slice(0, 2)) * 60 +
+          Number(input.startTime.slice(3));
+        const endMinutes =
+          Number(input.endTime.slice(0, 2)) * 60 + Number(input.endTime.slice(3));
+        const endDate =
+          endMinutes <= startMinutes
+            ? addCalendarDays(input.startDate, 1)
+            : input.startDate;
+        endsAt = bangkokDateTimeToUtc(endDate, input.endTime);
+        if (!endsAt) {
+          return { ok: false, error: "That end time doesn’t look right." };
+        }
+        if (endsAt.getTime() <= startsAt.getTime()) {
+          return { ok: false, error: "End time must be after start." };
+        }
+      }
+    } else if (input.endTime) {
+      return { ok: false, error: "Add a start time before an end time." };
+    } else {
+      startsAt = bangkokDateTimeToUtc(input.startDate, "00:00");
+      if (!startsAt) {
+        return { ok: false, error: "That date doesn’t look right." };
       }
     }
-  } else if (input.endTime) {
-    return { ok: false, error: "Add a date and start time before an end time." };
+  } else if (input.startTime || input.endTime) {
+    return { ok: false, error: "Add a date first — or leave time empty for TBD." };
   }
-  return { ok: true, startsAt, endsAt };
+  return { ok: true, startsAt, endsAt, hasTime, mapUrl: map.url };
 }
 
 export async function createMatchday(
@@ -112,9 +159,12 @@ export async function createMatchday(
       organiserId: organiser.id,
       title: fields.title,
       whenWhere: fields.whenWhere,
-      place: fields.place || null,
+      place: fields.venue || null,
+      venue: fields.venue || null,
+      mapUrl: checked.mapUrl,
       startsAt: checked.startsAt,
       endsAt: checked.endsAt,
+      hasTime: checked.hasTime,
       sport: fields.sport,
       formation: fields.formation,
       positions: positionsForSport(fields.sport) as unknown as Prisma.InputJsonValue,
@@ -146,9 +196,12 @@ export async function updateMatchday(
     data: {
       title: fields.title,
       whenWhere: fields.whenWhere,
-      place: fields.place || null,
+      place: fields.venue || null,
+      venue: fields.venue || null,
+      mapUrl: checked.mapUrl,
       startsAt: checked.startsAt,
       endsAt: checked.endsAt,
+      hasTime: checked.hasTime,
       sport: fields.sport,
       formation: fields.formation,
       positions: positionsForSport(fields.sport) as unknown as Prisma.InputJsonValue,

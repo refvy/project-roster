@@ -9,6 +9,7 @@ import {
   parseFormation,
   type FormationId,
 } from "@/lib/pitch";
+import { DateTimePlaceFields } from "@/components/DateTimePlaceFields";
 import { BasketballMark, FootballMark } from "@/components/SportMarks";
 import { SPORTS, type SportId } from "@/lib/positions";
 
@@ -19,7 +20,8 @@ type Defaults = {
   startDate?: string;
   startTime?: string;
   endTime?: string;
-  place?: string;
+  venue?: string;
+  mapUrl?: string;
   sport?: SportId;
   formation?: FormationId;
 };
@@ -126,48 +128,13 @@ export function MatchdayForm({
           className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
       </label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-          Date
-          <input
-            type="date"
-            name="startDate"
-            data-testid="start-date"
-            defaultValue={defaults?.startDate}
-            className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4"
-          />
-        </label>
-        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-          Start time
-          <input
-            type="time"
-            name="startTime"
-            data-testid="start-time"
-            defaultValue={defaults?.startTime}
-            className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4"
-          />
-        </label>
-      </div>
-      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-        End time
-        <input
-          type="time"
-          name="endTime"
-          data-testid="end-time"
-          defaultValue={defaults?.endTime}
-          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 focus:ring-4 sm:max-w-[12rem]"
-        />
-      </label>
-      <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-        Place
-        <input
-          name="place"
-          maxLength={120}
-          defaultValue={defaults?.place}
-          placeholder="Lumphini pitch 2"
-          className="min-h-14 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
-        />
-      </label>
+      <DateTimePlaceFields
+        startDate={defaults?.startDate}
+        startTime={defaults?.startTime}
+        endTime={defaults?.endTime}
+        venue={defaults?.venue}
+        mapUrl={defaults?.mapUrl}
+      />
       <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
         When / where
         <textarea

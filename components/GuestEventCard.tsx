@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
+import { InvitationCard } from "@/components/InvitationCard";
 import type { Position } from "@/lib/positions";
-
-type DisplayBit = { text: string; tbd: boolean };
+import type { DisplayBit } from "@/lib/when-where";
 
 export function GuestEventCard({
   publicId,
@@ -14,6 +14,9 @@ export function GuestEventCard({
   title,
   when,
   where,
+  mapUrl,
+  whenWhere,
+  collapseWhenWhere,
   goingCount,
   outCount,
   name,
@@ -27,6 +30,9 @@ export function GuestEventCard({
   title: string;
   when: DisplayBit;
   where: DisplayBit;
+  mapUrl?: string | null;
+  whenWhere?: string;
+  collapseWhenWhere?: boolean;
   goingCount: number;
   outCount: number;
   name: string;
@@ -43,30 +49,16 @@ export function GuestEventCard({
 
   return (
     <section data-testid="event-card" className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-          Matchday
-        </p>
-        <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
-          {title}
-        </h1>
-        <p
-          data-testid="event-when"
-          className={`mt-4 text-lg ${when.tbd ? "text-ink/40" : "text-ink-soft"}`}
-        >
-          {when.text}
-        </p>
-        <p
-          data-testid="event-where"
-          className={`mt-1 text-lg ${where.tbd ? "text-ink/40" : "text-ink-soft"}`}
-        >
-          {where.text}
-        </p>
-        <p data-testid="event-counts" className="mt-4 text-lg">
-          Going · {goingCount}
-          {outCount > 0 ? ` · Out · ${outCount}` : ""}
-        </p>
-      </div>
+      <InvitationCard
+        title={title}
+        when={when}
+        where={where}
+        mapUrl={mapUrl}
+        whenWhere={whenWhere}
+        collapseWhenWhere={collapseWhenWhere}
+        goingCount={goingCount}
+        outCount={outCount}
+      />
 
       <div className="flex flex-wrap items-center gap-4">
         {editing ? null : (

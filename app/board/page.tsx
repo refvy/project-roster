@@ -12,7 +12,10 @@ type MatchdayRow = {
   title: string;
   whenWhere: string;
   startsAt: Date | null;
+  endsAt: Date | null;
+  hasTime: boolean;
   place: string | null;
+  venue: string | null;
   sport: string;
   going: number;
   status: "LIVE" | "CANCELLED" | "COMPLETED";
@@ -178,7 +181,10 @@ function toRow(matchday: {
   title: string;
   whenWhere: string;
   startsAt: Date | null;
+  endsAt: Date | null;
+  hasTime: boolean;
   place: string | null;
+  venue: string | null;
   sport: string;
   status: "LIVE" | "CANCELLED" | "COMPLETED";
   _count: { rsvps: number };
@@ -189,7 +195,10 @@ function toRow(matchday: {
     title: matchday.title,
     whenWhere: matchday.whenWhere,
     startsAt: matchday.startsAt,
+    endsAt: matchday.endsAt,
+    hasTime: matchday.hasTime,
     place: matchday.place,
+    venue: matchday.venue,
     sport: matchday.sport,
     going: matchday._count.rsvps,
     status: matchday.status,
@@ -241,6 +250,9 @@ function MatchdayItem({
         <WhenWhereLine
           whenWhere={matchday.whenWhere}
           startsAt={matchday.startsAt}
+          endsAt={matchday.endsAt}
+          hasTime={matchday.hasTime}
+          venue={matchday.venue}
           place={matchday.place}
           going={matchday.going}
           className="mt-1 text-sm text-ink-soft"

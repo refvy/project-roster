@@ -50,7 +50,12 @@ model Matchday {
   /// Asia/Bangkok wall time stored as UTC. Null = TBD.
   startsAt    DateTime?
   endsAt      DateTime?
+  /// False = date only (time TBD). Timed rows are true.
+  hasTime     Boolean   @default(false)
   place       String?
+  venue       String?
+  /// Plain http(s) URL only. No embed.
+  mapUrl      String?
   sport       String    @default("football")
   formation   String    @default("4-3-3")
   positions   Json

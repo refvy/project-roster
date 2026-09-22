@@ -26,9 +26,10 @@ export async function GET(
   const ics = buildMatchdayIcs({
     publicId: matchday.publicId,
     title: matchday.title,
-    place: matchday.place,
+    place: matchday.venue ?? matchday.place,
     startsAt: matchday.startsAt,
     endsAt: matchday.endsAt,
+    hasTime: matchday.hasTime,
     url: `${getAppUrl()}/m/${matchday.publicId}`,
   });
 

@@ -2,7 +2,11 @@ export const MATCHDAY_TZ = "Asia/Bangkok";
 
 export type WhenWhereFields = {
   startsAt?: Date | null;
+  endsAt?: Date | null;
+  hasTime?: boolean | null;
   place?: string | null;
+  venue?: string | null;
+  mapUrl?: string | null;
   whenWhere: string;
 };
 
@@ -47,7 +51,13 @@ export function utcToBangkokParts(utc: Date) {
   };
 }
 
-export function formatBangkokWhen(utc: Date) {
+export function bangkokTodayDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MATCHDAY_TZ,
+  }).format(new Date());
+}
+
+function bangkokWhenParts(utc: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: MATCHDAY_TZ,
     weekday: "short",
@@ -60,16 +70,41 @@ export function formatBangkokWhen(utc: Date) {
   }).formatToParts(utc);
   const get = (type: string) =>
     parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("weekday")} ${get("day")} ${get("month")} ${get("year")} · ${get("hour")}:${get("minute")}`;
+  return {
+    date: `${get("weekday")} ${get("day")} ${get("month")} ${get("year")}`,
+    time: `${get("hour")}:${get("minute")}`,
+  };
+}
+
+export function formatBangkokDate(utc: Date) {
+  return bangkokWhenParts(utc).date;
+}
+
+export function formatBangkokWhen(utc: Date, endsAt?: Date | null) {
+  const { date, time } = bangkokWhenParts(utc);
+  if (endsAt) {
+    return `${date} · ${time}–${bangkokWhenParts(endsAt).time}`;
+  }
+  return `${date} · ${time}`;
 }
 
 export function hasStructuredStart(fields: WhenWhereFields) {
   return Boolean(fields.startsAt);
 }
 
+export function displayVenueName(fields: WhenWhereFields) {
+  return (fields.venue ?? fields.place)?.trim() ?? "";
+}
+
 export function displayWhen(fields: WhenWhereFields): DisplayBit {
   if (fields.startsAt) {
-    return { text: formatBangkokWhen(fields.startsAt), tbd: false };
+    if (fields.hasTime === false) {
+      return { text: formatBangkokDate(fields.startsAt), tbd: false };
+    }
+    return {
+      text: formatBangkokWhen(fields.startsAt, fields.endsAt),
+      tbd: false,
+    };
   }
   const fallback = formatWhenWhereLine(fields.whenWhere);
   if (fallback) return { text: fallback, tbd: false };
@@ -77,24 +112,29 @@ export function displayWhen(fields: WhenWhereFields): DisplayBit {
 }
 
 export function displayWhere(fields: WhenWhereFields): DisplayBit {
-  const place = fields.place?.trim() ?? "";
-  if (place) return { text: place, tbd: false };
+  const venue = displayVenueName(fields);
+  if (venue) return { text: venue, tbd: false };
   return { text: "TBD", tbd: true };
 }
 
 /**
- * Prefer structured date + place; else free-text whenWhere; else TBD.
+ * Prefer structured date + venue; else free-text whenWhere; else TBD.
  */
 export function matchdayWhenWhereLine(fields: WhenWhereFields): DisplayBit {
   const when = displayWhen(fields);
-  const place = fields.place?.trim() ?? "";
+  const venue = displayVenueName(fields);
   if (fields.startsAt) {
     return {
-      text: place ? `${when.text} · ${place}` : when.text,
+      text: venue ? `${when.text} · ${venue}` : when.text,
       tbd: false,
     };
   }
   if (!when.tbd) return when;
-  if (place) return { text: place, tbd: false };
+  if (venue) return { text: venue, tbd: false };
   return { text: "TBD", tbd: true };
+}
+
+export function shouldCollapseWhenWhere(fields: WhenWhereFields) {
+  const structured = Boolean(fields.startsAt) || Boolean(displayVenueName(fields));
+  return structured && Boolean(formatWhenWhereLine(fields.whenWhere));
 }

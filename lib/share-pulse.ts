@@ -36,7 +36,11 @@ export type SharePulseInput = {
   formation: string;
   whenWhere: string;
   startsAt?: Date | null;
+  endsAt?: Date | null;
+  hasTime?: boolean | null;
   place?: string | null;
+  venue?: string | null;
+  mapUrl?: string | null;
   positions: unknown;
   rsvps: { status: "GOING" | "OUT"; positionKey: string | null }[];
 };

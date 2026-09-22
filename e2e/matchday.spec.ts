@@ -31,8 +31,16 @@ import {
   formatWhenWhereLine,
   hasStructuredStart,
   matchdayWhenWhereLine,
+  shouldCollapseWhenWhere,
 } from "../lib/when-where";
 import { buildMatchdayIcs } from "../lib/ics";
+import { parseMapUrl, truncateMapUrl } from "../lib/map-url";
+import {
+  addOneHour,
+  HOURS_24,
+  isQuarterTime,
+  MINUTE_STEPS,
+} from "../lib/time-options";
 import {
   inviteShareUrl,
   matchdaySharePulse,
@@ -285,6 +293,9 @@ test.describe("when/where display", () => {
     const start = bangkokDateTimeToUtc("2026-10-03", "20:00");
     expect(start).toBeTruthy();
     expect(formatBangkokWhen(start!)).toBe("Sat 3 Oct 2026 · 20:00");
+    expect(formatBangkokWhen(start!, bangkokDateTimeToUtc("2026-10-03", "22:00"))).toBe(
+      "Sat 3 Oct 2026 · 20:00–22:00",
+    );
     expect(
       matchdayWhenWhereLine({
         startsAt: start,
@@ -293,16 +304,65 @@ test.describe("when/where display", () => {
       }).text,
     ).toBe("Sat 3 Oct 2026 · 20:00 · Lumphini pitch 2");
     expect(
+      matchdayWhenWhereLine({
+        startsAt: start,
+        hasTime: false,
+        venue: "Lumphini pitch 2",
+        whenWhere: "",
+      }).text,
+    ).toBe("Sat 3 Oct 2026 · Lumphini pitch 2");
+    expect(
       displayWhen({ startsAt: null, place: null, whenWhere: "Sun 17:00" }).text,
     ).toBe("Sun 17:00");
     expect(
       displayWhere({ startsAt: start, place: null, whenWhere: "Sun 17:00" }),
     ).toEqual({ text: "TBD", tbd: true });
     expect(
+      displayWhere({
+        startsAt: start,
+        venue: "Court 1",
+        place: "old",
+        whenWhere: "",
+      }).text,
+    ).toBe("Court 1");
+    expect(
       matchdayWhenWhereLine({ startsAt: null, place: null, whenWhere: "" }),
     ).toEqual({ text: "TBD", tbd: true });
     expect(hasStructuredStart({ startsAt: start, whenWhere: "" })).toBe(true);
     expect(hasStructuredStart({ startsAt: null, whenWhere: "Sun" })).toBe(false);
+    expect(
+      shouldCollapseWhenWhere({
+        startsAt: start,
+        venue: "Court 1",
+        whenWhere: "30 Sep or 1 Oct",
+      }),
+    ).toBe(true);
+    expect(
+      shouldCollapseWhenWhere({
+        startsAt: null,
+        venue: null,
+        whenWhere: "30 Sep or 1 Oct",
+      }),
+    ).toBe(false);
+  });
+
+  test("map URL is plain http(s) and truncates on the card", () => {
+    const url = "https://maps.app.goo.gl/yvCNh8AbCdEfGh";
+    expect(parseMapUrl(url)).toEqual({ ok: true, url });
+    expect(truncateMapUrl(url)).toBe("https://maps.app.goo.gl/yvCNh8…");
+    expect(parseMapUrl("ftp://example.com").ok).toBe(false);
+    expect(parseMapUrl("not a url").ok).toBe(false);
+    expect(parseMapUrl("")).toEqual({ ok: true, url: null });
+  });
+
+  test("times are 15-minute 24h steps; end defaults +1 hour", () => {
+    expect(MINUTE_STEPS).toEqual(["00", "15", "30", "45"]);
+    expect(HOURS_24).toHaveLength(24);
+    expect(HOURS_24[17]).toBe("17");
+    expect(isQuarterTime("17:00")).toBe(true);
+    expect(isQuarterTime("17:10")).toBe(false);
+    expect(addOneHour("20:00")).toEqual({ time: "21:00", nextDay: false });
+    expect(addOneHour("23:15")).toEqual({ time: "00:15", nextDay: true });
   });
 
   test("ICS includes UTC start and optional end", () => {
@@ -320,6 +380,16 @@ test.describe("when/where display", () => {
     expect(ics).toContain("DTEND:20261003T150000Z");
     expect(ics).toContain("LOCATION:Lumphini");
     expect(ics).toContain("SUMMARY:Sunday kickabout");
+    const allDay = buildMatchdayIcs({
+      publicId: "abc",
+      title: "Sunday kickabout",
+      place: "Lumphini",
+      startsAt,
+      hasTime: false,
+      url: "https://getskwad.com/m/abc",
+    });
+    expect(allDay).toContain("DTSTART;VALUE=DATE:20261003");
+    expect(allDay).not.toContain("DTSTART:20261003T");
   });
 });
 
@@ -1438,7 +1508,7 @@ test.describe("matchday board", () => {
   test("History is collapsed; empty History hidden; event card + calendar", async ({
     browser,
   }) => {
-    test.setTimeout(45_000);
+    test.setTimeout(60_000);
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+event+${Date.now()}@example.com`);
@@ -1448,25 +1518,30 @@ test.describe("matchday board", () => {
     );
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await expect(orgPage.getByTestId("add-time-row")).toBeDisabled();
     await orgPage.getByLabel("Title").fill("Dated kickabout");
-    await orgPage.getByTestId("start-date").fill("2026-10-03");
-    await orgPage.getByTestId("start-time").fill("20:00");
-    await orgPage.getByTestId("end-time").fill("22:00");
-    await orgPage.getByLabel("Place").fill("Lumphini pitch 2");
+    await orgPage.getByLabel("When / where").fill("30 Sep or 1 Oct if rain");
+    await pickDate(orgPage, "2026-10-03");
+    await pickTime(orgPage, "20:00", "22:00");
+    await pickPlace(
+      orgPage,
+      "Lumphini pitch 2",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Dated kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("when-where")).toHaveText(
-      "Sat 3 Oct 2026 · 20:00 · Lumphini pitch 2",
+      "Sat 3 Oct 2026 · 20:00–22:00 · Lumphini pitch 2",
     );
 
     await orgPage.getByRole("link", { name: /^edit$/i }).click();
     await expect(orgPage.getByTestId("start-date")).toHaveValue("2026-10-03");
     await expect(orgPage.getByTestId("start-time")).toHaveValue("20:00");
     await expect(orgPage.getByTestId("end-time")).toHaveValue("22:00");
-    await orgPage.getByLabel("Place").fill("Court 1");
+    await pickPlace(orgPage, "Court 1", "https://maps.app.goo.gl/yvCNh8AbCdEfGh");
     await orgPage.getByRole("button", { name: /^save$/i }).click();
     await expect(orgPage.getByTestId("when-where")).toHaveText(
-      "Sat 3 Oct 2026 · 20:00 · Court 1",
+      "Sat 3 Oct 2026 · 20:00–22:00 · Court 1",
     );
 
     const datedUrl = await shareUrlOf(orgPage);
@@ -1474,6 +1549,23 @@ test.describe("matchday board", () => {
     const page = await guest.newPage();
     await page.goto(datedUrl);
     await expect(page.getByTestId("signup-helper")).toBeVisible();
+    await expect(page.getByTestId("event-when")).toHaveText(
+      "Sat 3 Oct 2026 · 20:00–22:00",
+    );
+    await expect(page.getByTestId("event-where")).toHaveText("Court 1");
+    await expect(page.getByTestId("event-map")).toHaveText(
+      "https://maps.app.goo.gl/yvCNh8…",
+    );
+    await expect(page.getByTestId("event-map")).toHaveAttribute(
+      "href",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
+    await expect(page.getByTestId("more-whenwhere")).toHaveText("More");
+    await expect(page.getByTestId("whenwhere-more")).toHaveCount(0);
+    await page.getByTestId("more-whenwhere").click();
+    await expect(page.getByTestId("whenwhere-more")).toContainText(
+      "30 Sep or 1 Oct if rain",
+    );
     await expect(page.getByTestId("add-to-calendar")).toHaveCount(0);
     await page.getByLabel("Your name").fill("Nok");
     await page.getByTestId("status-going").click();
@@ -1481,9 +1573,12 @@ test.describe("matchday board", () => {
     await page.getByTestId("rsvp-submit").click();
     await expect(page.getByTestId("event-card")).toBeVisible();
     await expect(page.getByTestId("event-when")).toHaveText(
-      "Sat 3 Oct 2026 · 20:00",
+      "Sat 3 Oct 2026 · 20:00–22:00",
     );
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
+    await expect(page.getByTestId("event-map")).toHaveText(
+      "https://maps.app.goo.gl/yvCNh8…",
+    );
     await expect(page.getByTestId("event-counts")).toHaveText("Going · 1");
     await expect(page.getByTestId("add-to-calendar")).toBeVisible();
     await expect(page.getByTestId("change-status")).toHaveText("Change status");
@@ -1525,6 +1620,7 @@ test.describe("matchday board", () => {
     await tbdPage.getByTestId("rsvp-submit").click();
     await expect(tbdPage.getByTestId("event-when")).toHaveText("TBD");
     await expect(tbdPage.getByTestId("event-where")).toHaveText("TBD");
+    await expect(tbdPage.getByTestId("event-map")).toHaveCount(0);
     await expect(tbdPage.getByTestId("add-to-calendar")).toHaveCount(0);
     const missing = await tbdPage.request.get(`${tbdUrl}/calendar`);
     expect(missing.status()).toBe(404);
@@ -1540,6 +1636,66 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 });
+
+async function pickDate(page: Page, iso: string) {
+  await page.getByTestId("add-date-row").click();
+  await expect(page.getByTestId("date-sheet")).toBeVisible();
+  const targetMonth = iso.slice(0, 7);
+  for (let i = 0; i < 36; i += 1) {
+    const current = await page.getByTestId("cal-month").getAttribute("data-month");
+    if (current === targetMonth) break;
+    if ((current ?? "") < targetMonth) {
+      await page.getByTestId("cal-next").click();
+    } else {
+      await page.getByTestId("cal-prev").click();
+    }
+  }
+  await expect(page.getByTestId("cal-month")).toHaveAttribute(
+    "data-month",
+    targetMonth,
+  );
+  await page.getByTestId(`cal-day-${iso}`).click();
+  await page.getByTestId("date-sheet-done").click();
+  await expect(page.getByTestId("date-sheet")).toHaveCount(0);
+}
+
+async function pickTime(page: Page, start: string, end?: string) {
+  await page.getByTestId("add-time-row").click();
+  await expect(page.getByTestId("time-sheet")).toBeVisible();
+  const minutes = await page.getByTestId("start-minute").locator("option");
+  await expect(minutes).toHaveCount(4);
+  await expect(page.getByTestId("start-minute").locator('option[value="10"]')).toHaveCount(0);
+  await expect(page.getByTestId("start-hour").locator('option[value="17"]')).toHaveCount(1);
+  await expect(page.getByTestId("start-hour").locator('option[value="00"]')).toHaveCount(1);
+  await expect(page.getByTestId("start-hour").locator('option[value="23"]')).toHaveCount(1);
+  await expect(page.getByTestId("time-sheet")).not.toContainText(/AM|PM/);
+  const [startHour, startMinute] = start.split(":");
+  await page.getByTestId("start-hour").selectOption(startHour!);
+  await page.getByTestId("start-minute").selectOption(startMinute!);
+  if (end) {
+    await page.getByTestId("add-end-time").click();
+    const plusOne = addOneHour(start).time;
+    const [plusHour, plusMinute] = plusOne.split(":");
+    await expect(page.getByTestId("end-hour")).toHaveValue(plusHour!);
+    await expect(page.getByTestId("end-minute")).toHaveValue(plusMinute!);
+    const [endHour, endMinute] = end.split(":");
+    await page.getByTestId("end-hour").selectOption(endHour!);
+    await page.getByTestId("end-minute").selectOption(endMinute!);
+  }
+  await page.getByTestId("time-sheet-done").click();
+  await expect(page.getByTestId("time-sheet")).toHaveCount(0);
+}
+
+async function pickPlace(page: Page, venue: string, mapUrl?: string) {
+  await page.getByTestId("add-place-row").click();
+  await expect(page.getByTestId("place-sheet")).toBeVisible();
+  await page.getByTestId("venue-input").fill(venue);
+  if (mapUrl) {
+    await page.getByTestId("map-url-input").fill(mapUrl);
+  }
+  await page.getByTestId("place-sheet-done").click();
+  await expect(page.getByTestId("place-sheet")).toHaveCount(0);
+}
 
 async function signIn(page: Page, email: string) {
   await page.goto("/");

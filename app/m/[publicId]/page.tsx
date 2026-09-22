@@ -3,6 +3,7 @@ import { CoachBoard } from "@/components/CoachBoard";
 import { GuestEventCard } from "@/components/GuestEventCard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
+import { InvitationCard } from "@/components/InvitationCard";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
@@ -11,7 +12,12 @@ import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
 import { prisma } from "@/lib/prisma";
 import { matchdaySharePulse, ogImageUrl } from "@/lib/share-pulse";
-import { displayWhen, displayWhere, hasStructuredStart } from "@/lib/when-where";
+import {
+  displayWhen,
+  displayWhere,
+  hasStructuredStart,
+  shouldCollapseWhenWhere,
+} from "@/lib/when-where";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -113,6 +119,9 @@ export default async function GuestMatchdayPage({
           <WhenWhereLine
             whenWhere={matchday.whenWhere}
             startsAt={matchday.startsAt}
+            endsAt={matchday.endsAt}
+            hasTime={matchday.hasTime}
+            venue={matchday.venue}
             place={matchday.place}
             className="mt-3 text-lg text-ink/40"
           />
@@ -157,6 +166,9 @@ export default async function GuestMatchdayPage({
             <WhenWhereLine
               whenWhere={matchday.whenWhere}
               startsAt={matchday.startsAt}
+              endsAt={matchday.endsAt}
+              hasTime={matchday.hasTime}
+              venue={matchday.venue}
               place={matchday.place}
               className="mt-3 text-lg text-ink/40"
             />
@@ -207,6 +219,9 @@ export default async function GuestMatchdayPage({
             title={matchday.title}
             when={displayWhen(matchday)}
             where={displayWhere(matchday)}
+            mapUrl={matchday.mapUrl}
+            whenWhere={matchday.whenWhere}
+            collapseWhenWhere={shouldCollapseWhenWhere(matchday)}
             goingCount={going.length}
             outCount={outCount}
             name={existing.name}
@@ -246,29 +261,18 @@ export default async function GuestMatchdayPage({
         <Wordmark href="/board" />
       </header>
       <main className="mt-12 flex flex-col gap-10">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-            Matchday
-          </p>
-          <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">
-            {matchday.title}
-          </h1>
-          <p
-            data-testid="signup-helper"
-            className="mt-2 text-sm text-ink-soft"
-          >
-            No app. Pick a spot and tap Done.
-          </p>
-          <p className="mt-2">
-            <SportChip sport={matchday.sport} testId="sport-label" />
-          </p>
-          <WhenWhereLine
-            whenWhere={matchday.whenWhere}
-            startsAt={matchday.startsAt}
-            place={matchday.place}
-            className="mt-1 text-lg text-ink-soft"
-          />
-        </div>
+        <InvitationCard
+          title={matchday.title}
+          when={displayWhen(matchday)}
+          where={displayWhere(matchday)}
+          mapUrl={matchday.mapUrl}
+          whenWhere={matchday.whenWhere}
+          collapseWhenWhere={shouldCollapseWhenWhere(matchday)}
+          helper="No app. Pick a spot and tap Done."
+        />
+        <p>
+          <SportChip sport={matchday.sport} testId="sport-label" />
+        </p>
         <GuestRsvpForm
           publicId={publicId}
           sport={matchday.sport}
