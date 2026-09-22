@@ -51,6 +51,7 @@ export function GuestEventCard({
     <section data-testid="event-card" className="flex flex-col gap-6">
       <InvitationCard
         title={title}
+        sport={sport}
         when={when}
         where={where}
         mapUrl={mapUrl}

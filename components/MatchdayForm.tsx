@@ -136,19 +136,15 @@ export function MatchdayForm({
         mapUrl={defaults?.mapUrl}
       />
       <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
-        When / where
+        Details (optional)
         <textarea
           name="whenWhere"
           maxLength={200}
           rows={3}
           defaultValue={defaults?.whenWhere}
-          placeholder="Sun 17:00 · Lumphini pitch 2"
+          placeholder="Sun 17:00, National Stadium, Jersey : Red"
           className="rounded-2xl border border-ink/10 bg-surface px-4 py-3 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
         />
-        <span className="font-normal text-ink/50">
-          Optional fallback when the date is messy — like 30 Sep or 1 Oct. Empty
-          is TBD.
-        </span>
       </label>
       {state?.error ? (
         <p className="text-sm font-medium text-danger" role="alert">

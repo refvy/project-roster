@@ -15,6 +15,7 @@ type Props = {
   defaultPosition: string | null;
   confirmed?: boolean;
   onSaved?: () => void;
+  helper?: string;
 };
 
 export function GuestRsvpForm({
@@ -26,6 +27,7 @@ export function GuestRsvpForm({
   defaultPosition,
   confirmed,
   onSaved,
+  helper,
 }: Props) {
   const [status, setStatus] = useState<"GOING" | "OUT">(defaultStatus);
   const [position, setPosition] = useState(defaultPosition ?? "");
@@ -44,7 +46,14 @@ export function GuestRsvpForm({
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="position" value={position} />
 
-      <h2 className="font-display text-2xl tracking-tight">I’m going</h2>
+      <div className="flex flex-col gap-2">
+        {helper ? (
+          <p data-testid="signup-helper" className="text-sm text-ink-soft">
+            {helper}
+          </p>
+        ) : null}
+        <h2 className="font-display text-2xl tracking-tight">I’m going</h2>
+      </div>
 
       <AthleteNameInput
         sport={sport}

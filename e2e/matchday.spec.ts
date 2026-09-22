@@ -47,8 +47,6 @@ import {
   matchdaySharePulse,
   ogImageUrl,
   pulseBody,
-  shareUpdateText,
-  shareUpdateUrl,
   squadCapacity,
   stampKind,
   stampView,
@@ -532,24 +530,12 @@ test.describe("share pulse", () => {
     ).toBe("8 Going · 2 Out · need a CB · Sat 18:00");
   });
 
-  test("Share update URL adds ?v=; invite URL stays clean", () => {
+  test("invite URL stays clean; OG image uses ?v=", () => {
     expect(inviteShareUrl("https://getskwad.com", "abc")).toBe(
       "https://getskwad.com/m/abc",
     );
-    expect(shareUpdateUrl("https://getskwad.com", "abc", "1710000000")).toBe(
-      "https://getskwad.com/m/abc?v=1710000000",
-    );
     expect(ogImageUrl("abc", "1710000000")).toBe(
       "/m/abc/opengraph-image?v=1710000000",
-    );
-    expect(
-      shareUpdateText(
-        "Signup now for Pulse — powered by SKWAD",
-        "2 Going · Sat 18:00",
-        "https://getskwad.com/m/abc?v=1",
-      ),
-    ).toBe(
-      "Signup now for Pulse — powered by SKWAD\n2 Going · Sat 18:00\nhttps://getskwad.com/m/abc?v=1",
     );
   });
 
@@ -595,7 +581,12 @@ test.describe("matchday board", () => {
       "true",
     );
     await orgPage.getByLabel("Title").fill("Sunday kickabout");
-    await orgPage.getByLabel("When / where").fill("Sun 17:00 · Lumphini pitch 2");
+    await expect(orgPage.getByLabel("Details (optional)")).toHaveAttribute(
+      "placeholder",
+      "Sun 17:00, National Stadium, Jersey : Red",
+    );
+    await expect(orgPage.getByText(/Optional fallback/)).toHaveCount(0);
+    await orgPage.getByLabel("Details (optional)").fill("Sun 17:00 · Lumphini pitch 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
@@ -650,7 +641,7 @@ test.describe("matchday board", () => {
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByTestId("sport-basketball").click();
     await orgPage.getByLabel("Title").fill("Tuesday run");
-    await orgPage.getByLabel("When / where").fill("Tue 20:00 · Court 1");
+    await orgPage.getByLabel("Details (optional)").fill("Tue 20:00 · Court 1");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Tuesday run" })).toBeVisible();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Basketball");
@@ -716,6 +707,26 @@ test.describe("matchday board", () => {
     await expect(page.getByTestId("signup-helper")).toHaveText(
       "No app. Pick a spot and tap Done.",
     );
+    const signupTitleBox = await page
+      .getByRole("heading", { name: "Tuesday run" })
+      .boundingBox();
+    const signupPill = await page.getByTestId("sport-label").boundingBox();
+    const signupWhen = await page.getByTestId("event-when").boundingBox();
+    const signupHelper = await page.getByTestId("signup-helper").boundingBox();
+    const signupGoing = await page
+      .getByRole("heading", { name: /i.?m going/i })
+      .boundingBox();
+    expect(
+      signupTitleBox &&
+        signupPill &&
+        signupWhen &&
+        signupHelper &&
+        signupGoing,
+    ).toBeTruthy();
+    expect(signupTitleBox!.y).toBeLessThan(signupPill!.y);
+    expect(signupPill!.y).toBeLessThan(signupWhen!.y);
+    expect(signupWhen!.y).toBeLessThan(signupHelper!.y);
+    expect(signupHelper!.y).toBeLessThan(signupGoing!.y);
     await expect(page.getByTestId("position-PG")).toBeVisible();
     await expect(page.getByTestId("coach-board")).toHaveCount(0);
     await expect(page.getByTestId("position-C")).toBeVisible();
@@ -778,7 +789,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Coach board");
-    await orgPage.getByLabel("When / where").fill("Thu 20:00");
+    await orgPage.getByLabel("Details (optional)").fill("Thu 20:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-1-4-1").click();
     await expect(orgPage.getByTestId("squad-heading")).toHaveText("Squad");
@@ -830,7 +841,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Sunday kickabout");
-    await orgPage.getByLabel("When / where").fill("Sun 17:00\nLumphini");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 17:00\nLumphini");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("when-where")).toHaveText("Sun 17:00 · Lumphini");
@@ -840,7 +851,7 @@ test.describe("matchday board", () => {
       "Sun 17:00\nLumphini",
     );
     await orgPage.getByLabel("Title").fill("Monday 5s");
-    await orgPage.getByLabel("When / where").fill("Mon 20:00\nCourt 1");
+    await orgPage.getByLabel("Details (optional)").fill("Mon 20:00\nCourt 1");
     await orgPage.getByTestId("edit-formation-4-1-4-1").click();
     await orgPage.getByRole("button", { name: /^save$/i }).click();
     await expect(orgPage.getByRole("heading", { name: "Monday 5s" })).toBeVisible();
@@ -862,7 +873,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Saturday 5s");
-    await orgPage.getByLabel("When / where").fill("Sat 18:00 · Court 2");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 18:00 · Court 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const shareUrl = await shareUrlOf(orgPage);
 
@@ -899,7 +910,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("To delete after cancel");
-    await orgPage.getByLabel("When / where").fill("Sun 10:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 10:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const deleteUrl = await shareUrlOf(orgPage);
     orgPage.once("dialog", (dialog) => dialog.accept());
@@ -924,7 +935,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Friday kickabout");
-    await orgPage.getByLabel("When / where").fill("Fri 19:00 · Pitch 1");
+    await orgPage.getByLabel("Details (optional)").fill("Fri 19:00 · Pitch 1");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const shareUrl = await shareUrlOf(orgPage);
 
@@ -958,7 +969,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Still live then cancel");
-    await orgPage.getByLabel("When / where").fill("Sat 09:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 09:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const cancelUrl = await shareUrlOf(orgPage);
     await orgPage.getByTestId("cancel-matchday").click();
@@ -976,7 +987,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Wipe after complete");
-    await orgPage.getByLabel("When / where").fill("Sun 11:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 11:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const deleteUrl = await shareUrlOf(orgPage);
     orgPage.once("dialog", (dialog) => dialog.accept());
@@ -997,7 +1008,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("To delete");
-    await orgPage.getByLabel("When / where").fill("Fri 19:00");
+    await orgPage.getByLabel("Details (optional)").fill("Fri 19:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const shareUrl = await shareUrlOf(orgPage);
 
@@ -1026,7 +1037,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Sorted roster");
-    await orgPage.getByLabel("When / where").fill("Sat 16:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 16:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-1-4-1").click();
     const shareUrl = await shareUrlOf(orgPage);
@@ -1058,7 +1069,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Any strip");
-    await orgPage.getByLabel("When / where").fill("Sat 10:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 10:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const shareUrl = await shareUrlOf(orgPage);
     await guestGoing(browser, shareUrl, "Bee", "ANY");
@@ -1083,7 +1094,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Bring a friend");
-    await orgPage.getByLabel("When / where").fill("Sun 11:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 11:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     const shareUrl = await shareUrlOf(orgPage);
 
@@ -1162,7 +1173,7 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("LW stack");
-    await orgPage.getByLabel("When / where").fill("Sat 19:00");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 19:00");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
     await orgPage.getByTestId("formation-4-3-3").click();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
@@ -1303,7 +1314,7 @@ test.describe("matchday board", () => {
 
     await hostPage.getByRole("link", { name: "+ New matchday" }).click();
     await hostPage.getByLabel("Title").fill("Hosted game");
-    await hostPage.getByLabel("When / where").fill("Sat 18:00");
+    await hostPage.getByLabel("Details (optional)").fill("Sat 18:00");
     await hostPage.getByRole("button", { name: /create matchday/i }).click();
     const hostedShare = await shareUrlOf(hostPage);
 
@@ -1312,7 +1323,7 @@ test.describe("matchday board", () => {
     await signIn(playerPage, `mark+play+${Date.now()}@example.com`);
     await playerPage.getByRole("link", { name: "+ New matchday" }).click();
     await playerPage.getByLabel("Title").fill("My hosting");
-    await playerPage.getByLabel("When / where").fill("Sun 12:00");
+    await playerPage.getByLabel("Details (optional)").fill("Sun 12:00");
     await playerPage.getByRole("button", { name: /create matchday/i }).click();
     await playerPage.goto("/board");
     await expect(playerPage.getByRole("link", { name: "My hosting" })).toBeVisible();
@@ -1366,7 +1377,7 @@ test.describe("matchday board", () => {
     await host.close();
   });
 
-  test("Share update copies ?v=; OG Low stamp and pulse body", async ({
+  test("Copy invitation stays clean; OG Low stamp and pulse body", async ({
     browser,
   }) => {
     test.setTimeout(45_000);
@@ -1376,11 +1387,12 @@ test.describe("matchday board", () => {
 
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("Pulse game");
-    await orgPage.getByLabel("When / where").fill("Sat 18:00 · Court 2");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 18:00 · Court 2");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
-    await expect(orgPage.getByTestId("share-update")).toBeVisible();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
     await orgPage.screenshot({
-      path: join(SCREENSHOT_DIR, "share-update-board.png"),
+      path: join(SCREENSHOT_DIR, "copy-invitation-board.png"),
       fullPage: true,
     });
     const shareUrl = await shareUrlOf(orgPage);
@@ -1423,23 +1435,13 @@ test.describe("matchday board", () => {
     await pulsed.close();
 
     await orgPage.reload();
-    await orgPage.getByTestId("share-update").click();
-    await expect(orgPage.getByTestId("share-update")).toHaveText("Copied");
-    const updateUrl = await orgPage.getByTestId("share-update-url").textContent();
-    expect(updateUrl ?? "").toMatch(/\?v=\d+/);
-    expect(updateUrl ?? "").toContain(shareUrl);
-    const copied = await orgPage.getByTestId("share-update-text").textContent();
-    expect(copied).toContain("Signup now for Pulse game — powered by SKWAD");
-    expect(copied).toContain(
-      "2 Going · 1 Out · Too many GKs · need a CB · Sat 18:00 · Court 2",
-    );
-    expect(copied).toContain("?v=");
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
     expect(await shareUrlOf(orgPage)).toBe(shareUrl);
 
     await organiser.close();
   });
 
-  test("OG stamps Enough and Enough+Out; completed hides Share update", async ({
+  test("OG stamps Enough and Enough+Out; completed keeps Copy invitation", async ({
     browser,
   }) => {
     test.setTimeout(60_000);
@@ -1450,8 +1452,10 @@ test.describe("matchday board", () => {
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByTestId("sport-basketball").click();
     await orgPage.getByLabel("Title").fill("Enough run");
-    await orgPage.getByLabel("When / where").fill("Tue 20:00 · Court 1");
+    await orgPage.getByLabel("Details (optional)").fill("Tue 20:00 · Court 1");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
     const enoughUrl = await shareUrlOf(orgPage);
     await guestGoing(browser, enoughUrl, "Dan", "C");
     await guestGoing(browser, enoughUrl, "Pat", "PF");
@@ -1529,7 +1533,7 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByTestId("add-time-row")).toBeDisabled();
     await expect(orgPage.getByTestId("add-place-row")).toHaveText("Add place");
     await orgPage.getByLabel("Title").fill("Dated kickabout");
-    await orgPage.getByLabel("When / where").fill("30 Sep or 1 Oct if rain");
+    await orgPage.getByLabel("Details (optional)").fill("30 Sep or 1 Oct if rain");
     await pickDate(orgPage, "2026-10-03");
     await expect(orgPage.getByTestId("date-sheet")).toHaveCount(0);
     await expect(orgPage.getByTestId("when-summary")).toHaveText("Sat 3 Oct");

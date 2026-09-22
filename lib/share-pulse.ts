@@ -177,18 +177,6 @@ export function inviteShareUrl(origin: string, publicId: string) {
   return `${origin.replace(/\/$/, "")}/m/${publicId}`;
 }
 
-export function shareUpdateUrl(
-  origin: string,
-  publicId: string,
-  ogBust: string,
-) {
-  return `${inviteShareUrl(origin, publicId)}?v=${encodeURIComponent(ogBust)}`;
-}
-
-export function shareUpdateText(title: string, body: string, url: string) {
-  return `${title}\n${body}\n${url}`;
-}
-
 export function ogImageUrl(publicId: string, ogBust: string) {
   return `/m/${publicId}/opengraph-image?v=${encodeURIComponent(ogBust)}`;
 }

@@ -263,16 +263,13 @@ export default async function GuestMatchdayPage({
       <main className="mt-12 flex flex-col gap-10">
         <InvitationCard
           title={matchday.title}
+          sport={matchday.sport}
           when={displayWhen(matchday)}
           where={displayWhere(matchday)}
           mapUrl={matchday.mapUrl}
           whenWhere={matchday.whenWhere}
           collapseWhenWhere={shouldCollapseWhenWhere(matchday)}
-          helper="No app. Pick a spot and tap Done."
         />
-        <p>
-          <SportChip sport={matchday.sport} testId="sport-label" />
-        </p>
         <GuestRsvpForm
           publicId={publicId}
           sport={matchday.sport}
@@ -280,6 +277,7 @@ export default async function GuestMatchdayPage({
           defaultName={rememberedName}
           defaultStatus="GOING"
           defaultPosition={null}
+          helper="No app. Pick a spot and tap Done."
         />
         <section>
           <h2 className="font-display text-2xl tracking-tight">

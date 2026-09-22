@@ -20,9 +20,9 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 
 **Organisers (magic-link auth)**
 
-- Create a matchday: sport (Football | Basketball, default Football), title, optional **Add date** / **Add time** / **Add place** sheets (separate rows). Date row collapses to `Sun 28 Sep` + **Edit**; once a time exists the When summary can read `Sun 28 Sep · 17:00–18:00`. Time is its own sheet: 24h start (required, minutes **00 / 15 / 30 / 45**) and optional **Add end time** (start + 1 hour). Place is **Venue** (required if adding place) + optional plain **https** Map/website URL. Empty is **TBD**. Keep messy **When / where** text as a fallback (e.g. 30 Sep or 1 Oct).
+- Create a matchday: sport (Football | Basketball, default Football), title, optional **Add date** / **Add time** / **Add place** sheets (separate rows). Date row collapses to `Sun 28 Sep` + **Edit**; once a time exists the When summary can read `Sun 28 Sep · 17:00–18:00`. Time is its own sheet: 24h start (required, minutes **00 / 15 / 30 / 45**) and optional **Add end time** (start + 1 hour). Place is **Venue** (required if adding place) + optional plain **https** Map/website URL. Empty is **TBD**. Optional **Details (optional)** free text (placeholder `Sun 17:00, National Stadium, Jersey : Red`).
 - Edit title / date / place / when-where / sport / formation; delete with one confirm (guest link shows a deleted state)
-- **+ New matchday**; copy **Copy invitation link** (URL muted under the button). On a live match, **Share update** copies the same link with `?v=` plus title + count pulse so LINE recrawls the OG card.
+- **+ New matchday**; copy **Copy invitation link** (stable `/m/{id}` URL muted under the button). Invite OG thumbs recrawl via the daily 5am BKK cron (`ogBust`).
 - Home tabs **Invited** (matches you joined) · **Hosting** (matches you created). Each tab shows **Active** (LIVE) matches, then a collapsed **History** of Completed · Cancelled (hidden when empty).
 - After a guest RSVPs, `/m/{id}` becomes an **event card** (title, when, venue on its own line, truncated tappable map URL on its own row, Going, Change status). Freeform when/where sits behind **More** when structured date/place exist. **Add to calendar** (`.ics`) only when a structured start exists.
 - Live roster of Going players + positions, same back→front order guests see
@@ -97,7 +97,7 @@ EMAIL_FROM="Skwad <onboarding@resend.dev>"
 
 ## Tests
 
-Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG title stays **Signup now for {title}**; first-invite description is when/where; after RSVPs the body pulses Going / Out / imbalance; Share update copies `?v=`; OG stamp cases (Low / Enough / Enough+Out); History collapse; TBD when/where; Add date/place sheets; 15-minute 24h steps; end default +1h; venue + truncated map URL; More collapse; post-RSVP event card; Add to calendar only with a structured date; landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
+Playwright covers: crowded chip keeps the name + corner `+N`; football player chips Any·GK on the bottom row; match OG title stays **Signup now for {title}**; first-invite description is when/where; after RSVPs the body pulses Going / Out / imbalance; invite URL stays clean while OG image uses `?v=`; OG stamp cases (Low / Enough / Enough+Out); History collapse; TBD when/where; Details (optional); Add date/place sheets; 15-minute 24h steps; end default +1h; venue + truncated map URL; More collapse; post-RSVP event card; Add to calendar only with a structured date; landing/board OG tagline; basketball 3pt + center circle; `+ New matchday`; Copy invitation link; Squad; Invited/Hosting; CAM/CDM on CM; Out · N.
 
 ```bash
 npx prisma migrate deploy

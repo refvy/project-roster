@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SportChip } from "@/components/SportChip";
 import { truncateMapUrl } from "@/lib/map-url";
 import {
   formatWhenWhereLine,
@@ -9,6 +10,7 @@ import {
 
 export function InvitationCard({
   title,
+  sport,
   when,
   where,
   mapUrl,
@@ -16,9 +18,9 @@ export function InvitationCard({
   collapseWhenWhere,
   goingCount,
   outCount,
-  helper,
 }: {
   title: string;
+  sport?: string;
   when: DisplayBit;
   where: DisplayBit;
   mapUrl?: string | null;
@@ -26,7 +28,6 @@ export function InvitationCard({
   collapseWhenWhere?: boolean;
   goingCount?: number;
   outCount?: number;
-  helper?: string;
 }) {
   const [more, setMore] = useState(false);
   const map = mapUrl?.trim() ?? "";
@@ -40,9 +41,9 @@ export function InvitationCard({
       <h1 className="mt-1 font-display text-4xl tracking-tight md:text-5xl">
         {title}
       </h1>
-      {helper ? (
-        <p data-testid="signup-helper" className="mt-2 text-sm text-ink-soft">
-          {helper}
+      {sport ? (
+        <p className="mt-2">
+          <SportChip sport={sport} testId="sport-label" />
         </p>
       ) : null}
       <p
