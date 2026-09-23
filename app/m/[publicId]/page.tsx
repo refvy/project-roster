@@ -4,6 +4,7 @@ import { GuestEventCard } from "@/components/GuestEventCard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
 import { GuestRoster } from "@/components/GuestRoster";
+import { GuestShareCard } from "@/components/GuestShareCard";
 import { InvitationCard } from "@/components/InvitationCard";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
@@ -244,6 +245,13 @@ export default async function GuestMatchdayPage({
             }))}
           />
           <GuestRoster going={going} empty="No one Going yet." />
+          <GuestShareCard
+            title={matchday.title}
+            sport={matchday.sport}
+            formation={matchday.formation}
+            going={going}
+            matchdayId={matchday.id}
+          />
         </main>
       </div>
     );
@@ -273,6 +281,13 @@ export default async function GuestMatchdayPage({
           helper="No app. Pick a spot and tap Done."
         />
         <GuestRoster going={going} empty="No one Going yet." />
+        <GuestShareCard
+          title={matchday.title}
+          sport={matchday.sport}
+          formation={matchday.formation}
+          going={going}
+          matchdayId={matchday.id}
+        />
       </main>
     </div>
   );

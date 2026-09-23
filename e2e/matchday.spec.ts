@@ -623,6 +623,11 @@ test.describe("matchday board", () => {
     expect(lwChip && gkChip && anyChip).toBeTruthy();
     expect(lwChip!.y).toBeLessThan(gkChip!.y);
     expect(Math.abs(anyChip!.y - gkChip!.y)).toBeLessThan(20);
+    await expectShareCard(chipPage, {
+      title: "Sunday kickabout",
+      sport: "football",
+    });
+    await saveShot(chipPage.getByTestId("share-card"), "share-card-football.png");
     await chipGuest.close();
 
     await guestGoing(browser, shareUrl, "Nok", "CB");
@@ -739,6 +744,8 @@ test.describe("matchday board", () => {
     expect(signupHelper!.y).toBeLessThan(signupGoing!.y);
     await expect(page.getByTestId("position-PG")).toBeVisible();
     await expect(page.getByTestId("coach-board")).toHaveCount(0);
+    await expectShareCard(page, { title: "Tuesday run", sport: "basketball" });
+    await saveShot(page.getByTestId("share-card"), "share-card-basketball.png");
     await expect(page.getByTestId("position-C")).toBeVisible();
     await expect(page.getByTestId("position-GK")).toHaveCount(0);
     await expect(page.getByTestId("position-CB")).toHaveCount(0);
@@ -780,6 +787,7 @@ test.describe("matchday board", () => {
     await page.getByTestId("position-PG").click();
     await page.getByTestId("rsvp-submit").click();
     await expect(page.getByTestId("rsvp-confirmed")).toContainText(/going/i);
+    await expectShareCard(page, { title: "Tuesday run", sport: "basketball" });
     await guest.close();
 
     await orgPage.reload();
@@ -1811,6 +1819,32 @@ async function pickPlace(page: Page, venue: string, mapUrl?: string) {
   }
   await page.getByTestId("place-sheet-done").click();
   await expect(page.getByTestId("place-sheet")).toHaveCount(0);
+}
+
+async function expectShareCard(
+  page: Page,
+  opts: { title: string; sport: "football" | "basketball" },
+) {
+  const card = page.getByTestId("share-card");
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId("share-card-title")).toHaveText(opts.title);
+  await expect(page.getByTestId("share-card-footer")).toContainText(
+    "Powered by SKWAD",
+  );
+  await expect(page.getByRole("button", { name: /screenshot/i })).toHaveCount(0);
+  const roster = page.getByTestId("guest-roster");
+  const rosterBox = await roster.boundingBox();
+  const cardBox = await card.boundingBox();
+  expect(rosterBox && cardBox).toBeTruthy();
+  expect(rosterBox!.y).toBeLessThan(cardBox!.y);
+  if (opts.sport === "football") {
+    await expect(card.getByTestId("half-pitch")).toBeVisible();
+    await expect(card.getByTestId("half-court")).toHaveCount(0);
+  } else {
+    await expect(card.getByTestId("half-court")).toBeVisible();
+    await expect(card.getByTestId("half-pitch")).toHaveCount(0);
+  }
+  await expect(card.getByTestId("squad-heading")).toHaveCount(0);
 }
 
 async function signIn(page: Page, email: string) {

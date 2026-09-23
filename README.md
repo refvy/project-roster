@@ -16,7 +16,8 @@ Football first, multi-sport later. Smallest credible board: organiser creates a 
 4. Type a name (remembered in a cookie)
 5. See who’s Going, sorted back→front for that match’s formation, then Any / extras
 6. After **I’m going**, **Add someone else** on the same link (name + Going/Out + position). Extras show `added by {you}`; you can edit/delete only people you added
-7. Done in under a minute
+7. Below the Going roster, a cream **share card** (title, shrunk pitch/court, Powered by SKWAD) for a screenshot
+8. Done in under a minute
 
 **Organisers (magic-link auth)**
 

@@ -30,6 +30,7 @@ export function CoachBoard({
   going,
   out = [],
   readOnly = false,
+  share = false,
 }: {
   matchdayId: string;
   sport: string;
@@ -37,6 +38,7 @@ export function CoachBoard({
   going: GoingPlayer[];
   out?: { id: string; name: string }[];
   readOnly?: boolean;
+  share?: boolean;
 }) {
   const isBasketball = parseSport(sport) === "basketball";
   const [formationId, setFormationId] = useState<FormationId>(
@@ -55,6 +57,18 @@ export function CoachBoard({
     key: string;
     players: GoingPlayer[];
   } | null>(null);
+
+  if (share) {
+    return (
+      <div data-testid="share-board" className="pointer-events-none w-full">
+        {isBasketball ? (
+          <HalfCourtBoard lines={lines} onOpenSlot={() => {}} compact />
+        ) : (
+          <HalfPitchBoard lines={lines} onOpenSlot={() => {}} compact />
+        )}
+      </div>
+    );
+  }
 
   return (
     <section data-testid="coach-board" className="flex flex-col gap-4">
@@ -128,14 +142,18 @@ export function CoachBoard({
 function HalfPitchBoard({
   lines,
   onOpenSlot,
+  compact = false,
 }: {
   lines: PitchLine[];
   onOpenSlot: (slot: { key: string; players: GoingPlayer[] }) => void;
+  compact?: boolean;
 }) {
   return (
     <div
       data-testid="half-pitch"
-      className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
+      className={`relative mx-auto w-full overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30 ${
+        compact ? "max-w-[21rem]" : "max-w-md"
+      }`}
       style={{ aspectRatio: "3 / 4" }}
     >
       <HalfPitchMarks />
@@ -163,15 +181,19 @@ function HalfPitchBoard({
 function HalfCourtBoard({
   lines,
   onOpenSlot,
+  compact = false,
 }: {
   lines: PitchLine[];
   onOpenSlot: (slot: { key: string; players: GoingPlayer[] }) => void;
+  compact?: boolean;
 }) {
   const slots = lines.flatMap((line) => line.slots);
   return (
     <div
       data-testid="half-court"
-      className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30"
+      className={`relative mx-auto w-full overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30 ${
+        compact ? "max-w-[21rem]" : "max-w-md"
+      }`}
       style={{ aspectRatio: "400 / 510" }}
     >
       <HalfCourtMarks />
