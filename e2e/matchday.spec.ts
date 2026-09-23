@@ -1071,10 +1071,18 @@ test.describe("matchday board", () => {
       "aria-expanded",
       "true",
     );
+    await expect(page.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
+      "true",
+    );
     await page.getByTestId("roster-toggle").click();
     await expect(page.getByTestId("roster")).toHaveCount(0);
     await expect(page.getByTestId("roster-toggle")).toHaveAttribute(
       "aria-expanded",
+      "false",
+    );
+    await expect(page.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
       "false",
     );
     await page.getByTestId("roster-toggle").click();
