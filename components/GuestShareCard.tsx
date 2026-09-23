@@ -21,7 +21,7 @@ export function GuestShareCard({
     >
       <p
         data-testid="share-card-title"
-        className="font-display line-clamp-2 text-[1.375rem] leading-tight tracking-tight sm:text-2xl"
+        className="font-display line-clamp-2 text-center text-[1.375rem] leading-tight tracking-tight sm:text-2xl"
       >
         {title}
       </p>

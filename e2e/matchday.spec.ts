@@ -1827,7 +1827,12 @@ async function expectShareCard(
 ) {
   const card = page.getByTestId("share-card");
   await expect(card).toBeVisible();
-  await expect(page.getByTestId("share-card-title")).toHaveText(opts.title);
+  const shareTitle = page.getByTestId("share-card-title");
+  await expect(shareTitle).toHaveText(opts.title);
+  await expect(shareTitle).toHaveCSS("text-align", "center");
+  const pageTitle = page.getByRole("heading", { name: opts.title, exact: true });
+  await expect(pageTitle).toBeVisible();
+  await expect(pageTitle).toHaveCSS("text-align", /^(left|start)$/);
   const footer = page.getByTestId("share-card-footer");
   await expect(footer).toContainText("Powered by");
   await expect(footer).not.toContainText("SKWAD");
