@@ -1652,6 +1652,7 @@ test.describe("matchday board", () => {
       sport: "football",
       when: "Sat 3 Oct · 20:00–22:00",
     });
+    await saveShot(page.getByTestId("share-card"), "share-card-when.png");
     await expect(page.getByTestId("share-card")).not.toContainText("Court 1");
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
     await expect(page.getByTestId("event-where")).not.toContainText("maps.app");
