@@ -1828,9 +1828,16 @@ async function expectShareCard(
   const card = page.getByTestId("share-card");
   await expect(card).toBeVisible();
   await expect(page.getByTestId("share-card-title")).toHaveText(opts.title);
-  await expect(page.getByTestId("share-card-footer")).toContainText(
-    "Powered by SKWAD",
-  );
+  const footer = page.getByTestId("share-card-footer");
+  await expect(footer).toContainText("Powered by");
+  await expect(footer).not.toContainText("SKWAD");
+  const mark = footer.getByTestId("share-card-mark");
+  await expect(mark).toBeVisible();
+  const powered = footer.getByText("Powered by", { exact: true });
+  const poweredBox = await powered.boundingBox();
+  const markBox = await mark.boundingBox();
+  expect(poweredBox && markBox).toBeTruthy();
+  expect(poweredBox!.x).toBeLessThan(markBox!.x);
   await expect(page.getByRole("button", { name: /screenshot/i })).toHaveCount(0);
   const roster = page.getByTestId("guest-roster");
   const rosterBox = await roster.boundingBox();

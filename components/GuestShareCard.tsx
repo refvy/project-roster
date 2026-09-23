@@ -39,15 +39,16 @@ export function GuestShareCard({
         className="mt-2.5 flex flex-nowrap items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] leading-none"
         style={{ color: "#6B7280" }}
       >
+        <span>Powered by</span>
         <img
           src="/skwad-header.png"
           alt=""
+          data-testid="share-card-mark"
           width={47}
           height={13}
           className="h-[13px] w-auto shrink-0"
           draggable={false}
         />
-        <span>Powered by SKWAD</span>
       </div>
     </section>
   );
