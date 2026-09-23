@@ -251,6 +251,9 @@ export default async function GuestMatchdayPage({
             formation={matchday.formation}
             going={going}
             matchdayId={matchday.id}
+            startsAt={matchday.startsAt}
+            endsAt={matchday.endsAt}
+            hasTime={matchday.hasTime}
           />
         </main>
       </div>
@@ -287,6 +290,9 @@ export default async function GuestMatchdayPage({
           formation={matchday.formation}
           going={going}
           matchdayId={matchday.id}
+          startsAt={matchday.startsAt}
+          endsAt={matchday.endsAt}
+          hasTime={matchday.hasTime}
         />
       </main>
     </div>

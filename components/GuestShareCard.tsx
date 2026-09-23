@@ -1,5 +1,6 @@
 import { CoachBoard } from "@/components/CoachBoard";
 import type { GoingPlayer } from "@/lib/pitch";
+import { shareCardWhenLine } from "@/lib/when-where";
 
 export function GuestShareCard({
   title,
@@ -7,13 +8,20 @@ export function GuestShareCard({
   formation,
   going,
   matchdayId,
+  startsAt,
+  endsAt,
+  hasTime,
 }: {
   title: string;
   sport: string;
   formation: string;
   going: GoingPlayer[];
   matchdayId: string;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+  hasTime?: boolean | null;
 }) {
+  const whenLine = shareCardWhenLine({ startsAt, endsAt, hasTime });
   return (
     <section
       data-testid="share-card"
@@ -25,7 +33,19 @@ export function GuestShareCard({
       >
         {title}
       </p>
-      <div data-testid="share-card-board" className="mt-3 min-h-0 w-full flex-1">
+      {whenLine ? (
+        <p
+          data-testid="share-card-when"
+          className="mt-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-center text-[14px] leading-none"
+          style={{ color: "#6B7280" }}
+        >
+          {whenLine}
+        </p>
+      ) : null}
+      <div
+        data-testid="share-card-board"
+        className={`${whenLine ? "mt-2" : "mt-3"} min-h-0 w-full flex-1`}
+      >
         <CoachBoard
           matchdayId={matchdayId}
           sport={sport}

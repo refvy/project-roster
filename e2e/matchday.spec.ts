@@ -32,6 +32,7 @@ import {
   formatWhenWhereLine,
   hasStructuredStart,
   matchdayWhenWhereLine,
+  shareCardWhenLine,
   shouldCollapseWhenWhere,
   detailsPreview,
 } from "../lib/when-where";
@@ -334,6 +335,24 @@ test.describe("when/where display", () => {
       "Sat 3 Oct · 20:00–22:00",
     );
     expect(formatWhenSummary("2026-10-03", "", "")).toBe("Sat 3 Oct");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "19:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-01", "21:00"),
+      }),
+    ).toBe("Thu 1 Oct · 19:00–21:00");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "19:00"),
+      }),
+    ).toBe("Thu 1 Oct · 19:00");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "00:00"),
+        hasTime: false,
+      }),
+    ).toBe("Thu 1 Oct");
+    expect(shareCardWhenLine({ startsAt: null })).toBe(null);
     expect(
       shouldCollapseWhenWhere({
         startsAt: start,
@@ -1628,6 +1647,12 @@ test.describe("matchday board", () => {
     await expect(page.getByTestId("event-when")).toHaveText(
       "Sat 3 Oct 2026 · 20:00–22:00",
     );
+    await expectShareCard(page, {
+      title: "Dated kickabout",
+      sport: "football",
+      when: "Sat 3 Oct · 20:00–22:00",
+    });
+    await expect(page.getByTestId("share-card")).not.toContainText("Court 1");
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
     await expect(page.getByTestId("event-where")).not.toContainText("maps.app");
     await expect(page.getByTestId("event-map-row")).toBeVisible();
@@ -1669,6 +1694,12 @@ test.describe("matchday board", () => {
     await expect(page.getByTestId("event-when")).toHaveText(
       "Sat 3 Oct 2026 · 20:00–22:00",
     );
+    await expectShareCard(page, {
+      title: "Dated kickabout",
+      sport: "football",
+      when: "Sat 3 Oct · 20:00–22:00",
+    });
+    await expect(page.getByTestId("share-card")).not.toContainText("Court 1");
     await expect(page.getByTestId("event-where")).toHaveText("Court 1");
     await expect(page.getByTestId("event-map-row")).toBeVisible();
     await expect(page.getByTestId("event-map")).toHaveText(
@@ -1718,6 +1749,7 @@ test.describe("matchday board", () => {
     await tbdPage.getByTestId("position-CB").click();
     await tbdPage.getByTestId("rsvp-submit").click();
     await expect(tbdPage.getByTestId("event-when")).toHaveText("TBD");
+    await expectShareCard(tbdPage, { title: "TBD night", sport: "football" });
     await expect(tbdPage.getByTestId("event-where")).toHaveText("TBD");
     await expect(tbdPage.getByTestId("event-map")).toHaveCount(0);
     await expect(tbdPage.getByTestId("add-to-calendar")).toHaveCount(0);
@@ -1823,7 +1855,7 @@ async function pickPlace(page: Page, venue: string, mapUrl?: string) {
 
 async function expectShareCard(
   page: Page,
-  opts: { title: string; sport: "football" | "basketball" },
+  opts: { title: string; sport: "football" | "basketball"; when?: string },
 ) {
   const card = page.getByTestId("share-card");
   await expect(card).toBeVisible();
@@ -1833,6 +1865,20 @@ async function expectShareCard(
   const pageTitle = page.getByRole("heading", { name: opts.title, exact: true });
   await expect(pageTitle).toBeVisible();
   await expect(pageTitle).toHaveCSS("text-align", /^(left|start)$/);
+  const whenLine = page.getByTestId("share-card-when");
+  if (opts.when) {
+    await expect(whenLine).toHaveText(opts.when);
+    await expect(whenLine).toHaveCSS("text-align", "center");
+    await expect(whenLine).not.toContainText(/Court|Lumphini|maps\.app|TBD/i);
+    const titleBox = await shareTitle.boundingBox();
+    const whenBox = await whenLine.boundingBox();
+    const boardBox = await page.getByTestId("share-card-board").boundingBox();
+    expect(titleBox && whenBox && boardBox).toBeTruthy();
+    expect(titleBox!.y).toBeLessThan(whenBox!.y);
+    expect(whenBox!.y).toBeLessThan(boardBox!.y);
+  } else {
+    await expect(whenLine).toHaveCount(0);
+  }
   const footer = page.getByTestId("share-card-footer");
   await expect(footer).toContainText("Powered by");
   await expect(footer).not.toContainText("SKWAD");

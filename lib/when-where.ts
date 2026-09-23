@@ -103,6 +103,20 @@ export function formatWhenSummary(date: string, start: string, end: string) {
   return `${compact} · ${start}`;
 }
 
+/** Share-card when line from structured start/end only. Null if date/time TBD. */
+export function shareCardWhenLine(
+  fields: Pick<WhenWhereFields, "startsAt" | "endsAt" | "hasTime">,
+): string | null {
+  if (!fields.startsAt) return null;
+  const { date, time } = utcToBangkokParts(fields.startsAt);
+  const start = fields.hasTime === false ? "" : time;
+  const end =
+    fields.hasTime !== false && fields.endsAt
+      ? utcToBangkokParts(fields.endsAt).time
+      : "";
+  return formatWhenSummary(date, start, end) || null;
+}
+
 export function formatBangkokWhen(utc: Date, endsAt?: Date | null) {
   const { date, time } = bangkokWhenParts(utc);
   if (endsAt) {
