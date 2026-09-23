@@ -16,7 +16,6 @@ export function GuestEventCard({
   where,
   mapUrl,
   whenWhere,
-  collapseWhenWhere,
   goingCount,
   outCount,
   name,
@@ -32,7 +31,6 @@ export function GuestEventCard({
   where: DisplayBit;
   mapUrl?: string | null;
   whenWhere?: string;
-  collapseWhenWhere?: boolean;
   goingCount: number;
   outCount: number;
   name: string;
@@ -56,7 +54,6 @@ export function GuestEventCard({
         where={where}
         mapUrl={mapUrl}
         whenWhere={whenWhere}
-        collapseWhenWhere={collapseWhenWhere}
         goingCount={goingCount}
         outCount={outCount}
       />

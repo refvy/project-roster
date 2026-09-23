@@ -161,3 +161,21 @@ export function shouldCollapseWhenWhere(fields: WhenWhereFields) {
   const structured = Boolean(fields.startsAt) || Boolean(displayVenueName(fields));
   return structured && Boolean(formatWhenWhereLine(fields.whenWhere));
 }
+
+const DETAILS_PREVIEW_LINES = 3;
+
+/** Trimmed Details notes, split on newlines (empty lines count). */
+export function detailsLines(value: string) {
+  const trimmed = value.replace(/^\s+|\s+$/g, "");
+  if (!trimmed) return [];
+  return trimmed.split(/\r?\n/);
+}
+
+export function detailsPreview(value: string, maxLines = DETAILS_PREVIEW_LINES) {
+  const lines = detailsLines(value);
+  return {
+    text: lines.join("\n"),
+    preview: lines.slice(0, maxLines).join("\n"),
+    overflow: lines.length > maxLines,
+  };
+}

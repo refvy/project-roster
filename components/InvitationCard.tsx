@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SportChip } from "@/components/SportChip";
 import { truncateMapUrl } from "@/lib/map-url";
 import {
-  formatWhenWhereLine,
+  detailsPreview,
   type DisplayBit,
 } from "@/lib/when-where";
 
@@ -15,7 +15,6 @@ export function InvitationCard({
   where,
   mapUrl,
   whenWhere,
-  collapseWhenWhere,
   goingCount,
   outCount,
 }: {
@@ -25,13 +24,12 @@ export function InvitationCard({
   where: DisplayBit;
   mapUrl?: string | null;
   whenWhere?: string;
-  collapseWhenWhere?: boolean;
   goingCount?: number;
   outCount?: number;
 }) {
   const [more, setMore] = useState(false);
   const map = mapUrl?.trim() ?? "";
-  const freeform = formatWhenWhereLine(whenWhere ?? "");
+  const notes = detailsPreview(whenWhere ?? "");
 
   return (
     <div className="flex flex-col gap-2">
@@ -71,23 +69,23 @@ export function InvitationCard({
           </a>
         </div>
       ) : null}
-      {collapseWhenWhere && freeform ? (
+      {notes.text ? (
         <div className="mt-1">
-          <button
-            type="button"
-            data-testid="more-whenwhere"
-            onClick={() => setMore((open) => !open)}
-            className="text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
+          <p
+            data-testid="event-details"
+            className="whitespace-pre-wrap text-ink-soft"
           >
-            {more ? "Less" : "More"}
-          </button>
-          {more ? (
-            <p
-              data-testid="whenwhere-more"
-              className="mt-2 line-clamp-3 whitespace-pre-wrap text-ink-soft"
+            {more ? notes.text : notes.preview}
+          </p>
+          {notes.overflow ? (
+            <button
+              type="button"
+              data-testid="more-whenwhere"
+              onClick={() => setMore((open) => !open)}
+              className="mt-1 text-sm font-medium text-ink-soft underline-offset-4 hover:underline"
             >
-              {whenWhere}
-            </p>
+              {more ? "Less" : "More"}
+            </button>
           ) : null}
         </div>
       ) : null}

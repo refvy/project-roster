@@ -33,6 +33,7 @@ import {
   hasStructuredStart,
   matchdayWhenWhereLine,
   shouldCollapseWhenWhere,
+  detailsPreview,
 } from "../lib/when-where";
 import { buildMatchdayIcs } from "../lib/ics";
 import { parseMapUrl, truncateMapUrl } from "../lib/map-url";
@@ -347,6 +348,14 @@ test.describe("when/where display", () => {
         whenWhere: "30 Sep or 1 Oct",
       }),
     ).toBe(false);
+    expect(detailsPreview("").overflow).toBe(false);
+    expect(detailsPreview("Jersey : Red").preview).toBe("Jersey : Red");
+    expect(detailsPreview("Jersey : Red").overflow).toBe(false);
+    expect(
+      detailsPreview("a\nb\nc\nd").preview,
+    ).toBe("a\nb\nc");
+    expect(detailsPreview("a\nb\nc\nd").overflow).toBe(true);
+    expect(detailsPreview("a\nb\nc\nd").text).toBe("a\nb\nc\nd");
   });
 
   test("map URL is https-only and truncates as domain… on the card", () => {
@@ -1052,6 +1061,24 @@ test.describe("matchday board", () => {
     await page.goto(shareUrl);
     const roster = page.getByTestId("roster");
     await expect(roster).toBeVisible();
+    const cta = page.getByTestId("rsvp-submit");
+    await expect(cta).toBeVisible();
+    const ctaBox = await cta.boundingBox();
+    const rosterBox = await roster.boundingBox();
+    expect(ctaBox && rosterBox).toBeTruthy();
+    expect(ctaBox!.y).toBeLessThan(rosterBox!.y);
+    await expect(page.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await page.getByTestId("roster-toggle").click();
+    await expect(page.getByTestId("roster")).toHaveCount(0);
+    await expect(page.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await page.getByTestId("roster-toggle").click();
+    await expect(page.getByTestId("roster")).toBeVisible();
     await expect(roster.locator("li")).toHaveText([
       /Aek\s*GK/,
       /Bee\s*Any/,
@@ -1534,7 +1561,9 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByTestId("add-time-row")).toBeDisabled();
     await expect(orgPage.getByTestId("add-place-row")).toHaveText("Add place");
     await orgPage.getByLabel("Title").fill("Dated kickabout");
-    await orgPage.getByLabel("Details (optional)").fill("30 Sep or 1 Oct if rain");
+    await orgPage.getByLabel("Details (optional)").fill(
+      "Jersey : Red\nBring a ball\nWater at the gate\nNo metal studs",
+    );
     await pickDate(orgPage, "2026-10-03");
     await expect(orgPage.getByTestId("date-sheet")).toHaveCount(0);
     await expect(orgPage.getByTestId("when-summary")).toHaveText("Sat 3 Oct");
@@ -1597,11 +1626,23 @@ test.describe("matchday board", () => {
       "text-decoration-line",
       "underline",
     );
+    await expect(page.getByTestId("event-details")).toContainText("Jersey : Red");
+    await expect(page.getByTestId("event-details")).toContainText("Bring a ball");
+    await expect(page.getByTestId("event-details")).toContainText(
+      "Water at the gate",
+    );
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
+    );
     await expect(page.getByTestId("more-whenwhere")).toHaveText("More");
-    await expect(page.getByTestId("whenwhere-more")).toHaveCount(0);
     await page.getByTestId("more-whenwhere").click();
-    await expect(page.getByTestId("whenwhere-more")).toContainText(
-      "30 Sep or 1 Oct if rain",
+    await expect(page.getByTestId("event-details")).toContainText(
+      "No metal studs",
+    );
+    await expect(page.getByTestId("more-whenwhere")).toHaveText("Less");
+    await page.getByTestId("more-whenwhere").click();
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
     );
     await expect(page.getByTestId("add-to-calendar")).toHaveCount(0);
     await page.getByLabel("Your name").fill("Nok");
@@ -1618,6 +1659,10 @@ test.describe("matchday board", () => {
       "maps.app.goo.gl/yvCNh8AbCdEf…",
     );
     await expect(page.getByTestId("event-counts")).toHaveText("Going · 1");
+    await expect(page.getByTestId("event-details")).toContainText("Jersey : Red");
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
+    );
     await expect(page.getByTestId("add-to-calendar")).toBeVisible();
     await expect(page.getByTestId("change-status")).toHaveText("Change status");
     const ics = await page.request.get(`${datedUrl}/calendar`);

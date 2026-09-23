@@ -3,6 +3,7 @@ import { CoachBoard } from "@/components/CoachBoard";
 import { GuestEventCard } from "@/components/GuestEventCard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
 import { GoingList } from "@/components/GoingList";
+import { GuestRoster } from "@/components/GuestRoster";
 import { InvitationCard } from "@/components/InvitationCard";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
@@ -16,7 +17,6 @@ import {
   displayWhen,
   displayWhere,
   hasStructuredStart,
-  shouldCollapseWhenWhere,
 } from "@/lib/when-where";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -221,7 +221,6 @@ export default async function GuestMatchdayPage({
             where={displayWhere(matchday)}
             mapUrl={matchday.mapUrl}
             whenWhere={matchday.whenWhere}
-            collapseWhenWhere={shouldCollapseWhenWhere(matchday)}
             goingCount={going.length}
             outCount={outCount}
             name={existing.name}
@@ -244,12 +243,7 @@ export default async function GuestMatchdayPage({
               positionKey: extra.positionKey,
             }))}
           />
-          <section>
-            <h2 className="font-display text-2xl tracking-tight">
-              Going · {going.length}
-            </h2>
-            <GoingList going={going} empty="No one Going yet." />
-          </section>
+          <GuestRoster going={going} empty="No one Going yet." />
         </main>
       </div>
     );
@@ -268,7 +262,6 @@ export default async function GuestMatchdayPage({
           where={displayWhere(matchday)}
           mapUrl={matchday.mapUrl}
           whenWhere={matchday.whenWhere}
-          collapseWhenWhere={shouldCollapseWhenWhere(matchday)}
         />
         <GuestRsvpForm
           publicId={publicId}
@@ -279,12 +272,7 @@ export default async function GuestMatchdayPage({
           defaultPosition={null}
           helper="No app. Pick a spot and tap Done."
         />
-        <section>
-          <h2 className="font-display text-2xl tracking-tight">
-            Going · {going.length}
-          </h2>
-          <GoingList going={going} empty="No one Going yet." />
-        </section>
+        <GuestRoster going={going} empty="No one Going yet." />
       </main>
     </div>
   );
