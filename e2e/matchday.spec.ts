@@ -1688,7 +1688,7 @@ test.describe("matchday board", () => {
     await dupPage.getByTestId("rsvp-submit").click();
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toContainText(
-      "Nok is already on the list — change status instead?",
+      "“Nok” is already on the list — change status instead?",
     );
     await dupPage.getByTestId("duplicate-cancel").click();
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toHaveCount(0);
@@ -1714,7 +1714,8 @@ test.describe("matchday board", () => {
     await orgPage.getByRole("button", { name: "Remove Nok" }).click();
     await orgPage.getByTestId("remove-rsvp-confirm").click();
     await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
-    await expect(orgPage.getByTestId("roster")).not.toContainText("Nok");
+    await expect(orgPage.getByRole("heading", { name: "Going · 0" })).toBeVisible();
+    await expect(orgPage.getByTestId("roster")).toHaveCount(0);
     await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toHaveCount(0);
 
     await orgPage.getByTestId("out-toggle").click();

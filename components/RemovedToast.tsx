@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export const REMOVED_TOAST_KEY = "skwad-removed-toast";
+const REMOVED_EVENT = "skwad-removed";
 
 export function markRemovedToast() {
   try {
@@ -10,21 +11,34 @@ export function markRemovedToast() {
   } catch {
     /* ignore */
   }
+  window.dispatchEvent(new Event(REMOVED_EVENT));
 }
 
 export function RemovedToast() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem(REMOVED_TOAST_KEY) !== "1") return;
-      sessionStorage.removeItem(REMOVED_TOAST_KEY);
-    } catch {
-      return;
+    let timer: number | undefined;
+    function showToast() {
+      setShow(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShow(false), 1800);
     }
-    setShow(true);
-    const timer = window.setTimeout(() => setShow(false), 1800);
-    return () => window.clearTimeout(timer);
+    function consumeStored() {
+      try {
+        if (sessionStorage.getItem(REMOVED_TOAST_KEY) !== "1") return;
+        sessionStorage.removeItem(REMOVED_TOAST_KEY);
+        showToast();
+      } catch {
+        /* ignore */
+      }
+    }
+    consumeStored();
+    window.addEventListener(REMOVED_EVENT, showToast);
+    return () => {
+      window.removeEventListener(REMOVED_EVENT, showToast);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   if (!show) return null;

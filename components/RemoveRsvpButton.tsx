@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { removeOrganiserRsvp } from "@/app/actions/rsvp";
 import { Sheet } from "@/components/Sheet";
 import { markRemovedToast } from "@/components/RemovedToast";
@@ -14,7 +15,9 @@ export function RemoveRsvpButton({
   rsvpId: string;
   name: string;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [, startTransition] = useTransition();
 
   return (
     <>
@@ -45,20 +48,24 @@ export function RemoveRsvpButton({
           >
             Cancel
           </button>
-          <form
-            action={removeOrganiserRsvp}
-            onSubmit={() => markRemovedToast()}
+          <button
+            type="button"
+            data-testid="remove-rsvp-confirm"
+            onClick={() => {
+              const data = new FormData();
+              data.set("matchdayId", matchdayId);
+              data.set("rsvpId", rsvpId);
+              markRemovedToast();
+              setOpen(false);
+              startTransition(async () => {
+                await removeOrganiserRsvp(data);
+                router.refresh();
+              });
+            }}
+            className="inline-flex min-h-12 items-center rounded-full bg-danger px-5 text-sm font-semibold text-cream hover:opacity-90"
           >
-            <input type="hidden" name="matchdayId" value={matchdayId} />
-            <input type="hidden" name="rsvpId" value={rsvpId} />
-            <button
-              type="submit"
-              data-testid="remove-rsvp-confirm"
-              className="inline-flex min-h-12 items-center rounded-full bg-danger px-5 text-sm font-semibold text-cream hover:opacity-90"
-            >
-              Remove
-            </button>
-          </form>
+            Remove
+          </button>
         </div>
       </Sheet>
     </>
