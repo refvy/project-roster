@@ -36,6 +36,11 @@ import {
   shouldCollapseWhenWhere,
   detailsPreview,
 } from "../lib/when-where";
+import {
+  buildRosterNameLines,
+  buildRosterPaste,
+  formatRosterPasteWhen,
+} from "../lib/roster-paste";
 import { buildMatchdayIcs } from "../lib/ics";
 import { parseMapUrl, truncateMapUrl } from "../lib/map-url";
 import {
@@ -354,6 +359,70 @@ test.describe("when/where display", () => {
     ).toBe("Thu 1 Oct");
     expect(shareCardWhenLine({ startsAt: null })).toBe(null);
     expect(
+      formatRosterPasteWhen({
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "20:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-03", "22:00"),
+      }),
+    ).toBe("3 Oct 2026 - 20:00–22:00");
+    expect(formatRosterPasteWhen({ startsAt: null })).toBe(null);
+    expect(
+      formatRosterPasteWhen({
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "00:00"),
+        hasTime: false,
+      }),
+    ).toBe("3 Oct 2026");
+    expect(
+      buildRosterNameLines(
+        [
+          { name: "Dan", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        FOOTBALL_POSITIONS,
+      ),
+    ).toEqual(["1. Dan · GK", "2. Nok · CB"]);
+    expect(
+      buildRosterNameLines(
+        [
+          { name: "Dan", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        FOOTBALL_POSITIONS,
+        true,
+      ),
+    ).toEqual(["GK", "1. Dan", "CB", "1. Nok"]);
+    expect(
+      buildRosterPaste({
+        title: "TEST Copy roster",
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "20:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-03", "22:00"),
+        venue: "Court 1",
+        mapUrl: "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+        going: [
+          { name: "Aek", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        positions: FOOTBALL_POSITIONS,
+      }),
+    ).toBe(
+      [
+        "TEST Copy roster",
+        "3 Oct 2026 - 20:00–22:00",
+        "",
+        "@ Court 1",
+        "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+        "",
+        "1. Aek · GK",
+        "2. Nok · CB",
+      ].join("\n"),
+    );
+    expect(
+      buildRosterPaste({
+        title: "Sunday kickabout",
+        going: [{ name: "Nok", positionKey: "CB" }],
+        positions: FOOTBALL_POSITIONS,
+      }),
+    ).toBe("Sunday kickabout\n\n1. Nok · CB");
+    expect(
       shouldCollapseWhenWhere({
         startsAt: start,
         venue: "Court 1",
@@ -620,6 +689,7 @@ test.describe("matchday board", () => {
     await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
     await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
     await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-roster")).toHaveCount(0);
 
     const shareUrl = await shareUrlOf(orgPage);
     expect(shareUrl).toMatch(/\/m\//);
@@ -1578,6 +1648,73 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
+  test("Copy roster pastes Going names on the manager board", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+copyroster+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST Copy roster");
+    await pickDate(orgPage, "2026-10-03");
+    await pickTime(orgPage, "20:00", "22:00");
+    await pickPlace(
+      orgPage,
+      "Court 1",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST Copy roster" })).toBeVisible();
+    await expect(orgPage.getByTestId("copy-roster")).toHaveCount(0);
+    await expect(orgPage.getByTestId("position-counts")).toBeVisible();
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("copy-roster")).toHaveCount(0);
+    await guest.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestOut(browser, shareUrl, "Bee");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByTestId("roster")).toContainText("Aek");
+    await expect(orgPage.getByTestId("roster")).not.toContainText("Bee");
+    const expected = [
+      "TEST Copy roster",
+      "3 Oct 2026 - 20:00–22:00",
+      "",
+      "@ Court 1",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+      "",
+      "1. Aek · GK",
+      "2. Nok · CB",
+    ].join("\n");
+    const button = orgPage.getByTestId("copy-roster");
+    await expect(button).toBeVisible();
+    await expect(button).toHaveText("Copy roster");
+    await expect(button).toHaveCSS("color", "rgb(107, 114, 128)");
+    const buttonBox = await button.boundingBox();
+    const countsBox = await orgPage.getByTestId("position-counts").boundingBox();
+    expect(buttonBox && countsBox).toBeTruthy();
+    expect(Math.abs(buttonBox!.y - countsBox!.y)).toBeLessThan(24);
+    await expect(button).toHaveAttribute("data-paste", expected);
+    await organiser.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await button.click();
+    await expect(orgPage.getByTestId("roster-copied-toast")).toHaveText(
+      "Roster copied",
+    );
+    expect(await orgPage.evaluate(() => navigator.clipboard.readText())).toBe(
+      expected,
+    );
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "copy-roster-paste.txt"), expected);
+    await saveShot(orgPage.getByTestId("copy-roster"), "copy-roster-button.png");
+    await organiser.close();
+  });
+
   test("History is collapsed; empty History hidden; event card + calendar", async ({
     browser,
   }) => {
@@ -1904,6 +2041,7 @@ async function expectShareCard(
     await expect(card.getByTestId("half-pitch")).toHaveCount(0);
   }
   await expect(card.getByTestId("squad-heading")).toHaveCount(0);
+  await expect(page.getByTestId("copy-roster")).toHaveCount(0);
 }
 
 async function signIn(page: Page, email: string) {

@@ -1,6 +1,7 @@
 import { logoutAction } from "@/app/actions/auth";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { CopyRosterButton } from "@/components/CopyRosterButton";
 import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
@@ -15,6 +16,7 @@ import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
 import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
+import { buildRosterPaste } from "@/lib/roster-paste";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -50,6 +52,17 @@ export default async function OrganiserMatchdayPage({
     ...position,
     count: going.filter((rsvp) => rsvp.positionKey === position.key).length,
   }));
+  const rosterPaste = buildRosterPaste({
+    title: matchday.title,
+    startsAt: matchday.startsAt,
+    endsAt: matchday.endsAt,
+    hasTime: matchday.hasTime,
+    venue: matchday.venue,
+    place: matchday.place,
+    mapUrl: matchday.mapUrl,
+    going: ordered,
+    positions,
+  });
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8">
@@ -151,9 +164,15 @@ export default async function OrganiserMatchdayPage({
             <h2 className="font-display text-2xl tracking-tight">
               Going · {going.length}
             </h2>
-            <p className="max-w-xl text-right text-sm text-ink-soft" data-testid="position-counts">
-              {counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
-            </p>
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+              {going.length > 0 ? <CopyRosterButton text={rosterPaste} /> : null}
+              <p
+                className="max-w-xl text-right text-sm text-ink-soft"
+                data-testid="position-counts"
+              >
+                {counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
+              </p>
+            </div>
           </div>
           <GoingList
             going={ordered}
