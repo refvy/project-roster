@@ -232,11 +232,13 @@ export default async function GuestMatchdayPage({
                 ? `/m/${publicId}/calendar`
                 : null
             }
+            goingNames={going.map((player) => player.name)}
           />
           <AddFriendPanel
             publicId={publicId}
             sport={matchday.sport}
             positions={positions}
+            goingNames={going.map((player) => player.name)}
             extras={extras.map((extra) => ({
               id: extra.id,
               name: extra.name,
@@ -282,6 +284,7 @@ export default async function GuestMatchdayPage({
           defaultStatus="GOING"
           defaultPosition={null}
           helper="No app. Pick a spot and tap Done."
+          goingNames={going.map((player) => player.name)}
         />
         <GuestRoster going={going} empty="No one Going yet." />
         <GuestShareCard

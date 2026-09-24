@@ -3,17 +3,20 @@
 import { revalidatePath } from "next/cache";
 import {
   getOrCreateGuestId,
+  getOrganiser,
   rememberGuestName,
 } from "@/lib/auth";
 import { randomToken } from "@/lib/crypto";
 import { isKnownPosition, parsePositions } from "@/lib/positions";
 import { isMatchdayLive } from "@/lib/matchday-status";
+import { normalizePersonName } from "@/lib/rsvp-name";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
 
 export type RsvpState = {
   ok: boolean;
   error?: string;
+  duplicate?: string;
 } | null;
 
 function readRsvpFields(formData: FormData) {
@@ -30,6 +33,25 @@ function validatePerson(name: string) {
     return "Type a name so the roster can list you.";
   }
   return null;
+}
+
+async function findGoingNameCollision(
+  matchdayId: string,
+  name: string,
+  except?: { guestId?: string; rsvpId?: string },
+) {
+  const going = await prisma.rsvp.findMany({
+    where: { matchdayId, status: "GOING" },
+    select: { id: true, name: true, guestId: true },
+  });
+  const needle = normalizePersonName(name);
+  return (
+    going.find((row) => {
+      if (except?.rsvpId && row.id === except.rsvpId) return false;
+      if (except?.guestId && row.guestId === except.guestId) return false;
+      return normalizePersonName(row.name) === needle;
+    }) ?? null
+  );
 }
 
 export async function submitRsvp(
@@ -58,6 +80,14 @@ export async function submitRsvp(
   }
 
   const guestId = await getOrCreateGuestId();
+  if (status === "GOING") {
+    const collision = await findGoingNameCollision(matchday.id, name, {
+      guestId,
+    });
+    if (collision) {
+      return { ok: false, duplicate: collision.name };
+    }
+  }
   await rememberGuestName(name);
 
   await prisma.rsvp.upsert({
@@ -122,6 +152,12 @@ export async function addFriendRsvp(
   if (status === "GOING" && !isKnownPosition(positions, positionKey)) {
     return { ok: false, error: "Pick a position." };
   }
+  if (status === "GOING") {
+    const collision = await findGoingNameCollision(matchday.id, name);
+    if (collision) {
+      return { ok: false, duplicate: collision.name };
+    }
+  }
 
   await prisma.rsvp.create({
     data: {
@@ -175,6 +211,14 @@ export async function updateFriendRsvp(
   if (status === "GOING" && !isKnownPosition(positions, positionKey)) {
     return { ok: false, error: "Pick a position." };
   }
+  if (status === "GOING") {
+    const collision = await findGoingNameCollision(matchday.id, name, {
+      rsvpId: extra.id,
+    });
+    if (collision) {
+      return { ok: false, duplicate: collision.name };
+    }
+  }
 
   await prisma.rsvp.update({
     where: { id: extra.id },
@@ -213,4 +257,32 @@ export async function deleteFriendRsvp(formData: FormData) {
   await prisma.rsvp.delete({ where: { id: extra.id } });
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);
+}
+
+export async function removeOrganiserRsvp(formData: FormData) {
+  const organiser = await getOrganiser();
+  if (!organiser) return;
+
+  const matchdayId = String(formData.get("matchdayId") ?? "").trim();
+  const rsvpId = String(formData.get("rsvpId") ?? "").trim();
+  if (!matchdayId || !rsvpId) return;
+
+  const matchday = await prisma.matchday.findUnique({
+    where: { id: matchdayId },
+  });
+  if (
+    !matchday ||
+    matchday.organiserId !== organiser.id ||
+    matchday.deletedAt ||
+    !isMatchdayLive(matchday)
+  ) {
+    return;
+  }
+
+  const rsvp = await prisma.rsvp.findUnique({ where: { id: rsvpId } });
+  if (!rsvp || rsvp.matchdayId !== matchday.id) return;
+
+  await prisma.rsvp.delete({ where: { id: rsvp.id } });
+  revalidatePath(`/board/${matchday.id}`);
+  revalidatePath(`/m/${matchday.publicId}`);
 }

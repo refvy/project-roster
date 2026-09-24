@@ -17,6 +17,7 @@ import {
   type PitchSlot,
   FOOTBALL_FORMATIONS,
 } from "@/lib/pitch";
+import { RemoveRsvpButton } from "@/components/RemoveRsvpButton";
 import { halfCourtGeometry } from "@/lib/court";
 import { parseSport } from "@/lib/positions";
 
@@ -31,6 +32,7 @@ export function CoachBoard({
   out = [],
   readOnly = false,
   share = false,
+  canRemove = false,
 }: {
   matchdayId: string;
   sport: string;
@@ -39,6 +41,7 @@ export function CoachBoard({
   out?: { id: string; name: string }[];
   readOnly?: boolean;
   share?: boolean;
+  canRemove?: boolean;
 }) {
   const isBasketball = parseSport(sport) === "basketball";
   const [formationId, setFormationId] = useState<FormationId>(
@@ -124,9 +127,15 @@ export function CoachBoard({
       <AnyStrip
         any={any}
         overflow={bench.filter((p) => p.positionKey !== "ANY")}
+        canRemove={canRemove}
+        matchdayId={matchdayId}
       />
 
-      <OutSection people={out} />
+      <OutSection
+        people={out}
+        canRemove={canRemove}
+        matchdayId={matchdayId}
+      />
 
       {sheet ? (
         <SlotSheet
@@ -228,9 +237,13 @@ function HalfCourtBoard({
 function AnyStrip({
   any,
   overflow,
+  canRemove = false,
+  matchdayId,
 }: {
   any: GoingPlayer[];
   overflow: GoingPlayer[];
+  canRemove?: boolean;
+  matchdayId: string;
 }) {
   const people = [...any, ...overflow];
   return (
@@ -248,7 +261,7 @@ function AnyStrip({
           {people.map((player) => (
             <li
               key={player.id}
-              className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm ring-1 ring-ink/10"
+              className="group inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 text-sm ring-1 ring-ink/10"
             >
               <span className="font-medium">{player.name}</span>
               <span
@@ -262,6 +275,13 @@ function AnyStrip({
                   ? "Any"
                   : player.positionKey}
               </span>
+              {canRemove ? (
+                <RemoveRsvpButton
+                  matchdayId={matchdayId}
+                  rsvpId={player.id}
+                  name={player.name}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
@@ -402,7 +422,15 @@ function SlotSheet({
   );
 }
 
-function OutSection({ people }: { people: { id: string; name: string }[] }) {
+function OutSection({
+  people,
+  canRemove = false,
+  matchdayId,
+}: {
+  people: { id: string; name: string }[];
+  canRemove?: boolean;
+  matchdayId: string;
+}) {
   const [open, setOpen] = useState(false);
   if (people.length === 0) return null;
   return (
@@ -431,8 +459,18 @@ function OutSection({ people }: { people: { id: string; name: string }[] }) {
       {open ? (
         <ul data-testid="out-list" className="border-t border-ink/10 px-4 py-2">
           {people.map((person) => (
-            <li key={person.id} className="py-2 text-sm font-medium">
-              {person.name}
+            <li
+              key={person.id}
+              className="group flex items-center justify-between gap-3 py-2 text-sm font-medium"
+            >
+              <span>{person.name}</span>
+              {canRemove ? (
+                <RemoveRsvpButton
+                  matchdayId={matchdayId}
+                  rsvpId={person.id}
+                  name={person.name}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

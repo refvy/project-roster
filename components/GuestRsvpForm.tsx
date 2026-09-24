@@ -3,7 +3,9 @@
 import { useActionState, useEffect, useState } from "react";
 import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
 import { AthleteNameInput } from "@/components/AthleteNameInput";
+import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
+import { collidingGoingName } from "@/lib/rsvp-name";
 import { groupedPositionRows, type Position } from "@/lib/positions";
 
 type Props = {
@@ -16,6 +18,9 @@ type Props = {
   confirmed?: boolean;
   onSaved?: () => void;
   helper?: string;
+  goingNames?: string[];
+  ownName?: string | null;
+  onChangeStatus?: () => void;
 };
 
 export function GuestRsvpForm({
@@ -28,9 +33,13 @@ export function GuestRsvpForm({
   confirmed,
   onSaved,
   helper,
+  goingNames = [],
+  ownName,
+  onChangeStatus,
 }: Props) {
   const [status, setStatus] = useState<"GOING" | "OUT">(defaultStatus);
   const [position, setPosition] = useState(defaultPosition ?? "");
+  const [duplicate, setDuplicate] = useState<string | null>(null);
   const [state, action, pending] = useActionState<RsvpState, FormData>(
     submitRsvp,
     confirmed ? { ok: true } : null,
@@ -40,8 +49,32 @@ export function GuestRsvpForm({
     if (state?.ok) onSaved?.();
   }, [state?.ok]);
 
+  useEffect(() => {
+    if (state?.duplicate) setDuplicate(state.duplicate);
+  }, [state?.duplicate]);
+
   return (
-    <form action={action} className="flex flex-col gap-8">
+    <form
+      action={action}
+      className="flex flex-col gap-8"
+      onSubmit={(event) => {
+        if (status !== "GOING") return;
+        const name = String(new FormData(event.currentTarget).get("name") ?? "");
+        const hit = collidingGoingName(goingNames, name, ownName);
+        if (hit) {
+          event.preventDefault();
+          setDuplicate(hit);
+        }
+      }}
+    >
+      <DuplicateNameSheet
+        name={duplicate}
+        onCancel={() => setDuplicate(null)}
+        onChangeStatus={() => {
+          setDuplicate(null);
+          onChangeStatus?.();
+        }}
+      />
       <input type="hidden" name="publicId" value={publicId} />
       <input type="hidden" name="status" value={status} />
       <input type="hidden" name="position" value={position} />

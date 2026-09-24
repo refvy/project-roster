@@ -22,6 +22,7 @@ export function GuestEventCard({
   status,
   position,
   calendarHref,
+  goingNames,
 }: {
   publicId: string;
   sport: string;
@@ -37,6 +38,7 @@ export function GuestEventCard({
   status: "GOING" | "OUT";
   position: string | null;
   calendarHref: string | null;
+  goingNames?: string[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -85,6 +87,9 @@ export function GuestEventCard({
           defaultName={name}
           defaultStatus={status}
           defaultPosition={position}
+          goingNames={goingNames}
+          ownName={name}
+          onChangeStatus={() => setEditing(true)}
           onSaved={() => {
             setEditing(false);
             router.refresh();

@@ -6,6 +6,7 @@ import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
+import { RemovedToast } from "@/components/RemovedToast";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { SportChip } from "@/components/SportChip";
@@ -146,6 +147,7 @@ export default async function OrganiserMatchdayPage({
           sport={matchday.sport}
           formation={matchday.formation}
           readOnly={matchday.status !== "LIVE"}
+          canRemove={matchday.status === "LIVE"}
           going={going.map((rsvp) => ({
             id: rsvp.id,
             name: rsvp.name,
@@ -177,9 +179,12 @@ export default async function OrganiserMatchdayPage({
           <GoingList
             going={ordered}
             empty="Waiting on the first Going. Share the link."
+            canRemove={matchday.status === "LIVE"}
+            matchdayId={matchday.id}
           />
         </section>
       </main>
+      <RemovedToast />
     </div>
   );
 }

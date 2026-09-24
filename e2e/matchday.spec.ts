@@ -36,6 +36,7 @@ import {
   shouldCollapseWhenWhere,
   detailsPreview,
 } from "../lib/when-where";
+import { collidingGoingName } from "../lib/rsvp-name";
 import {
   buildRosterNameLines,
   buildRosterPaste,
@@ -358,6 +359,9 @@ test.describe("when/where display", () => {
       }),
     ).toBe("Thu 1 Oct");
     expect(shareCardWhenLine({ startsAt: null })).toBe(null);
+    expect(collidingGoingName(["Nok", "Aek"], "nok")).toBe("Nok");
+    expect(collidingGoingName(["Nok"], "Nok", "Nok")).toBe(null);
+    expect(collidingGoingName(["Nok", "Aek"], "Bee")).toBe(null);
     expect(
       formatRosterPasteWhen({
         startsAt: bangkokDateTimeToUtc("2026-10-03", "20:00"),
@@ -1648,6 +1652,114 @@ test.describe("matchday board", () => {
     await organiser.close();
   });
 
+  test("manager can remove Going and Out; guest cannot; duplicate Going is blocked", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+remove+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST remove");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST remove" })).toBeVisible();
+    await expect(orgPage.getByTestId("remove-rsvp")).toHaveCount(0);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const peek = await browser.newContext();
+    const peekPage = await peek.newPage();
+    await peekPage.goto(shareUrl);
+    await expect(peekPage.getByTestId("remove-rsvp")).toHaveCount(0);
+    await peek.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestOut(browser, shareUrl, "Bee");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toBeVisible();
+
+    const dup = await browser.newContext();
+    const dupPage = await dup.newPage();
+    await dupPage.goto(shareUrl);
+    await expect(dupPage.getByTestId("remove-rsvp")).toHaveCount(0);
+    await dupPage.getByLabel("Your name").fill("nok");
+    await dupPage.getByTestId("status-going").click();
+    await dupPage.getByTestId("position-CB").click();
+    await dupPage.getByTestId("rsvp-submit").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toContainText(
+      "Nok is already on the list — change status instead?",
+    );
+    await dupPage.getByTestId("duplicate-cancel").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toHaveCount(0);
+    await dupPage.getByTestId("rsvp-submit").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
+    await dupPage.getByTestId("duplicate-change-status").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toHaveCount(0);
+    await expect(dupPage.getByTestId("rsvp-confirmed")).toHaveCount(0);
+    await dup.close();
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByTestId("roster").getByText("Nok")).toHaveCount(1);
+
+    await orgPage.getByRole("button", { name: "Remove Nok" }).click();
+    const sheet = orgPage.getByTestId("remove-rsvp-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("heading")).toHaveText("Remove Nok?");
+    await expect(sheet).toContainText("They’ll need to sign up again.");
+    await orgPage.getByTestId("remove-rsvp-cancel").click();
+    await expect(sheet).toHaveCount(0);
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.getByRole("button", { name: "Remove Nok" }).click();
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByTestId("roster")).not.toContainText("Nok");
+    await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toHaveCount(0);
+
+    await orgPage.getByTestId("out-toggle").click();
+    await expect(orgPage.getByTestId("out-list")).toContainText("Bee");
+    await orgPage.getByRole("button", { name: "Remove Bee" }).click();
+    await expect(orgPage.getByTestId("remove-rsvp-sheet")).toContainText(
+      "Remove Bee?",
+    );
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
+
+    await organiser.close();
+  });
+
+  test("manager can remove a Bench Going chip", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+benchrm+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByTestId("sport-basketball").click();
+    await orgPage.getByLabel("Title").fill("TEST bench remove");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST bench remove" })).toBeVisible();
+    const shareUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, shareUrl, "Dan", "C");
+    await guestGoing(browser, shareUrl, "Pat", "PF");
+    await guestGoing(browser, shareUrl, "Sam", "SF");
+    await guestGoing(browser, shareUrl, "Joe", "SG");
+    await guestGoing(browser, shareUrl, "Wee", "PG");
+    await guestGoing(browser, shareUrl, "Nok", "ANY");
+    await orgPage.reload();
+    const bench = orgPage.getByTestId("bench");
+    await expect(bench).toContainText("Nok");
+    await bench.getByRole("button", { name: "Remove Nok" }).click();
+    await expect(orgPage.getByTestId("remove-rsvp-sheet")).toContainText(
+      "Remove Nok?",
+    );
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Nok");
+    await expect(orgPage.getByTestId("roster")).not.toContainText("Nok");
+    await organiser.close();
+  });
+
   test("Copy roster pastes Going names on the manager board", async ({
     browser,
   }) => {
@@ -2042,6 +2154,7 @@ async function expectShareCard(
   }
   await expect(card.getByTestId("squad-heading")).toHaveCount(0);
   await expect(page.getByTestId("copy-roster")).toHaveCount(0);
+  await expect(page.getByTestId("remove-rsvp")).toHaveCount(0);
 }
 
 async function signIn(page: Page, email: string) {

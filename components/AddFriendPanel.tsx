@@ -8,9 +8,11 @@ import {
   type RsvpState,
 } from "@/app/actions/rsvp";
 import { AthleteNameInput } from "@/components/AthleteNameInput";
+import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
 import { PositionChipGrid } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
+import { collidingGoingName } from "@/lib/rsvp-name";
 
 export type ExtraRsvp = {
   id: string;
@@ -24,11 +26,13 @@ export function AddFriendPanel({
   sport,
   positions,
   extras,
+  goingNames = [],
 }: {
   publicId: string;
   sport: string;
   positions: Position[];
   extras: ExtraRsvp[];
+  goingNames?: string[];
 }) {
   return (
     <section className="flex flex-col gap-6" data-testid="add-friend">
@@ -46,6 +50,7 @@ export function AddFriendPanel({
         pendingLabel="Adding…"
         testId="friend-submit"
         nameLabel="Friend's name"
+        goingNames={goingNames}
       />
       {extras.length > 0 ? (
         <ul className="divide-y divide-ink/10" data-testid="my-extras">
@@ -56,6 +61,7 @@ export function AddFriendPanel({
               publicId={publicId}
               sport={sport}
               positions={positions}
+              goingNames={goingNames}
             />
           ))}
         </ul>
@@ -69,11 +75,13 @@ function ExtraRow({
   publicId,
   sport,
   positions,
+  goingNames,
 }: {
   extra: ExtraRsvp;
   publicId: string;
   sport: string;
   positions: Position[];
+  goingNames: string[];
 }) {
   const [editing, setEditing] = useState(false);
   if (editing) {
@@ -90,6 +98,8 @@ function ExtraRow({
           pendingLabel="Saving…"
           testId={`extra-save-${extra.id}`}
           nameLabel="Friend's name"
+          goingNames={goingNames}
+          ownName={extra.name}
           onDone={() => setEditing(false)}
         />
         <button
@@ -161,6 +171,8 @@ function FriendForm({
   testId,
   nameLabel,
   onDone,
+  goingNames = [],
+  ownName,
 }: {
   publicId: string;
   sport: string;
@@ -176,11 +188,14 @@ function FriendForm({
   testId: string;
   nameLabel: string;
   onDone?: () => void;
+  goingNames?: string[];
+  ownName?: string | null;
 }) {
   const [status, setStatus] = useState<"GOING" | "OUT">(
     defaults?.status ?? "GOING",
   );
   const [position, setPosition] = useState(defaults?.positionKey ?? "");
+  const [duplicate, setDuplicate] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState<RsvpState, FormData>(
     action,
     null,
@@ -192,8 +207,29 @@ function FriendForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onDone is a setState wrapper
   }, [state?.ok]);
 
+  useEffect(() => {
+    if (state?.duplicate) setDuplicate(state.duplicate);
+  }, [state?.duplicate]);
+
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form
+      action={formAction}
+      className="flex flex-col gap-5"
+      onSubmit={(event) => {
+        if (status !== "GOING") return;
+        const name = String(new FormData(event.currentTarget).get("name") ?? "");
+        const hit = collidingGoingName(goingNames, name, ownName);
+        if (hit) {
+          event.preventDefault();
+          setDuplicate(hit);
+        }
+      }}
+    >
+      <DuplicateNameSheet
+        name={duplicate}
+        onCancel={() => setDuplicate(null)}
+        onChangeStatus={() => setDuplicate(null)}
+      />
       <input type="hidden" name="publicId" value={publicId} />
       {extraId ? <input type="hidden" name="extraId" value={extraId} /> : null}
       <input type="hidden" name="status" value={status} />
