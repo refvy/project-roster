@@ -129,7 +129,7 @@ export function hasStructuredStart(fields: WhenWhereFields) {
   return Boolean(fields.startsAt);
 }
 
-export function displayVenueName(fields: WhenWhereFields) {
+export function displayVenueName(fields: Pick<WhenWhereFields, "venue" | "place">) {
   return (fields.venue ?? fields.place)?.trim() ?? "";
 }
 
