@@ -1068,7 +1068,7 @@ test.describe("matchday board", () => {
     const guest = await browser.newContext();
     const page = await guest.newPage();
     await page.goto(shareUrl);
-    await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
     await expect(page.getByTestId("sport-label")).toHaveText("Basketball");
     await expect(page.getByTestId("signup-helper")).toHaveText(
       "No app. Pick a spot and tap Done.",
@@ -1735,7 +1735,7 @@ test.describe("matchday board", () => {
     await expect(playerPage.getByTestId("rsvp-confirmed")).toContainText(
       /going/i,
     );
-    await playerPage.getByRole("link", { name: "Skwad" }).click();
+    await playerPage.getByRole("link", { name: "Skwad", exact: true }).click();
     await expect(playerPage).toHaveURL(/\/board/);
     await expect(playerPage.getByTestId("tab-hosting")).toBeVisible();
     await playerPage.getByTestId("tab-invited").click();
@@ -2681,7 +2681,7 @@ async function expectShareCard(
 
 async function signIn(page: Page, email: string) {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: /magic link/i }).click();
   await expect(page.getByTestId("magic-link-sent")).toHaveCount(0);
@@ -2785,7 +2785,7 @@ async function guestGoing(
   const context = await browser.newContext();
   const page: Page = await context.newPage();
   await page.goto(shareUrl);
-  await expect(page.getByRole("link", { name: "Skwad" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
   await page.getByLabel("Your name").fill(name);
   await page.getByTestId("status-going").click();
   await page.getByTestId(`position-${position}`).click();
