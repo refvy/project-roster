@@ -2425,7 +2425,9 @@ test.describe("matchday board", () => {
     await expect(editor).toHaveCount(0);
     const card = orgPage.getByTestId("lineup-card");
     await expect(card).toHaveCount(1);
-    const lineupHeading = orgPage.getByRole("heading", { name: "Lineups" });
+    const lineupHeading = orgPage
+      .getByTestId("lineups")
+      .getByRole("heading", { name: "Lineups", exact: true });
     const headingBox = await lineupHeading.boundingBox();
     const cardBox = await card.boundingBox();
     expect(headingBox && cardBox).toBeTruthy();
