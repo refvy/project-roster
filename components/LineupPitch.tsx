@@ -24,7 +24,6 @@ export function LineupPitch({
 }) {
   const byId = new Map(slots.map((slot) => [slot.id, slot]));
   const lines = lineupLines(formation);
-  const tight = compact || fit;
 
   return (
     <div
@@ -47,16 +46,20 @@ export function LineupPitch({
     >
       <HalfPitchMarks />
       <div
-        className={`absolute inset-0 z-10 flex flex-col-reverse justify-between ${
-          tight
-            ? "px-1.5 pb-2.5 pt-6 sm:px-2.5 sm:pb-3 sm:pt-8"
-            : "px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
+        className={`absolute inset-0 z-10 flex flex-col-reverse ${
+          fit
+            ? "justify-center gap-2.5 px-2 pb-3 pt-7 sm:gap-3 sm:px-3"
+            : compact
+              ? "justify-between px-1.5 pb-2.5 pt-6 sm:px-2.5 sm:pb-3 sm:pt-8"
+              : "justify-between px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
         }`}
       >
         {lines.map((line, lineIndex) => (
           <div
             key={`${line.area}-${lineIndex}`}
-            className="flex items-center justify-evenly gap-1"
+            className={`flex items-center ${
+              fit ? "justify-center gap-2" : "justify-evenly gap-1"
+            }`}
           >
             {line.slots.map((slot) => {
               const snap = byId.get(slot.id);
@@ -68,7 +71,8 @@ export function LineupPitch({
                   slotId={slot.id}
                   slotKey={slot.key}
                   name={name}
-                  compact={tight}
+                  compact={compact}
+                  fit={fit}
                   selected={selectedSlotId === slot.id}
                   interactive={Boolean(onSlot)}
                   onClick={onSlot ? () => onSlot(slot.id) : undefined}
@@ -88,6 +92,7 @@ function SlotChip({
   slotKey,
   name,
   compact,
+  fit = false,
   selected,
   interactive,
   onClick,
@@ -97,6 +102,7 @@ function SlotChip({
   slotKey: string;
   name: string | null;
   compact: boolean;
+  fit?: boolean;
   selected: boolean;
   interactive: boolean;
   onClick?: () => void;
@@ -104,7 +110,9 @@ function SlotChip({
 }) {
   const size = compact
     ? "min-h-8 min-w-8 px-1.5 py-1"
-    : "min-h-12 min-w-[3.5rem] px-2.5 py-1.5 sm:min-h-14 sm:min-w-[4rem]";
+    : fit
+      ? "min-h-[38px] min-w-[38px] px-2 py-1"
+      : "min-h-12 min-w-[3.5rem] px-2.5 py-1.5 sm:min-h-14 sm:min-w-[4rem]";
   const className = filled
     ? `flex flex-col items-center justify-center rounded-full bg-accent text-center ${size} ${
         selected ? "ring-4 ring-ink/20" : ""
@@ -118,7 +126,7 @@ function SlotChip({
       {filled ? (
         <span
           className={`font-display leading-none tracking-tight text-ink ${
-            compact ? "text-[11px]" : "text-lg"
+            compact ? "text-[11px]" : fit ? "text-[13px]" : "text-lg"
           }`}
         >
           {firstName(name ?? "")}
@@ -126,7 +134,7 @@ function SlotChip({
       ) : (
         <span
           className={`font-medium uppercase tracking-wide text-ink/40 ${
-            compact ? "text-[8px]" : "text-[11px]"
+            compact ? "text-[8px]" : fit ? "text-[10px]" : "text-[11px]"
           }`}
         >
           {slotKey}

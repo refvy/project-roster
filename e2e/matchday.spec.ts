@@ -755,7 +755,7 @@ test.describe("privacy", () => {
     await landing.goto("/");
     const landingLink = landing.getByTestId("privacy-link");
     await expect(landingLink).toBeVisible();
-    await expect(landingLink).toHaveText("Privacy");
+    await expect(landingLink).toHaveText("SKWAD privacy policy");
     await expect(landingLink).toHaveCSS("color", "rgb(156, 163, 175)");
     await expect(landingLink).toHaveCSS("font-size", "12px");
     await expect(landing.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
@@ -782,13 +782,16 @@ test.describe("privacy", () => {
     await expect(orgPage.getByRole("heading", { name: "TEST privacy" })).toBeVisible();
     const boardLink = orgPage.getByTestId("privacy-link");
     await expect(boardLink).toBeVisible();
-    await expect(boardLink).toHaveText("Privacy");
+    await expect(boardLink).toHaveText("SKWAD privacy policy");
 
     const shareUrl = await shareUrlOf(orgPage);
     const guest = await browser.newContext();
     const guestPage = await guest.newPage();
     await guestPage.goto(shareUrl);
     await expect(guestPage.getByTestId("privacy-link")).toBeVisible();
+    await expect(guestPage.getByTestId("privacy-link")).toHaveText(
+      "SKWAD privacy policy",
+    );
     await guestPage.getByTestId("privacy-link").click();
     await expect(guestPage).toHaveURL(/\/privacy$/);
     await expect(guestPage.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
@@ -2393,6 +2396,7 @@ test.describe("matchday board", () => {
     const gkBox = await gk.boundingBox();
     const footerBox = await footer.boundingBox();
     expect(gkBox && footerBox).toBeTruthy();
+    expect(gkBox!.height).toBeGreaterThanOrEqual(36);
     expect(gkBox!.y + gkBox!.height).toBeLessThanOrEqual(footerBox!.y + 2);
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="false"]')
@@ -2421,6 +2425,12 @@ test.describe("matchday board", () => {
     await expect(editor).toHaveCount(0);
     const card = orgPage.getByTestId("lineup-card");
     await expect(card).toHaveCount(1);
+    const lineupHeading = orgPage.getByRole("heading", { name: "Lineups" });
+    const headingBox = await lineupHeading.boundingBox();
+    const cardBox = await card.boundingBox();
+    expect(headingBox && cardBox).toBeTruthy();
+    expect(cardBox!.x).toBeGreaterThanOrEqual(16);
+    expect(Math.abs(cardBox!.x - headingBox!.x)).toBeLessThan(12);
     await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-3-3");
     await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Aek");
     await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Bee");
@@ -2510,6 +2520,12 @@ test.describe("matchday board", () => {
     }
     await expect(orgPage.getByTestId("lineup-card")).toHaveCount(4);
     await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
+    const peekCard = orgPage.getByTestId("lineup-card").nth(1);
+    const peekBox = await peekCard.boundingBox();
+    const viewport = orgPage.viewportSize();
+    expect(peekBox && viewport).toBeTruthy();
+    expect(peekBox!.x).toBeLessThan(viewport!.width);
+    expect(peekBox!.x).toBeGreaterThan(200);
 
     await orgPage.getByTestId("lineup-card").filter({ hasText: "Q4 —" }).getByTestId("lineup-card-open").click();
     orgPage.once("dialog", (dialog) => dialog.accept());

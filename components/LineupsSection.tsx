@@ -73,7 +73,7 @@ export function LineupsSection({
       {lineups.length > 0 ? (
         <div
           data-testid="lineup-carousel"
-          className="-mx-6 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2"
+          className="-mx-6 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
         >
           {lineups.map((row) => {
             const slots = parseLineupSlots(row.slots);
@@ -83,7 +83,7 @@ export function LineupsSection({
                 key={row.id}
                 data-testid="lineup-card"
                 data-name={row.name}
-                className="w-[80%] max-w-sm shrink-0 snap-start rounded-3xl bg-cream p-3 ring-1 ring-accent/30"
+                className="w-[80%] max-w-sm shrink-0 snap-start rounded-3xl bg-cream p-3 ring-1 ring-accent/30 first:ml-5 last:mr-5"
               >
                 <button
                   type="button"

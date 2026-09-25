@@ -6,10 +6,10 @@ export function PrivacyLink() {
       <Link
         href="/privacy"
         data-testid="privacy-link"
-        className="text-[12px] leading-none underline-offset-4 hover:underline"
+        className="font-display text-[12px] leading-none underline-offset-4 hover:underline"
         style={{ color: "#9CA3AF" }}
       >
-        Privacy
+        SKWAD privacy policy
       </Link>
     </footer>
   );
