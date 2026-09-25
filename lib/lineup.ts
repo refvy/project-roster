@@ -1,6 +1,17 @@
 export const LINEUP_CAP = 4;
 
-export type LineupFormationId = "4-4-2" | "4-3-3" | "4-2-3-1" | "3-5-2";
+export type LineupFormationId =
+  | "4-4-2"
+  | "4-3-3"
+  | "4-1-4-1"
+  | "3-5-2"
+  | "4-2-3-1";
+
+/** Chips for new creates / edits. 4-2-3-1 is legacy display-only. */
+export const LINEUP_FORMATION_CHIPS: Exclude<
+  LineupFormationId,
+  "4-2-3-1"
+>[] = ["4-4-2", "4-3-3", "4-1-4-1", "3-5-2"];
 
 export type LineupSlotDef = {
   id: string;
@@ -56,6 +67,17 @@ export const LINEUP_FORMATIONS: {
     ],
   },
   {
+    id: "4-1-4-1",
+    label: "4-1-4-1",
+    lines: [
+      { area: "the keeper", keys: ["GK"] },
+      { area: "defence", keys: ["LB", "CB", "CB", "RB"] },
+      { area: "midfield", keys: ["CDM"] },
+      { area: "midfield", keys: ["LW", "CM", "CM", "RW"] },
+      { area: "attack", keys: ["ST"] },
+    ],
+  },
+  {
     id: "4-2-3-1",
     label: "4-2-3-1",
     lines: [
@@ -82,6 +104,7 @@ export function parseLineupFormation(value: unknown): LineupFormationId {
   if (
     value === "4-4-2" ||
     value === "4-3-3" ||
+    value === "4-1-4-1" ||
     value === "4-2-3-1" ||
     value === "3-5-2"
   ) {
@@ -91,7 +114,10 @@ export function parseLineupFormation(value: unknown): LineupFormationId {
 }
 
 export function getLineupFormation(id: LineupFormationId) {
-  return LINEUP_FORMATIONS.find((item) => item.id === id) ?? LINEUP_FORMATIONS[1]!;
+  return (
+    LINEUP_FORMATIONS.find((item) => item.id === id) ??
+    LINEUP_FORMATIONS.find((item) => item.id === "4-3-3")!
+  );
 }
 
 export function lineupLines(formation: unknown): LineupLine[] {
