@@ -2562,7 +2562,6 @@ test.describe("matchday board", () => {
       const expected = pitch4141!.x + ((i + 0.5) / 4) * pitch4141!.width;
       expect(Math.abs(midCenters[i]! - expected)).toBeLessThan(pitch4141!.width * 0.08);
     }
-    void midRow;
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="false"]')
       .first()
