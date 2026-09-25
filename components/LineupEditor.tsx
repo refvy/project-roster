@@ -45,6 +45,7 @@ export function LineupEditor({
   const [formation, setFormation] = useState<LineupFormationId>(draft.formation);
   const [slots, setSlots] = useState<LineupSlotSnap[]>(draft.slots);
   const [picking, setPicking] = useState<LineupSlotSnap | null>(null);
+  const [query, setQuery] = useState("");
   const [createState, createAction, creating] = useActionState<
     LineupState,
     FormData
@@ -64,6 +65,7 @@ export function LineupEditor({
         : draft.slots,
     );
     setPicking(null);
+    setQuery("");
     // Hydrate once when the sheet opens — live Going refreshes must not wipe taps.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- going is the open-time pool
   }, [open, draft]);
@@ -101,29 +103,24 @@ export function LineupEditor({
   const error = draft.id ? updateState?.error : createState?.error;
   const action = draft.id ? updateAction : createAction;
   const pool = poolForEditor(going, slots);
-  const currentPick =
-    picking?.rsvpId
-      ? (going.find((player) => player.id === picking.rsvpId) ?? {
-          id: picking.rsvpId,
-          name: picking.name ?? "",
-          positionKey: null,
-        })
-      : null;
-  const pickerPeople = currentPick
-    ? [currentPick, ...pool.filter((player) => player.id !== currentPick.id)]
-    : pool;
+  const needle = query.trim().toLowerCase();
+  const pickerPeople = pool.filter((person) =>
+    needle ? person.name.toLowerCase().includes(needle) : true,
+  );
 
   function changeFormation(next: LineupFormationId) {
     if (next === formation) return;
     setFormation(next);
     setSlots(clearLineupSlots(next));
     setPicking(null);
+    setQuery("");
   }
 
   function choosePerson(person: LineupGoing | null) {
     if (!picking) return;
     setSlots((current) => assignToSlot(current, picking.id, person));
     setPicking(null);
+    setQuery("");
   }
 
   return (
@@ -196,7 +193,9 @@ export function LineupEditor({
               slots={slots}
               onSlot={(slotId) => {
                 const slot = slots.find((row) => row.id === slotId);
-                if (slot) setPicking(slot);
+                if (!slot) return;
+                setQuery("");
+                setPicking(slot);
               }}
             />
           </div>
@@ -256,7 +255,10 @@ export function LineupEditor({
               type="button"
               aria-label="Close picker"
               className="absolute inset-0 bg-ink/40"
-              onClick={() => setPicking(null)}
+              onClick={() => {
+                setPicking(null);
+                setQuery("");
+              }}
             />
             <div
               role="dialog"
@@ -269,52 +271,64 @@ export function LineupEditor({
                 id="lineup-picker-title"
                 className="font-display text-2xl tracking-tight"
               >
-                {picking.key}
+                Add player · {picking.key}
               </h4>
-              {picking.rsvpId ? (
-                <button
-                  type="button"
-                  data-testid="lineup-picker-clear"
-                  onClick={() => choosePerson(null)}
-                  className="mt-3 text-sm font-medium text-danger underline-offset-4 hover:underline"
-                >
-                  Clear
-                </button>
-              ) : null}
-              {pickerPeople.length === 0 ? (
-                <p className="mt-4 text-sm text-ink-soft">
-                  {going.length === 0
-                    ? "Waiting on the first Going."
-                    : "Everyone is on the pitch."}
-                </p>
-              ) : (
-                <ul className="mt-4 flex flex-col gap-1">
-                  {pickerPeople.map((person) => {
-                    const selected = person.id === picking.rsvpId;
-                    return (
-                      <li key={person.id}>
-                        <button
-                          type="button"
-                          data-testid="lineup-picker-person"
-                          data-name={person.name}
-                          onClick={() => choosePerson(person)}
-                          className={`flex min-h-11 w-full items-center gap-2 rounded-2xl px-2 text-left ${
-                            selected ? "bg-accent-soft" : "hover:bg-cream"
-                          }`}
-                        >
+              <input
+                data-testid="lineup-picker-search"
+                value={query}
+                placeholder="Search players"
+                onChange={(event) => setQuery(event.target.value)}
+                className="mt-4 min-h-12 w-full rounded-2xl border border-ink/10 bg-surface px-4 text-base text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
+              />
+              <ul className="mt-4 flex flex-col gap-1">
+                {picking.rsvpId ? (
+                  <li>
+                    <button
+                      type="button"
+                      data-testid="lineup-picker-clear"
+                      onClick={() => choosePerson(null)}
+                      className="flex min-h-11 w-full items-center gap-2 rounded-2xl px-2 text-left hover:bg-cream"
+                    >
+                      <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border-2 border-ink/25 bg-surface" />
+                      <span className="text-sm font-medium text-ink-soft">
+                        Clear slot
+                      </span>
+                    </button>
+                  </li>
+                ) : null}
+                {pickerPeople.length === 0 ? (
+                  <li className="px-2 py-3 text-sm text-ink-soft">
+                    {going.length === 0
+                      ? "Waiting on the first Going."
+                      : needle
+                        ? "No names match."
+                        : "Everyone is on the pitch."}
+                  </li>
+                ) : (
+                  pickerPeople.map((person) => (
+                    <li key={person.id}>
+                      <button
+                        type="button"
+                        data-testid="lineup-picker-person"
+                        data-name={person.name}
+                        onClick={() => choosePerson(person)}
+                        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-2 text-left hover:bg-cream"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border-2 border-ink/25 bg-surface" />
                           <span className="text-sm font-medium">{person.name}</span>
-                          <span
-                            className="text-[12px] leading-none"
-                            style={{ color: "#9CA3AF" }}
-                          >
-                            {positionHint(person.positionKey)}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                        </span>
+                        <span
+                          className="text-[12px] leading-none"
+                          style={{ color: "#9CA3AF" }}
+                        >
+                          {positionHint(person.positionKey)}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
             </div>
           </div>
         ) : null}

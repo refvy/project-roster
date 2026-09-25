@@ -2317,7 +2317,15 @@ test.describe("matchday board", () => {
       .click();
     const picker = orgPage.getByTestId("lineup-picker");
     await expect(picker).toBeVisible();
-    await expect(picker).toContainText("CB");
+    await expect(picker.getByRole("heading", { name: "Add player · CB" })).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-picker-search")).toHaveAttribute(
+      "placeholder",
+      "Search players",
+    );
+    await orgPage.getByTestId("lineup-picker-search").fill("Nok");
+    await expect(
+      orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Aek" }),
+    ).toHaveCount(0);
     const nok = orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Nok" });
     await expect(nok).toContainText("CB");
     await nok.click();
@@ -2352,13 +2360,16 @@ test.describe("matchday board", () => {
       .first()
       .click();
     await expect(orgPage.getByTestId("lineup-picker")).toBeVisible();
+    await expect(
+      orgPage.getByRole("heading", { name: "Add player · ST" }),
+    ).toBeVisible();
     await orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Nok" }).click();
     await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="true"]')
       .first()
       .click();
-    await expect(orgPage.getByTestId("lineup-picker-clear")).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-picker-clear")).toHaveText("Clear slot");
     await orgPage.getByTestId("lineup-picker-clear").click();
     await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
     await expect(
