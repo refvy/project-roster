@@ -8,6 +8,7 @@ import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
+import { LineupsSection } from "@/components/LineupsSection";
 import { PrivacyLink } from "@/components/PrivacyLink";
 import { RemovedToast } from "@/components/RemovedToast";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
@@ -20,7 +21,7 @@ import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
 import { orderGoingForRoster } from "@/lib/pitch";
-import { parsePositions } from "@/lib/positions";
+import { parsePositions, parseSport } from "@/lib/positions";
 import { buildRosterPaste } from "@/lib/roster-paste";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -40,7 +41,10 @@ export default async function OrganiserMatchdayPage({
   const query = await searchParams;
   const matchday = await prisma.matchday.findUnique({
     where: { id },
-    include: { rsvps: { orderBy: { createdAt: "asc" } } },
+    include: {
+      rsvps: { orderBy: { createdAt: "asc" } },
+      lineups: { orderBy: { createdAt: "asc" } },
+    },
   });
   if (
     !matchday ||
@@ -193,6 +197,25 @@ export default async function OrganiserMatchdayPage({
             matchdayId={matchday.id}
           />
         </section>
+
+        {parseSport(matchday.sport) === "football" ? (
+          <LineupsSection
+            matchdayId={matchday.id}
+            canEdit={matchday.status === "LIVE"}
+            going={ordered.map((rsvp) => ({
+              id: rsvp.id,
+              name: rsvp.name,
+              positionKey: rsvp.positionKey,
+            }))}
+            lineups={matchday.lineups.map((row) => ({
+              id: row.id,
+              name: row.name,
+              formation: row.formation,
+              slots: row.slots,
+              bench: row.bench,
+            }))}
+          />
+        ) : null}
       </main>
       <PrivacyLink />
       <RemovedToast />

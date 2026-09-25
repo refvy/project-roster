@@ -65,8 +65,26 @@ model Matchday {
   /// LINE cache-bust token. The 5am BKK OG refresh cron bumps this.
   ogBust      String    @default("0")
   rsvps       Rsvp[]
+  lineups     Lineup[]
 
   @@index([organiserId])
+}
+
+/// Manager football XI snapshot. Names freeze at Save; later roster edits do not hollow the card.
+model Lineup {
+  id         String   @id @default(cuid())
+  matchdayId String
+  matchday   Matchday @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  name       String
+  formation  String
+  /// [{ id, key, rsvpId, name }] at save.
+  slots      Json
+  /// Going − XI at save: [{ rsvpId, name }].
+  bench      Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([matchdayId])
 }
 
 enum MatchdayStatus {

@@ -42,6 +42,14 @@ import {
   getPosthogKey,
   isAnalyticsEnabled,
 } from "../lib/analytics";
+import {
+  LINEUP_CAP,
+  assignToSlot,
+  clearLineupSlots,
+  parseLineupFormation,
+  snapshotBench,
+  suggestedLineupName,
+} from "../lib/lineup";
 import { collidingGoingName } from "../lib/rsvp-name";
 import {
   buildRosterNameLines,
@@ -655,6 +663,44 @@ test.describe("analytics helper", () => {
   });
 });
 
+test.describe("lineup helper", () => {
+  test("bench is Going minus XI; Out is never in the pool", () => {
+    const going = [
+      { id: "1", name: "Nok", positionKey: "CB" },
+      { id: "2", name: "Aek", positionKey: "GK" },
+      { id: "3", name: "Bee", positionKey: "ANY" },
+    ];
+    const slots = clearLineupSlots("4-3-3");
+    const gk = slots.find((slot) => slot.key === "GK")!;
+    const placed = assignToSlot(slots, gk.id, going[1]!);
+    expect(snapshotBench(going, placed).map((row) => row.name)).toEqual([
+      "Nok",
+      "Bee",
+    ]);
+  });
+
+  test("formation change clears every slot", () => {
+    const slots = clearLineupSlots("4-3-3");
+    const st = slots.find((slot) => slot.key === "ST")!;
+    const filled = assignToSlot(slots, st.id, {
+      id: "1",
+      name: "Nok",
+      positionKey: "CF",
+    });
+    expect(filled.some((slot) => slot.name === "Nok")).toBe(true);
+    const cleared = clearLineupSlots("4-2-3-1");
+    expect(cleared.every((slot) => slot.rsvpId === null)).toBe(true);
+    expect(parseLineupFormation("4-2-3-1")).toBe("4-2-3-1");
+    expect(cleared).toHaveLength(11);
+  });
+
+  test("suggested names and cap", () => {
+    expect(suggestedLineupName([])).toBe("Q1");
+    expect(suggestedLineupName(["Q1", "Q2"])).toBe("Q3");
+    expect(LINEUP_CAP).toBe(4);
+  });
+});
+
 test.describe("privacy", () => {
   test("Privacy link on landing and match pages opens the stub", async ({
     browser,
@@ -921,6 +967,8 @@ test.describe("matchday board", () => {
     );
     await expect(orgPage.getByTestId("half-court")).toBeVisible();
     await expect(orgPage.getByTestId("half-pitch")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineups")).toHaveCount(0);
+    await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
 
     const court = orgPage.getByTestId("half-court");
     const courtBox = await court.boundingBox();
@@ -2211,6 +2259,116 @@ test.describe("matchday board", () => {
 
     await organiser.close();
   });
+
+  test("manager football lineups: tap-assign, snapshot, bench, cap 4, delete; guest hidden", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+lineup+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST lineups");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST lineups" })).toBeVisible();
+    const going = orgPage.getByRole("heading", { name: /Going/ });
+    const lineups = orgPage.getByTestId("lineups");
+    await expect(lineups).toBeVisible();
+    await expect(orgPage.getByTestId("create-lineup")).toBeVisible();
+    const goingBox = await going.boundingBox();
+    const lineupsBox = await lineups.boundingBox();
+    expect(goingBox && lineupsBox).toBeTruthy();
+    expect(goingBox!.y).toBeLessThan(lineupsBox!.y);
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(0);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const peek = await browser.newContext();
+    const peekPage = await peek.newPage();
+    await peekPage.goto(shareUrl);
+    await expect(peekPage.getByTestId("lineups")).toHaveCount(0);
+    await expect(peekPage.getByTestId("create-lineup")).toHaveCount(0);
+    await peek.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await orgPage.reload();
+
+    await orgPage.getByTestId("create-lineup").click();
+    const editor = orgPage.getByTestId("lineup-editor");
+    await expect(editor).toBeVisible();
+    await expect(editor.getByRole("heading", { name: "Create lineup" })).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-name")).toHaveValue("Q1");
+    await expect(orgPage.getByTestId("lineup-formation-4-3-3")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(orgPage.getByTestId("lineup-formation-4-2-3-1")).toBeVisible();
+    const nok = orgPage.getByTestId("lineup-pool-person").filter({ hasText: "Nok" });
+    await expect(nok).toContainText("CB");
+    await nok.click();
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="false"]')
+      .first()
+      .click();
+    await expect(
+      orgPage.getByTestId("lineup-pool-person").filter({ hasText: "Nok" }),
+    ).toHaveCount(0);
+    await orgPage.getByTestId("lineup-save").click();
+    await expect(editor).toHaveCount(0);
+    const card = orgPage.getByTestId("lineup-card");
+    await expect(card).toHaveCount(1);
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-3-3");
+    await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Aek");
+    await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Bee");
+    await expect(orgPage.getByTestId("lineup-card-bench")).not.toContainText("Nok");
+
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("lineups")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByTestId("lineup-card-open").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toBeVisible();
+    await expect(orgPage.getByRole("heading", { name: "Edit lineup" })).toBeVisible();
+    await orgPage.getByTestId("lineup-formation-4-2-3-1").click();
+    await expect(
+      orgPage.getByTestId("lineup-pool-person").filter({ hasText: "Nok" }),
+    ).toBeVisible();
+    await orgPage.getByTestId("lineup-pool-person").filter({ hasText: "Nok" }).click();
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="false"]')
+      .first()
+      .click();
+    await orgPage.getByTestId("lineup-save").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-2-3-1");
+
+    await orgPage.getByRole("button", { name: "Remove Nok" }).first().click();
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByRole("heading", { name: "Going · 2" })).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-2-3-1");
+    await expect(card).toContainText("Nok");
+
+    for (const label of ["Q2", "Q3", "Q4"]) {
+      await orgPage.getByTestId("create-lineup").click();
+      await expect(orgPage.getByTestId("lineup-name")).toHaveValue(label);
+      await orgPage.getByTestId("lineup-save").click();
+      await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    }
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(4);
+    await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
+
+    await orgPage.getByTestId("lineup-card").filter({ hasText: "Q4 —" }).getByTestId("lineup-card-open").click();
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("lineup-delete").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(3);
+    await expect(orgPage.getByTestId("create-lineup")).toBeVisible();
+
+    await organiser.close();
+  });
 });
 
 async function openDateSheet(page: Page) {
@@ -2350,6 +2508,8 @@ async function expectShareCard(
   await expect(card.getByTestId("squad-heading")).toHaveCount(0);
   await expect(page.getByTestId("copy-roster")).toHaveCount(0);
   await expect(page.getByTestId("remove-rsvp")).toHaveCount(0);
+  await expect(page.getByTestId("lineups")).toHaveCount(0);
+  await expect(page.getByTestId("create-lineup")).toHaveCount(0);
 }
 
 async function signIn(page: Page, email: string) {
