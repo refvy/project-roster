@@ -2398,6 +2398,15 @@ test.describe("matchday board", () => {
     expect(gkBox && footerBox).toBeTruthy();
     expect(gkBox!.height).toBeGreaterThanOrEqual(36);
     expect(gkBox!.y + gkBox!.height).toBeLessThanOrEqual(footerBox!.y + 2);
+    const pitchBox = await editor.getByTestId("lineup-pitch").boundingBox();
+    const lbBox = await editor.locator('[data-slot-key="LB"]').first().boundingBox();
+    const rbBox = await editor.locator('[data-slot-key="RB"]').first().boundingBox();
+    expect(pitchBox && lbBox && rbBox).toBeTruthy();
+    expect(lbBox!.x - pitchBox!.x).toBeLessThan(pitchBox!.width * 0.22);
+    expect(pitchBox!.x + pitchBox!.width - (rbBox!.x + rbBox!.width)).toBeLessThan(
+      pitchBox!.width * 0.22,
+    );
+    expect(rbBox!.x - lbBox!.x).toBeGreaterThan(pitchBox!.width * 0.45);
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="false"]')
       .first()
@@ -2425,13 +2434,24 @@ test.describe("matchday board", () => {
     await expect(editor).toHaveCount(0);
     const card = orgPage.getByTestId("lineup-card");
     await expect(card).toHaveCount(1);
+    const carousel = orgPage.getByTestId("lineup-carousel");
+    const startGutter = orgPage.getByTestId("lineup-carousel-start");
+    const endGutter = orgPage.getByTestId("lineup-carousel-end");
+    await expect(startGutter).toBeAttached();
+    await expect(endGutter).toBeAttached();
     const lineupHeading = orgPage
       .getByTestId("lineups")
       .getByRole("heading", { name: "Lineups", exact: true });
     const headingBox = await lineupHeading.boundingBox();
     const cardBox = await card.boundingBox();
-    expect(headingBox && cardBox).toBeTruthy();
+    const startBox = await startGutter.boundingBox();
+    const carouselBox = await carousel.boundingBox();
+    const viewport = orgPage.viewportSize();
+    expect(headingBox && cardBox && startBox && carouselBox && viewport).toBeTruthy();
+    expect(startBox!.width).toBeGreaterThanOrEqual(16);
+    expect(startBox!.x).toBeLessThanOrEqual(carouselBox!.x + 2);
     expect(cardBox!.x).toBeGreaterThanOrEqual(16);
+    expect(cardBox!.x - startBox!.x).toBeGreaterThanOrEqual(16);
     expect(Math.abs(cardBox!.x - headingBox!.x)).toBeLessThan(12);
     await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-3-3");
     await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Aek");
@@ -2522,9 +2542,12 @@ test.describe("matchday board", () => {
     }
     await expect(orgPage.getByTestId("lineup-card")).toHaveCount(4);
     await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
+    const firstAfterCap = orgPage.getByTestId("lineup-card").first();
+    const firstAfterBox = await firstAfterCap.boundingBox();
+    expect(firstAfterBox).toBeTruthy();
+    expect(firstAfterBox!.x).toBeGreaterThanOrEqual(16);
     const peekCard = orgPage.getByTestId("lineup-card").nth(1);
     const peekBox = await peekCard.boundingBox();
-    const viewport = orgPage.viewportSize();
     expect(peekBox && viewport).toBeTruthy();
     expect(peekBox!.x).toBeLessThan(viewport!.width);
     expect(peekBox!.x).toBeGreaterThan(200);

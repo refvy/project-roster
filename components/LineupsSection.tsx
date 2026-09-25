@@ -73,9 +73,15 @@ export function LineupsSection({
       {lineups.length > 0 ? (
         <div
           data-testid="lineup-carousel"
-          className="-mx-6 mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+          className="-mx-6 mt-4 flex snap-x snap-mandatory overflow-x-auto scroll-px-5 pb-2"
         >
-          {lineups.map((row) => {
+          <div
+            aria-hidden
+            data-testid="lineup-carousel-start"
+            className="pointer-events-none shrink-0"
+            style={{ width: 20, minWidth: 20, flex: "0 0 20px" }}
+          />
+          {lineups.map((row, index) => {
             const slots = parseLineupSlots(row.slots);
             const bench = parseLineupBench(row.bench);
             return (
@@ -83,7 +89,9 @@ export function LineupsSection({
                 key={row.id}
                 data-testid="lineup-card"
                 data-name={row.name}
-                className="w-[80%] max-w-sm shrink-0 snap-start rounded-3xl bg-cream p-3 ring-1 ring-accent/30 first:ml-5 last:mr-5"
+                className={`w-[80%] max-w-sm shrink-0 snap-start rounded-3xl bg-cream p-3 ring-1 ring-accent/30 ${
+                  index > 0 ? "ml-3" : ""
+                }`}
               >
                 <button
                   type="button"
@@ -128,6 +136,12 @@ export function LineupsSection({
               </article>
             );
           })}
+          <div
+            aria-hidden
+            data-testid="lineup-carousel-end"
+            className="pointer-events-none shrink-0"
+            style={{ width: 20, minWidth: 20, flex: "0 0 20px" }}
+          />
         </div>
       ) : null}
 

@@ -57,9 +57,7 @@ export function LineupPitch({
         {lines.map((line, lineIndex) => (
           <div
             key={`${line.area}-${lineIndex}`}
-            className={`flex items-center ${
-              fit ? "justify-center gap-2" : "justify-evenly gap-1"
-            }`}
+            className="flex items-center justify-evenly"
           >
             {line.slots.map((slot) => {
               const snap = byId.get(slot.id);
