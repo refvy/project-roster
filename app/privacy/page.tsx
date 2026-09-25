@@ -64,10 +64,10 @@ export default function PrivacyPage() {
           <ul className="mt-3 flex flex-col gap-2 text-ink-soft">
             <li>
               <a
-                href="mailto:thedanniest@gmail.com"
+                href="mailto:privacy@getskwad.com"
                 className="underline-offset-4 hover:underline"
               >
-                thedanniest@gmail.com
+                privacy@getskwad.com
               </a>
             </li>
           </ul>

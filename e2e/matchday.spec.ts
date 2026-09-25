@@ -673,7 +673,7 @@ test.describe("privacy", () => {
     await expect(landing).toHaveURL(/\/privacy$/);
     await expect(landing.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
     await expect(landing.getByTestId("privacy-page")).toContainText(
-      "thedanniest@gmail.com",
+      "privacy@getskwad.com",
     );
     await expect(landing.getByRole("heading", { name: "What we store" })).toBeVisible();
     await expect(
@@ -700,7 +700,7 @@ test.describe("privacy", () => {
     await guestPage.getByTestId("privacy-link").click();
     await expect(guestPage).toHaveURL(/\/privacy$/);
     await expect(guestPage.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
-    await expect(guestPage.getByText("thedanniest@gmail.com")).toBeVisible();
+    await expect(guestPage.getByText("privacy@getskwad.com")).toBeVisible();
     await expect(guestPage.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
       0,
     );
