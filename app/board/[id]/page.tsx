@@ -3,12 +3,11 @@ import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { AnalyticsScope } from "@/components/AnalyticsScope";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
-import { CopyRosterButton } from "@/components/CopyRosterButton";
 import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
-import { GoingList } from "@/components/GoingList";
 import { LineupsSection } from "@/components/LineupsSection";
+import { ManagerGoing } from "@/components/ManagerGoing";
 import { PrivacyLink } from "@/components/PrivacyLink";
 import { RemovedToast } from "@/components/RemovedToast";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
@@ -175,28 +174,14 @@ export default async function OrganiserMatchdayPage({
 
         <ImbalanceBanner message={imbalance} />
 
-        <section>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <h2 className="font-display text-2xl tracking-tight">
-              Going · {going.length}
-            </h2>
-            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-              {going.length > 0 ? <CopyRosterButton text={rosterPaste} /> : null}
-              <p
-                className="max-w-xl text-right text-sm text-ink-soft"
-                data-testid="position-counts"
-              >
-                {counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
-              </p>
-            </div>
-          </div>
-          <GoingList
-            going={ordered}
-            empty="Waiting on the first Going. Share the link."
-            canRemove={matchday.status === "LIVE"}
-            matchdayId={matchday.id}
-          />
-        </section>
+        <ManagerGoing
+          going={ordered}
+          empty="Waiting on the first Going. Share the link."
+          canRemove={matchday.status === "LIVE"}
+          matchdayId={matchday.id}
+          rosterPaste={rosterPaste}
+          counts={counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
+        />
 
         {parseSport(matchday.sport) === "football" ? (
           <LineupsSection

@@ -247,3 +247,50 @@ export function positionHint(positionKey: string | null | undefined) {
   if (!positionKey || positionKey === "ANY") return "Any";
   return positionKey;
 }
+
+/** Assigned rsvpIds on other saved lineups (exclude the lineup being edited). */
+export function usedRsvpIdsElsewhere(
+  lineups: { id: string; slots: unknown }[],
+  exceptId?: string,
+) {
+  const ids = new Set<string>();
+  for (const row of lineups) {
+    if (exceptId && row.id === exceptId) continue;
+    for (const slot of parseLineupSlots(row.slots)) {
+      if (slot.rsvpId) ids.add(slot.rsvpId);
+    }
+  }
+  return ids;
+}
+
+export function otherLineupCount(
+  lineups: { id: string }[],
+  exceptId?: string,
+) {
+  return lineups.filter((row) => row.id !== exceptId).length;
+}
+
+/** First Q on a match: hide New tags. Later Qs: unused-elsewhere is New. */
+export function isNewToOtherLineups(
+  rsvpId: string,
+  usedElsewhere: Set<string>,
+  others: number,
+) {
+  if (others <= 0) return false;
+  return !usedElsewhere.has(rsvpId);
+}
+
+export function sortPickerPeople(
+  people: LineupGoing[],
+  usedElsewhere: Set<string>,
+  others: number,
+) {
+  return [...people].sort((a, b) => {
+    if (others > 0) {
+      const aNew = isNewToOtherLineups(a.id, usedElsewhere, others) ? 0 : 1;
+      const bNew = isNewToOtherLineups(b.id, usedElsewhere, others) ? 0 : 1;
+      if (aNew !== bNew) return aNew - bNew;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}

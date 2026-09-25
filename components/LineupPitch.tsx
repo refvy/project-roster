@@ -8,6 +8,7 @@ export function LineupPitch({
   formation,
   slots,
   compact = false,
+  fit = false,
   selectedSlotId = null,
   onSlot,
   testId = "lineup-pitch",
@@ -15,25 +16,41 @@ export function LineupPitch({
   formation: string;
   slots: LineupSlotSnap[];
   compact?: boolean;
+  /** Scale the 3:4 pitch into the leftover editor height so GK sits above the footer. */
+  fit?: boolean;
   selectedSlotId?: string | null;
   onSlot?: (slotId: string) => void;
   testId?: string;
 }) {
   const byId = new Map(slots.map((slot) => [slot.id, slot]));
   const lines = lineupLines(formation);
+  const tight = compact || fit;
 
   return (
     <div
       data-testid={testId}
-      className={`relative mx-auto w-full overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30 ${
-        compact ? "max-w-[18rem]" : "max-w-md"
+      className={`relative overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30 ${
+        fit
+          ? "max-h-full"
+          : compact
+            ? "mx-auto w-full max-w-[18rem]"
+            : "mx-auto w-full max-w-md"
       }`}
-      style={{ aspectRatio: "3 / 4" }}
+      style={
+        fit
+          ? {
+              width: "min(100cqw, calc(100cqh * 3 / 4))",
+              aspectRatio: "3 / 4",
+            }
+          : { aspectRatio: "3 / 4" }
+      }
     >
       <HalfPitchMarks />
       <div
         className={`absolute inset-0 z-10 flex flex-col-reverse justify-between ${
-          compact ? "px-2 pb-3 pt-8" : "px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
+          tight
+            ? "px-1.5 pb-2.5 pt-6 sm:px-2.5 sm:pb-3 sm:pt-8"
+            : "px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
         }`}
       >
         {lines.map((line, lineIndex) => (
@@ -51,7 +68,7 @@ export function LineupPitch({
                   slotId={slot.id}
                   slotKey={slot.key}
                   name={name}
-                  compact={compact}
+                  compact={tight}
                   selected={selectedSlotId === slot.id}
                   interactive={Boolean(onSlot)}
                   onClick={onSlot ? () => onSlot(slot.id) : undefined}

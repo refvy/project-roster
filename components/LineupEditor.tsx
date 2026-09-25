@@ -13,9 +13,11 @@ import {
   assignToSlot,
   clearLineupSlots,
   hydrateEditorSlots,
+  isNewToOtherLineups,
   parseLineupFormation,
   poolForEditor,
   positionHint,
+  sortPickerPeople,
   type LineupFormationId,
   type LineupGoing,
   type LineupSlotSnap,
@@ -33,12 +35,16 @@ export function LineupEditor({
   matchdayId,
   going,
   draft,
+  otherAssignedIds = [],
+  otherSavedCount = 0,
   onClose,
 }: {
   open: boolean;
   matchdayId: string;
   going: LineupGoing[];
   draft: LineupDraft;
+  otherAssignedIds?: string[];
+  otherSavedCount?: number;
   onClose: () => void;
 }) {
   const [name, setName] = useState(draft.name);
@@ -104,8 +110,13 @@ export function LineupEditor({
   const action = draft.id ? updateAction : createAction;
   const pool = poolForEditor(going, slots);
   const needle = query.trim().toLowerCase();
-  const pickerPeople = pool.filter((person) =>
-    needle ? person.name.toLowerCase().includes(needle) : true,
+  const usedElsewhere = new Set(otherAssignedIds);
+  const pickerPeople = sortPickerPeople(
+    pool.filter((person) =>
+      needle ? person.name.toLowerCase().includes(needle) : true,
+    ),
+    usedElsewhere,
+    otherSavedCount,
   );
 
   function changeFormation(next: LineupFormationId) {
@@ -128,69 +139,63 @@ export function LineupEditor({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="lineup-editor-title"
+        aria-label="Lineup"
         data-testid="lineup-editor"
         className="relative flex h-full w-full max-w-3xl flex-col bg-surface shadow-banner"
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 px-5 py-4">
-          <h3
-            id="lineup-editor-title"
-            className="font-display text-2xl tracking-tight"
-          >
-            {draft.id ? "Edit lineup" : "Create lineup"}
-          </h3>
+        <header className="flex shrink-0 items-center gap-2 px-4 pb-1.5 pt-3 sm:px-5">
+          <label className="sr-only" htmlFor="lineup-name">
+            Lineup name
+          </label>
+          <input
+            id="lineup-name"
+            data-testid="lineup-name"
+            value={name}
+            maxLength={20}
+            placeholder="e.g. Q1"
+            onChange={(event) => setName(event.target.value)}
+            className="min-h-11 min-w-0 flex-1 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
+          />
           <button
             type="button"
             data-testid="lineup-close"
             aria-label="Close"
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center text-2xl leading-none text-ink-soft"
+            className="grid h-11 w-11 shrink-0 place-items-center text-2xl leading-none text-ink-soft"
           >
             ×
           </button>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col px-5">
-          <label className="flex shrink-0 flex-col gap-2 text-sm font-medium text-ink-soft">
-            Lineup name
-            <input
-              data-testid="lineup-name"
-              value={name}
-              maxLength={20}
-              placeholder="e.g. Q1"
-              onChange={(event) => setName(event.target.value)}
-              className="min-h-12 rounded-2xl border border-ink/10 bg-surface px-4 text-lg text-ink outline-none ring-accent/30 placeholder:text-ink/30 focus:ring-4"
-            />
-          </label>
+        <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-5">
+          <div className="flex shrink-0 flex-wrap gap-1.5 pb-2">
+            {LINEUP_FORMATION_CHIPS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                data-testid={`lineup-formation-${id}`}
+                aria-pressed={formation === id}
+                onClick={() => changeFormation(id)}
+                className={`inline-flex min-h-9 items-center rounded-full border-2 px-3 text-sm font-semibold tracking-wide transition ${
+                  formation === id
+                    ? "border-accent bg-accent text-on-accent"
+                    : "border-ink/15 bg-surface text-ink hover:border-accent/40"
+                }`}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
 
-          <fieldset className="mt-4 shrink-0">
-            <legend className="mb-2 text-sm font-medium text-ink-soft">
-              Formation
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {LINEUP_FORMATION_CHIPS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  data-testid={`lineup-formation-${id}`}
-                  aria-pressed={formation === id}
-                  onClick={() => changeFormation(id)}
-                  className={`inline-flex min-h-11 items-center rounded-full border-2 px-4 text-sm font-semibold tracking-wide transition ${
-                    formation === id
-                      ? "border-accent bg-accent text-on-accent"
-                      : "border-ink/15 bg-surface text-ink hover:border-accent/40"
-                  }`}
-                >
-                  {id}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="mt-4 flex min-h-0 flex-1 items-start justify-center overflow-hidden pb-2">
+          <div
+            className="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+            style={{ containerType: "size" }}
+          >
             <LineupPitch
+              fit
               formation={formation}
               slots={slots}
+              selectedSlotId={picking?.id ?? null}
               onSlot={(slotId) => {
                 const slot = slots.find((row) => row.id === slotId);
                 if (!slot) return;
@@ -208,7 +213,8 @@ export function LineupEditor({
 
         <form
           action={action}
-          className="flex shrink-0 flex-wrap items-center gap-4 border-t border-ink/10 px-5 py-4"
+          data-testid="lineup-editor-footer"
+          className="flex shrink-0 flex-wrap items-center gap-4 border-t border-ink/10 px-4 py-3 sm:px-5"
         >
           <input type="hidden" name="matchdayId" value={matchdayId} />
           {draft.id ? <input type="hidden" name="lineupId" value={draft.id} /> : null}
@@ -305,28 +311,46 @@ export function LineupEditor({
                         : "Everyone is on the pitch."}
                   </li>
                 ) : (
-                  pickerPeople.map((person) => (
-                    <li key={person.id}>
-                      <button
-                        type="button"
-                        data-testid="lineup-picker-person"
-                        data-name={person.name}
-                        onClick={() => choosePerson(person)}
-                        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-2 text-left hover:bg-cream"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border-2 border-ink/25 bg-surface" />
-                          <span className="text-sm font-medium">{person.name}</span>
-                        </span>
-                        <span
-                          className="text-[12px] leading-none"
-                          style={{ color: "#9CA3AF" }}
+                  pickerPeople.map((person) => {
+                    const isNew = isNewToOtherLineups(
+                      person.id,
+                      usedElsewhere,
+                      otherSavedCount,
+                    );
+                    return (
+                      <li key={person.id}>
+                        <button
+                          type="button"
+                          data-testid="lineup-picker-person"
+                          data-name={person.name}
+                          data-new={isNew ? "true" : "false"}
+                          onClick={() => choosePerson(person)}
+                          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-2xl px-2 text-left hover:bg-cream"
                         >
-                          {positionHint(person.positionKey)}
-                        </span>
-                      </button>
-                    </li>
-                  ))
+                          <span className="flex items-center gap-2">
+                            <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border-2 border-ink/25 bg-surface" />
+                            <span className="text-sm font-medium">
+                              {person.name}
+                            </span>
+                            {isNew ? (
+                              <span
+                                data-testid="lineup-picker-new"
+                                className="text-[11px] font-medium text-ink/40"
+                              >
+                                New
+                              </span>
+                            ) : null}
+                          </span>
+                          <span
+                            className="text-[12px] leading-none"
+                            style={{ color: "#9CA3AF" }}
+                          >
+                            {positionHint(person.positionKey)}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
                 )}
               </ul>
             </div>

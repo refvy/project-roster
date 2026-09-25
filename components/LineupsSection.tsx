@@ -5,10 +5,12 @@ import { LineupEditor, startDraft, type LineupDraft } from "@/components/LineupE
 import { LineupPitch } from "@/components/LineupPitch";
 import {
   LINEUP_CAP,
+  otherLineupCount,
   parseLineupBench,
   parseLineupFormation,
   parseLineupSlots,
   suggestedLineupName,
+  usedRsvpIdsElsewhere,
   type LineupGoing,
 } from "@/lib/lineup";
 
@@ -135,6 +137,10 @@ export function LineupsSection({
           matchdayId={matchdayId}
           going={going}
           draft={draft}
+          otherAssignedIds={[
+            ...usedRsvpIdsElsewhere(lineups, draft.id),
+          ]}
+          otherSavedCount={otherLineupCount(lineups, draft.id)}
           onClose={() => setDraft(null)}
         />
       ) : null}
