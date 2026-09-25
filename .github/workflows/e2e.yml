@@ -1,0 +1,42 @@
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: roster
+          POSTGRES_PASSWORD: roster
+          POSTGRES_DB: roster
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://roster:roster@127.0.0.1:5432/roster
+      AUTH_SECRET: ci-auth-secret-please-use-32chars
+      APP_URL: http://localhost:3000
+      AUTH_DEBUG: "true"
+      RESEND_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+        env:
+          CI: true

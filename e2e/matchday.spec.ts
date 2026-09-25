@@ -1,0 +1,2894 @@
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { describeImbalance } from "../lib/imbalance";
+import {
+  BASKETBALL_LINES,
+  BASKETBALL_SLOT_LAYOUT,
+  fillPitch,
+  firstName,
+  getFormation,
+  overflowBadgeLabel,
+  orderGoingForRoster,
+  slotOverflowCount,
+} from "../lib/pitch";
+import {
+  BASKETBALL_FIRST_NAMES,
+  FOOTBALL_FIRST_NAMES,
+} from "../lib/athlete-names";
+import { arcSweepFlag, halfCourtGeometry, horizontalArcBulgeY } from "../lib/court";
+import { publicAppOrigin } from "../lib/env";
+import {
+  BASKETBALL_POSITIONS,
+  FOOTBALL_POSITIONS,
+  groupedPositionRows,
+} from "../lib/positions";
+import {
+  bangkokDateTimeToUtc,
+  displayWhen,
+  displayWhere,
+  formatBangkokWhen,
+  formatWhenSummary,
+  formatWhenWhereLine,
+  hasStructuredStart,
+  matchdayWhenWhereLine,
+  shareCardWhenLine,
+  shouldCollapseWhenWhere,
+  detailsPreview,
+} from "../lib/when-where";
+import {
+  analyticsFromMatchday,
+  capture,
+  getPosthogKey,
+  isAnalyticsEnabled,
+} from "../lib/analytics";
+import {
+  LINEUP_CAP,
+  LINEUP_FORMATION_CHIPS,
+  assignToSlot,
+  clearLineupSlots,
+  isNewToOtherLineups,
+  otherLineupCount,
+  parseLineupFormation,
+  snapshotBench,
+  sortPickerPeople,
+  suggestedLineupName,
+  usedRsvpIdsElsewhere,
+} from "../lib/lineup";
+import { collidingGoingName } from "../lib/rsvp-name";
+import {
+  buildRosterNameLines,
+  buildRosterPaste,
+  formatRosterPasteWhen,
+} from "../lib/roster-paste";
+import { buildMatchdayIcs } from "../lib/ics";
+import { parseMapUrl, truncateMapUrl } from "../lib/map-url";
+import {
+  addOneHour,
+  HOURS_24,
+  isQuarterTime,
+  MINUTE_STEPS,
+} from "../lib/time-options";
+import {
+  inviteShareUrl,
+  matchdaySharePulse,
+  ogImageUrl,
+  pulseBody,
+  squadCapacity,
+  stampKind,
+  stampView,
+  signupTitle,
+} from "../lib/share-pulse";
+
+const SCREENSHOT_DIR = "/opt/cursor/artifacts/screenshots";
+
+test.describe("imbalance rule", () => {
+  test("two GKs and a CB: Too many GKs", () => {
+    const message = describeImbalance(
+      [{ positionKey: "GK" }, { positionKey: "GK" }, { positionKey: "CB" }],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBe("Too many GKs");
+  });
+
+  test("two GKs without a CB", () => {
+    const message = describeImbalance(
+      [{ positionKey: "GK" }, { positionKey: "GK" }, { positionKey: "CM" }],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBe("Too many GKs · need a CB");
+  });
+
+  test("heavy CMs, light wings", () => {
+    const message = describeImbalance(
+      [
+        { positionKey: "CM" },
+        { positionKey: "CM" },
+        { positionKey: "CM" },
+        { positionKey: "CB" },
+      ],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBe("3 on CM · light on CAM");
+  });
+
+  test("3 PGs need a big when SG is also Going", () => {
+    const message = describeImbalance(
+      [
+        { positionKey: "PG" },
+        { positionKey: "PG" },
+        { positionKey: "PG" },
+        { positionKey: "SG" },
+      ],
+      BASKETBALL_POSITIONS,
+      "basketball",
+    );
+    expect(message).toBe("3 on PG · need a big");
+  });
+
+  test("3 on LW · light on RW", () => {
+    const message = describeImbalance(
+      [{ positionKey: "LW" }, { positionKey: "LW" }, { positionKey: "LW" }],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBe("3 on LW · light on RW");
+  });
+
+  test("Any is ignored", () => {
+    const message = describeImbalance(
+      [{ positionKey: "ANY" }, { positionKey: "ANY" }, { positionKey: "CM" }],
+      FOOTBALL_POSITIONS,
+      "football",
+    );
+    expect(message).toBeNull();
+  });
+});
+
+test.describe("pitch fill", () => {
+  test("CBs stack across CB slots; extra stays off the bench", () => {
+    const formation = getFormation("4-1-4-1");
+    const { lines, bench } = fillPitch(formation.lines, [
+      { id: "1", name: "Nok", positionKey: "CB" },
+      { id: "2", name: "Bee", positionKey: "CB" },
+      { id: "3", name: "Aek", positionKey: "CB" },
+    ]);
+    const cbs = lines.flatMap((line) =>
+      line.slots.filter((slot) => slot.key === "CB"),
+    );
+    expect(cbs[0]?.players.map((p) => p.name)).toEqual(["Nok", "Aek"]);
+    expect(cbs[1]?.players.map((p) => p.name)).toEqual(["Bee"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("three LWs stack on the one LW slot with +2 overflow", () => {
+    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Tim", positionKey: "LW" },
+      { id: "2", name: "Dan", positionKey: "LW" },
+      { id: "3", name: "Mit", positionKey: "LW" },
+    ]);
+    const lw = lines
+      .flatMap((line) => line.slots)
+      .find((slot) => slot.key === "LW");
+    expect(lw?.players.map((p) => p.name)).toEqual(["Tim", "Dan", "Mit"]);
+    expect(slotOverflowCount(lw?.players ?? [])).toBe(2);
+    expect(overflowBadgeLabel(lw?.players ?? [])).toBe("+2");
+    expect(
+      overflowBadgeLabel(
+        Array.from({ length: 12 }, (_, i) => ({
+          id: String(i),
+          name: `P${i}`,
+          positionKey: "LW",
+        })),
+      ),
+    ).toBe("9+");
+    expect(firstName("Alexander")).toBe("Alexande");
+    expect(bench).toEqual([]);
+  });
+
+  test("CAM and CDM fill CM slots on 4-3-3", () => {
+    const { lines, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Terng", positionKey: "CM" },
+      { id: "2", name: "Joe", positionKey: "CAM" },
+      { id: "3", name: "Wee", positionKey: "CDM" },
+    ]);
+    const cms = lines
+      .flatMap((line) => line.slots)
+      .filter((slot) => slot.key === "CM")
+      .flatMap((slot) => slot.players);
+    expect(cms.map((p) => p.name).sort()).toEqual(["Joe", "Terng", "Wee"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("CDM stays on CDM when the formation has that slot", () => {
+    const { lines } = fillPitch(getFormation("4-1-4-1").lines, [
+      { id: "1", name: "Wee", positionKey: "CDM" },
+    ]);
+    const cdm = lines
+      .flatMap((line) => line.slots)
+      .find((slot) => slot.key === "CDM");
+    expect(cdm?.players.map((p) => p.name)).toEqual(["Wee"]);
+  });
+
+  test("LW fills LM when the formation uses LM/RM", () => {
+    const { lines, bench } = fillPitch(
+      [
+        { area: "the keeper", keys: ["GK"] },
+        { area: "midfield", keys: ["LM", "CM", "CM", "RM"] },
+      ],
+      [{ id: "1", name: "Nok", positionKey: "LW" }],
+    );
+    const lm = lines.flatMap((line) => line.slots).find((slot) => slot.key === "LM");
+    expect(lm?.players.map((p) => p.name)).toEqual(["Nok"]);
+    expect(bench).toEqual([]);
+  });
+
+  test("roster order is formation back→front then leftover Any", () => {
+    const ordered = orderGoingForRoster(
+      [
+        { id: "1", name: "Nok", positionKey: "CB" },
+        { id: "2", name: "Bee", positionKey: "ANY" },
+        { id: "3", name: "Aek", positionKey: "GK" },
+      ],
+      "football",
+      "4-1-4-1",
+    );
+    expect(ordered.map((p) => p.name)).toEqual(["Aek", "Bee", "Nok"]);
+  });
+
+  test("Any fills a remaining vacancy", () => {
+    const { lines, any, bench } = fillPitch(getFormation("4-3-3").lines, [
+      { id: "1", name: "Bee", positionKey: "ANY" },
+    ]);
+    expect(any).toEqual([]);
+    expect(bench).toEqual([]);
+    expect(
+      lines.flatMap((line) => line.slots).some((slot) =>
+        slot.players.some((p) => p.name === "Bee"),
+      ),
+    ).toBe(true);
+  });
+
+  test("leftover Any sits on the bench when the pitch is full", () => {
+    const filled = getFormation("4-3-3")
+      .lines.flatMap((line) => line.keys)
+      .map((key, index) => ({
+        id: String(index),
+        name: `P${index}`,
+        positionKey: key,
+      }));
+    const { any, bench } = fillPitch(getFormation("4-3-3").lines, [
+      ...filled,
+      { id: "any", name: "Bee", positionKey: "ANY" },
+    ]);
+    expect(any.map((p) => p.name)).toEqual(["Bee"]);
+    expect(bench.map((p) => p.name)).toEqual(["Bee"]);
+  });
+
+  test("basketball lines are C, PF/SF wide, SG/PG closer", () => {
+    expect(BASKETBALL_LINES.map((line) => line.keys)).toEqual([
+      ["C"],
+      ["PF", "SF"],
+      ["SG", "PG"],
+    ]);
+    const pf = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PF!.left);
+    const sf = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SF!.left);
+    const sg = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SG!.left);
+    const pg = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PG!.left);
+    const cTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.C!.top);
+    const wingTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.PF!.top);
+    const guardTop = Number.parseFloat(BASKETBALL_SLOT_LAYOUT.SG!.top);
+    expect(cTop).toBeLessThan(wingTop);
+    expect(wingTop).toBeLessThan(guardTop);
+    expect(Math.abs(sf - pf)).toBeGreaterThan(Math.abs(pg - sg));
+  });
+
+  test("position chips group like the board", () => {
+    expect(
+      groupedPositionRows(BASKETBALL_POSITIONS).map((row) =>
+        row.map((p) => p.key),
+      ),
+    ).toEqual([["C"], ["PF", "SF"], ["SG", "PG"], ["ANY"]]);
+    expect(
+      groupedPositionRows(FOOTBALL_POSITIONS).map((row) =>
+        row.map((p) => p.key),
+      ),
+    ).toEqual([
+      ["LW", "CF", "RW"],
+      ["CAM", "CM", "CDM"],
+      ["LB", "CB", "RB"],
+      ["ANY", "GK"],
+    ]);
+  });
+});
+
+test.describe("when/where display", () => {
+  test("collapses newlines to a single middle-dot line", () => {
+    expect(formatWhenWhereLine("Sun 17:00\nLumphini pitch 2")).toBe(
+      "Sun 17:00 · Lumphini pitch 2",
+    );
+    expect(formatWhenWhereLine("  Mon 20:00  \n\n  Court 1  ")).toBe(
+      "Mon 20:00 · Court 1",
+    );
+  });
+
+  test("prefers structured Bangkok date + place; else free text; else TBD", () => {
+    const start = bangkokDateTimeToUtc("2026-10-03", "20:00");
+    expect(start).toBeTruthy();
+    expect(formatBangkokWhen(start!)).toBe("Sat 3 Oct 2026 · 20:00");
+    expect(formatBangkokWhen(start!, bangkokDateTimeToUtc("2026-10-03", "22:00"))).toBe(
+      "Sat 3 Oct 2026 · 20:00–22:00",
+    );
+    expect(
+      matchdayWhenWhereLine({
+        startsAt: start,
+        place: "Lumphini pitch 2",
+        whenWhere: "ignore me",
+      }).text,
+    ).toBe("Sat 3 Oct 2026 · 20:00 · Lumphini pitch 2");
+    expect(
+      matchdayWhenWhereLine({
+        startsAt: start,
+        hasTime: false,
+        venue: "Lumphini pitch 2",
+        whenWhere: "",
+      }).text,
+    ).toBe("Sat 3 Oct 2026 · Lumphini pitch 2");
+    expect(
+      displayWhen({ startsAt: null, place: null, whenWhere: "Sun 17:00" }).text,
+    ).toBe("Sun 17:00");
+    expect(
+      displayWhere({ startsAt: start, place: null, whenWhere: "Sun 17:00" }),
+    ).toEqual({ text: "TBD", tbd: true });
+    expect(
+      displayWhere({
+        startsAt: start,
+        venue: "Court 1",
+        place: "old",
+        whenWhere: "",
+      }).text,
+    ).toBe("Court 1");
+    expect(
+      matchdayWhenWhereLine({ startsAt: null, place: null, whenWhere: "" }),
+    ).toEqual({ text: "TBD", tbd: true });
+    expect(hasStructuredStart({ startsAt: start, whenWhere: "" })).toBe(true);
+    expect(hasStructuredStart({ startsAt: null, whenWhere: "Sun" })).toBe(false);
+    expect(formatWhenSummary("2026-10-03", "20:00", "22:00")).toBe(
+      "Sat 3 Oct · 20:00–22:00",
+    );
+    expect(formatWhenSummary("2026-10-03", "", "")).toBe("Sat 3 Oct");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "19:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-01", "21:00"),
+      }),
+    ).toBe("Thu 1 Oct · 19:00–21:00");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "19:00"),
+      }),
+    ).toBe("Thu 1 Oct · 19:00");
+    expect(
+      shareCardWhenLine({
+        startsAt: bangkokDateTimeToUtc("2026-10-01", "00:00"),
+        hasTime: false,
+      }),
+    ).toBe("Thu 1 Oct");
+    expect(shareCardWhenLine({ startsAt: null })).toBe(null);
+    expect(collidingGoingName(["Nok", "Aek"], "nok")).toBe("Nok");
+    expect(collidingGoingName(["Nok"], "Nok", "Nok")).toBe(null);
+    expect(collidingGoingName(["Nok", "Aek"], "Bee")).toBe(null);
+    expect(
+      formatRosterPasteWhen({
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "20:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-03", "22:00"),
+      }),
+    ).toBe("3 Oct 2026 - 20:00–22:00");
+    expect(formatRosterPasteWhen({ startsAt: null })).toBe(null);
+    expect(
+      formatRosterPasteWhen({
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "00:00"),
+        hasTime: false,
+      }),
+    ).toBe("3 Oct 2026");
+    expect(
+      buildRosterNameLines(
+        [
+          { name: "Dan", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        FOOTBALL_POSITIONS,
+      ),
+    ).toEqual(["1. Dan · GK", "2. Nok · CB"]);
+    expect(
+      buildRosterNameLines(
+        [
+          { name: "Dan", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        FOOTBALL_POSITIONS,
+        true,
+      ),
+    ).toEqual(["GK", "1. Dan", "CB", "1. Nok"]);
+    expect(
+      buildRosterPaste({
+        title: "TEST Copy roster",
+        startsAt: bangkokDateTimeToUtc("2026-10-03", "20:00"),
+        endsAt: bangkokDateTimeToUtc("2026-10-03", "22:00"),
+        venue: "Court 1",
+        mapUrl: "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+        going: [
+          { name: "Aek", positionKey: "GK" },
+          { name: "Nok", positionKey: "CB" },
+        ],
+        positions: FOOTBALL_POSITIONS,
+      }),
+    ).toBe(
+      [
+        "TEST Copy roster",
+        "3 Oct 2026 - 20:00–22:00",
+        "",
+        "@ Court 1",
+        "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+        "",
+        "1. Aek · GK",
+        "2. Nok · CB",
+      ].join("\n"),
+    );
+    expect(
+      buildRosterPaste({
+        title: "Sunday kickabout",
+        going: [{ name: "Nok", positionKey: "CB" }],
+        positions: FOOTBALL_POSITIONS,
+      }),
+    ).toBe("Sunday kickabout\n\n1. Nok · CB");
+    expect(
+      shouldCollapseWhenWhere({
+        startsAt: start,
+        venue: "Court 1",
+        whenWhere: "30 Sep or 1 Oct",
+      }),
+    ).toBe(true);
+    expect(
+      shouldCollapseWhenWhere({
+        startsAt: null,
+        venue: null,
+        whenWhere: "30 Sep or 1 Oct",
+      }),
+    ).toBe(false);
+    expect(detailsPreview("").overflow).toBe(false);
+    expect(detailsPreview("Jersey : Red").preview).toBe("Jersey : Red");
+    expect(detailsPreview("Jersey : Red").overflow).toBe(false);
+    expect(
+      detailsPreview("a\nb\nc\nd").preview,
+    ).toBe("a\nb\nc");
+    expect(detailsPreview("a\nb\nc\nd").overflow).toBe(true);
+    expect(detailsPreview("a\nb\nc\nd").text).toBe("a\nb\nc\nd");
+  });
+
+  test("map URL is https-only and truncates as domain… on the card", () => {
+    const url = "https://maps.app.goo.gl/yvCNh8AbCdEfGh";
+    expect(parseMapUrl(url)).toEqual({ ok: true, url });
+    expect(truncateMapUrl(url)).toBe("maps.app.goo.gl/yvCNh8AbCdEf…");
+    expect(parseMapUrl("http://example.com").ok).toBe(false);
+    expect(parseMapUrl("ftp://example.com").ok).toBe(false);
+    expect(parseMapUrl("not a url").ok).toBe(false);
+    expect(parseMapUrl("")).toEqual({ ok: true, url: null });
+  });
+
+  test("times are 15-minute 24h steps; end defaults +1 hour", () => {
+    expect(MINUTE_STEPS).toEqual(["00", "15", "30", "45"]);
+    expect(HOURS_24).toHaveLength(24);
+    expect(HOURS_24[17]).toBe("17");
+    expect(isQuarterTime("17:00")).toBe(true);
+    expect(isQuarterTime("17:10")).toBe(false);
+    expect(addOneHour("20:00")).toEqual({ time: "21:00", nextDay: false });
+    expect(addOneHour("23:15")).toEqual({ time: "00:15", nextDay: true });
+  });
+
+  test("ICS includes UTC start and optional end", () => {
+    const startsAt = bangkokDateTimeToUtc("2026-10-03", "20:00")!;
+    const endsAt = bangkokDateTimeToUtc("2026-10-03", "22:00")!;
+    const ics = buildMatchdayIcs({
+      publicId: "abc",
+      title: "Sunday kickabout",
+      place: "Lumphini",
+      startsAt,
+      endsAt,
+      url: "https://getskwad.com/m/abc",
+    });
+    expect(ics).toContain("DTSTART:20261003T130000Z");
+    expect(ics).toContain("DTEND:20261003T150000Z");
+    expect(ics).toContain("LOCATION:Lumphini");
+    expect(ics).toContain("SUMMARY:Sunday kickabout");
+    const allDay = buildMatchdayIcs({
+      publicId: "abc",
+      title: "Sunday kickabout",
+      place: "Lumphini",
+      startsAt,
+      hasTime: false,
+      url: "https://getskwad.com/m/abc",
+    });
+    expect(allDay).toContain("DTSTART;VALUE=DATE:20261003");
+    expect(allDay).not.toContain("DTSTART:20261003T");
+  });
+});
+
+test.describe("half-court geometry", () => {
+  test("restricted under the rim inside the key; FT arc outside toward midcourt; 3pt from short corners", () => {
+    const g = halfCourtGeometry();
+    expect(g.restrictedBulgeY).toBeGreaterThan(g.hoopY);
+    expect(g.restrictedBulgeY).toBeLessThan(g.keyBottom);
+    expect(g.ftBulgeY).toBeGreaterThan(g.keyBottom);
+    expect(g.restR).toBeLessThan(g.ftR);
+    expect(g.cornerY).toBeGreaterThan(g.top + 40);
+    expect(g.threeLeft.startsWith(`M${g.c1} ${g.top} V`)).toBe(true);
+    expect(g.threeArc).not.toMatch(new RegExp(`M${g.c1} ${g.top} A`));
+    expect(g.restricted).toMatch(/A 28 28 0 0 0 /);
+    expect(g.freeThrow).toMatch(/A 43 43 0 0 0 /);
+    expect(arcSweepFlag(g.restricted)).toBe(0);
+    expect(arcSweepFlag(g.freeThrow)).toBe(0);
+    expect(arcSweepFlag(g.threeArc)).toBe(0);
+    expect(horizontalArcBulgeY(g.hoopY, g.restR, 0)).toBe(g.restrictedBulgeY);
+    expect(horizontalArcBulgeY(g.keyBottom, g.ftR, 0)).toBe(g.ftBulgeY);
+  });
+});
+
+test.describe("athlete placeholders", () => {
+  test("twenty first names per sport, never Bee or Nok", () => {
+    expect(FOOTBALL_FIRST_NAMES).toHaveLength(20);
+    expect(BASKETBALL_FIRST_NAMES).toHaveLength(20);
+    expect(FOOTBALL_FIRST_NAMES).not.toContain("Bee");
+    expect(FOOTBALL_FIRST_NAMES).not.toContain("Nok");
+    expect(BASKETBALL_FIRST_NAMES).not.toContain("Bee");
+    expect(BASKETBALL_FIRST_NAMES).not.toContain("Nok");
+  });
+});
+
+test.describe("public origin", () => {
+  test("production magic links use APP_URL, not a Vercel alias", () => {
+    const prevV = process.env.VERCEL_ENV;
+    const prevA = process.env.APP_URL;
+    process.env.VERCEL_ENV = "production";
+    process.env.APP_URL = "https://getskwad.com";
+    try {
+      expect(publicAppOrigin("https://project-roster-tau.vercel.app")).toBe(
+        "https://getskwad.com",
+      );
+    } finally {
+      if (prevV === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = prevV;
+      if (prevA === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = prevA;
+    }
+  });
+});
+
+test.describe("analytics helper", () => {
+  const sample = {
+    sport: "football",
+    going_count: 2,
+    has_datetime: true,
+    has_map: false,
+    role: "manager" as const,
+  };
+
+  test("capture is a silent no-op when the key is absent", async () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    const logs: unknown[][] = [];
+    const origLog = console.log;
+    const origInfo = console.info;
+    const origWarn = console.warn;
+    const origError = console.error;
+    console.log = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.info = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.warn = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.error = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    try {
+      expect(getPosthogKey()).toBe("");
+      expect(isAnalyticsEnabled()).toBe(false);
+      await capture("match_created", sample);
+      await capture("invite_copied", sample);
+      expect(logs).toEqual([]);
+    } finally {
+      console.log = origLog;
+      console.info = origInfo;
+      console.warn = origWarn;
+      console.error = origError;
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("whitespace key stays off", () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "   ";
+    try {
+      expect(getPosthogKey()).toBe("");
+      expect(isAnalyticsEnabled()).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("props come from the matchday, not player names", () => {
+    expect(
+      analyticsFromMatchday(
+        {
+          sport: "basketball",
+          startsAt: new Date("2026-10-03T13:00:00.000Z"),
+          hasTime: true,
+          mapUrl: "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+          publicId: "pub_abc",
+        },
+        4,
+        "guest",
+      ),
+    ).toEqual({
+      sport: "basketball",
+      going_count: 4,
+      has_datetime: true,
+      has_map: true,
+      role: "guest",
+      match_id: "pub_abc",
+    });
+    expect(
+      analyticsFromMatchday(
+        {
+          sport: "football",
+          startsAt: new Date("2026-10-03T00:00:00.000Z"),
+          hasTime: false,
+          mapUrl: "  ",
+          publicId: "pub_tbd",
+        },
+        0,
+        "manager",
+      ),
+    ).toEqual({
+      sport: "football",
+      going_count: 0,
+      has_datetime: false,
+      has_map: false,
+      role: "manager",
+      match_id: "pub_tbd",
+    });
+  });
+});
+
+test.describe("lineup helper", () => {
+  test("bench is Going minus XI; Out is never in the pool", () => {
+    const going = [
+      { id: "1", name: "Nok", positionKey: "CB" },
+      { id: "2", name: "Aek", positionKey: "GK" },
+      { id: "3", name: "Bee", positionKey: "ANY" },
+    ];
+    const slots = clearLineupSlots("4-3-3");
+    const gk = slots.find((slot) => slot.key === "GK")!;
+    const placed = assignToSlot(slots, gk.id, going[1]!);
+    expect(snapshotBench(going, placed).map((row) => row.name)).toEqual([
+      "Nok",
+      "Bee",
+    ]);
+  });
+
+  test("formation change clears every slot", () => {
+    const slots = clearLineupSlots("4-3-3");
+    const st = slots.find((slot) => slot.key === "ST")!;
+    const filled = assignToSlot(slots, st.id, {
+      id: "1",
+      name: "Nok",
+      positionKey: "CF",
+    });
+    expect(filled.some((slot) => slot.name === "Nok")).toBe(true);
+    const cleared = clearLineupSlots("4-1-4-1");
+    expect(cleared.every((slot) => slot.rsvpId === null)).toBe(true);
+    expect(parseLineupFormation("4-1-4-1")).toBe("4-1-4-1");
+    expect(parseLineupFormation("4-2-3-1")).toBe("4-2-3-1");
+    expect(LINEUP_FORMATION_CHIPS).toEqual(["4-4-2", "4-3-3", "4-1-4-1", "3-5-2"]);
+    expect(LINEUP_FORMATION_CHIPS).not.toContain("4-2-3-1");
+    expect(cleared).toHaveLength(11);
+  });
+
+  test("suggested names and cap", () => {
+    expect(suggestedLineupName([])).toBe("Q1");
+    expect(suggestedLineupName(["Q1", "Q2"])).toBe("Q3");
+    expect(LINEUP_CAP).toBe(4);
+  });
+
+  test("New is unused-elsewhere; first Q hides the badge", () => {
+    const q1 = {
+      id: "q1",
+      slots: [{ id: "s1", key: "CB", rsvpId: "nok", name: "Nok" }],
+    };
+    expect(otherLineupCount([], undefined)).toBe(0);
+    expect(isNewToOtherLineups("aek", new Set(), 0)).toBe(false);
+    expect(
+      sortPickerPeople(
+        [
+          { id: "nok", name: "Nok", positionKey: "CB" },
+          { id: "aek", name: "Aek", positionKey: "GK" },
+          { id: "bee", name: "Bee", positionKey: "ANY" },
+        ],
+        new Set(),
+        0,
+      ).map((row) => row.name),
+    ).toEqual(["Aek", "Bee", "Nok"]);
+
+    const used = usedRsvpIdsElsewhere([q1], undefined);
+    expect([...used]).toEqual(["nok"]);
+    expect(otherLineupCount([q1], undefined)).toBe(1);
+    expect(isNewToOtherLineups("nok", used, 1)).toBe(false);
+    expect(isNewToOtherLineups("aek", used, 1)).toBe(true);
+    expect(otherLineupCount([q1], "q1")).toBe(0);
+    expect(
+      sortPickerPeople(
+        [
+          { id: "nok", name: "Nok", positionKey: "CB" },
+          { id: "bee", name: "Bee", positionKey: "ANY" },
+          { id: "aek", name: "Aek", positionKey: "GK" },
+        ],
+        used,
+        1,
+      ).map((row) => row.name),
+    ).toEqual(["Aek", "Bee", "Nok"]);
+  });
+});
+
+test.describe("privacy", () => {
+  test("Privacy link on landing and match pages opens the stub", async ({
+    browser,
+  }) => {
+    const landing = await browser.newPage();
+    await landing.goto("/");
+    const landingLink = landing.getByTestId("privacy-link");
+    await expect(landingLink).toBeVisible();
+    await expect(landingLink).toHaveText("SKWAD privacy policy");
+    await expect(landingLink).toHaveCSS("color", "rgb(156, 163, 175)");
+    await expect(landingLink).toHaveCSS("font-size", "12px");
+    await expect(landing.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
+      0,
+    );
+    await landingLink.click();
+    await expect(landing).toHaveURL(/\/privacy$/);
+    await expect(landing.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
+    await expect(landing.getByTestId("privacy-page")).toContainText(
+      "privacy@getskwad.com",
+    );
+    await expect(landing.getByRole("heading", { name: "What we store" })).toBeVisible();
+    await expect(
+      landing.getByRole("heading", { name: "Analytics (when on)" }),
+    ).toBeVisible();
+    await landing.close();
+
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+privacy+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST privacy");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST privacy" })).toBeVisible();
+    const boardLink = orgPage.getByTestId("privacy-link");
+    await expect(boardLink).toBeVisible();
+    await expect(boardLink).toHaveText("SKWAD privacy policy");
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("privacy-link")).toBeVisible();
+    await expect(guestPage.getByTestId("privacy-link")).toHaveText(
+      "SKWAD privacy policy",
+    );
+    await guestPage.getByTestId("privacy-link").click();
+    await expect(guestPage).toHaveURL(/\/privacy$/);
+    await expect(guestPage.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
+    await expect(guestPage.getByText("privacy@getskwad.com")).toBeVisible();
+    await expect(guestPage.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
+      0,
+    );
+    await guest.close();
+    await organiser.close();
+  });
+});
+
+test.describe("share pulse", () => {
+  test("capacity is formation slot count", () => {
+    expect(squadCapacity("football", "4-3-3")).toBe(11);
+    expect(squadCapacity("football", "3-5-2")).toBe(11);
+    expect(squadCapacity("basketball", "4-3-3")).toBe(5);
+  });
+
+  test("title is stable signup copy", () => {
+    expect(signupTitle("3 เส้า v SISB v STA")).toBe(
+      "Signup now for 3 เส้า v SISB v STA — powered by SKWAD",
+    );
+  });
+
+  test("Low stamp: white fill, coral NEED / n MORE, −12°", () => {
+    expect(stampKind(8, 2, 11)).toBe("low");
+    const stamp = stampView(9, 0, 11);
+    expect(stamp).toMatchObject({
+      kind: "low",
+      tiltDeg: -12,
+      border: "#FF5A3D",
+      fill: "#ffffff",
+      line1: { text: "NEED", color: "#FF5A3D" },
+      line2: { text: "2 MORE", color: "#FF5A3D" },
+    });
+  });
+
+  test("Enough + Out: teal border, black n GOING, gray n OUT, +12°", () => {
+    expect(stampKind(11, 2, 11)).toBe("enough-out");
+    const stamp = stampView(8, 2, 8);
+    expect(stamp).toMatchObject({
+      kind: "enough-out",
+      tiltDeg: 12,
+      border: "#00D4C8",
+      fill: "#ffffff",
+      line1: { text: "8 GOING", color: "#1a1714" },
+      line2: { text: "2 OUT", color: "#6B7280" },
+    });
+  });
+
+  test("Enough with no Out omits the Out line", () => {
+    expect(stampKind(5, 0, 5)).toBe("enough");
+    const stamp = stampView(5, 0, 5);
+    expect(stamp).toMatchObject({
+      kind: "enough",
+      tiltDeg: 12,
+      border: "#00D4C8",
+      fill: "#ffffff",
+      line1: { text: "5 GOING", color: "#1a1714" },
+      line2: null,
+    });
+  });
+
+  test("no stamp until a Going or Out exists", () => {
+    expect(stampKind(0, 0, 11)).toBeNull();
+    expect(stampView(0, 0, 11)).toBeNull();
+  });
+
+  test("body pulses Going, Out, imbalance, when/where", () => {
+    expect(
+      pulseBody({
+        going: 0,
+        out: 0,
+        imbalance: null,
+        whenWhere: "Tue 20:00 · Court 1",
+      }),
+    ).toBe("Tue 20:00 · Court 1");
+    expect(
+      pulseBody({
+        going: 8,
+        out: 0,
+        imbalance: "need a CB",
+        whenWhere: "Sat 18:00",
+      }),
+    ).toBe("8 Going · need a CB · Sat 18:00");
+    expect(
+      pulseBody({
+        going: 8,
+        out: 2,
+        imbalance: "need a CB",
+        whenWhere: "Sat 18:00",
+      }),
+    ).toBe("8 Going · 2 Out · need a CB · Sat 18:00");
+  });
+
+  test("invite URL stays clean; OG image uses ?v=", () => {
+    expect(inviteShareUrl("https://getskwad.com", "abc")).toBe(
+      "https://getskwad.com/m/abc",
+    );
+    expect(ogImageUrl("abc", "1710000000")).toBe(
+      "/m/abc/opengraph-image?v=1710000000",
+    );
+  });
+
+  test("matchdaySharePulse wires stamp + body", () => {
+    const low = matchdaySharePulse({
+      title: "Sunday",
+      sport: "football",
+      formation: "4-3-3",
+      whenWhere: "Sun 17:00",
+      positions: FOOTBALL_POSITIONS,
+      rsvps: [
+        { status: "GOING", positionKey: "GK" },
+        { status: "GOING", positionKey: "GK" },
+        { status: "OUT", positionKey: null },
+      ],
+    });
+    expect(low.title).toBe("Signup now for Sunday — powered by SKWAD");
+    expect(low.stamp?.kind).toBe("low");
+    expect(low.body).toContain("2 Going · 1 Out");
+    expect(low.body).toContain("Too many GKs");
+    expect(low.body).toContain("Sun 17:00");
+  });
+});
+
+test.describe("matchday board", () => {
+  test("football CB on roster, then GK imbalance", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+fb+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await expect(orgPage.getByTestId("sport-icon-football")).toBeVisible();
+    await expect(orgPage.getByTestId("sport-icon-basketball")).toBeVisible();
+    await saveShot(orgPage.getByTestId("sport-football"), "sport-icon-football.png");
+    await orgPage.getByTestId("sport-basketball").click();
+    await saveShot(
+      orgPage.getByTestId("sport-basketball"),
+      "sport-icon-basketball.png",
+    );
+    await orgPage.getByTestId("sport-football").click();
+    await expect(orgPage.getByTestId("sport-football")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await orgPage.getByLabel("Title").fill("Sunday kickabout");
+    await expect(orgPage.getByLabel("Details (optional)")).toHaveAttribute(
+      "placeholder",
+      "Sun 17:00, National Stadium, Jersey : Red",
+    );
+    await expect(orgPage.getByText(/Optional fallback/)).toHaveCount(0);
+    await orgPage.getByLabel("Details (optional)").fill("Sun 17:00 · Lumphini pitch 2");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-roster")).toHaveCount(0);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    expect(shareUrl).toMatch(/\/m\//);
+    await orgPage.getByTestId("copy-link").click();
+
+    const chipGuest = await browser.newContext();
+    const chipPage = await chipGuest.newPage();
+    await chipPage.goto(shareUrl);
+    await expect(chipPage.getByLabel("Your name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(chipPage.getByLabel("Your name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
+    );
+    const lwChip = await chipPage.getByTestId("position-LW").boundingBox();
+    const gkChip = await chipPage.getByTestId("position-GK").boundingBox();
+    const anyChip = await chipPage.getByTestId("position-ANY").boundingBox();
+    expect(lwChip && gkChip && anyChip).toBeTruthy();
+    expect(lwChip!.y).toBeLessThan(gkChip!.y);
+    expect(Math.abs(anyChip!.y - gkChip!.y)).toBeLessThan(20);
+    await expectShareCard(chipPage, {
+      title: "Sunday kickabout",
+      sport: "football",
+    });
+    await saveShot(chipPage.getByTestId("share-card"), "share-card-football.png");
+    await chipGuest.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    const roster = orgPage.getByTestId("roster");
+    await expect(roster).toContainText("Nok");
+    await expect(roster).toContainText("CB");
+    await expect(orgPage.getByTestId("imbalance-banner")).toHaveCount(0);
+
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestGoing(browser, shareUrl, "Bee", "GK");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Aek");
+    await expect(orgPage.getByTestId("imbalance-banner")).toContainText(
+      /Too many GKs/i,
+    );
+
+    await organiser.close();
+  });
+
+  test("basketball matchday shows PG chips", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+bb+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByTestId("sport-basketball").click();
+    await orgPage.getByLabel("Title").fill("Tuesday run");
+    await orgPage.getByLabel("Details (optional)").fill("Tue 20:00 · Court 1");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Tuesday run" })).toBeVisible();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Basketball");
+    await expect(orgPage.getByTestId("squad-heading")).toHaveText("Squad");
+    await expect(orgPage.getByRole("heading", { name: "Pitch" })).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toHaveText(
+      "Copy invitation link",
+    );
+    await expect(orgPage.getByTestId("half-court")).toBeVisible();
+    await expect(orgPage.getByTestId("half-pitch")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineups")).toHaveCount(0);
+    await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
+
+    const court = orgPage.getByTestId("half-court");
+    const courtBox = await court.boundingBox();
+    expect(courtBox).toBeTruthy();
+    const ratio = courtBox!.width / courtBox!.height;
+    expect(ratio).toBeGreaterThan(0.7);
+    expect(ratio).toBeLessThan(0.9);
+
+    const c = await orgPage.getByTestId("bb-slot-C").boundingBox();
+    const pf = await orgPage.getByTestId("bb-slot-PF").boundingBox();
+    const sf = await orgPage.getByTestId("bb-slot-SF").boundingBox();
+    const sg = await orgPage.getByTestId("bb-slot-SG").boundingBox();
+    const pg = await orgPage.getByTestId("bb-slot-PG").boundingBox();
+    expect(c && pf && sf && sg && pg).toBeTruthy();
+    expect(c!.y).toBeLessThan(pf!.y);
+    expect(Math.abs(pf!.y - sf!.y)).toBeLessThan(12);
+    expect(sg!.y).toBeGreaterThan(pf!.y);
+    expect(Math.abs(sg!.y - pg!.y)).toBeLessThan(12);
+    expect(centerX(sf!) - centerX(pf!)).toBeGreaterThan(
+      centerX(pg!) - centerX(sg!),
+    );
+    await expect(orgPage.getByTestId("bb-3pt")).toBeVisible();
+    await expect(orgPage.getByTestId("bb-center-circle")).toBeVisible();
+    const marks = halfCourtGeometry();
+    await expect(orgPage.getByTestId("bb-restricted")).toHaveAttribute(
+      "d",
+      marks.restricted,
+    );
+    await expect(orgPage.getByTestId("bb-ft-arc")).toHaveAttribute(
+      "d",
+      marks.freeThrow,
+    );
+    await expect(orgPage.getByTestId("bb-3pt-left")).toHaveAttribute(
+      "d",
+      marks.threeLeft,
+    );
+    await expect(orgPage.getByTestId("bb-3pt-right")).toHaveAttribute(
+      "d",
+      marks.threeRight,
+    );
+    await expect(orgPage.getByTestId("bb-3pt")).toHaveAttribute(
+      "d",
+      marks.threeArc,
+    );
+    await saveShot(court, "basketball-halfcourt.png");
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
+    await expect(page.getByTestId("sport-label")).toHaveText("Basketball");
+    await expect(page.getByTestId("signup-helper")).toHaveText(
+      "No app. Pick a spot and tap Done.",
+    );
+    const signupTitleBox = await page
+      .getByRole("heading", { name: "Tuesday run" })
+      .boundingBox();
+    const signupPill = await page.getByTestId("sport-label").boundingBox();
+    const signupWhen = await page.getByTestId("event-when").boundingBox();
+    const signupHelper = await page.getByTestId("signup-helper").boundingBox();
+    const signupGoing = await page
+      .getByRole("heading", { name: /i.?m going/i })
+      .boundingBox();
+    expect(
+      signupTitleBox &&
+        signupPill &&
+        signupWhen &&
+        signupHelper &&
+        signupGoing,
+    ).toBeTruthy();
+    expect(signupTitleBox!.y).toBeLessThan(signupPill!.y);
+    expect(signupPill!.y).toBeLessThan(signupWhen!.y);
+    expect(signupWhen!.y).toBeLessThan(signupHelper!.y);
+    expect(signupHelper!.y).toBeLessThan(signupGoing!.y);
+    await expect(page.getByTestId("position-PG")).toBeVisible();
+    await expect(page.getByTestId("coach-board")).toHaveCount(0);
+    await expectShareCard(page, { title: "Tuesday run", sport: "basketball" });
+    await saveShot(page.getByTestId("share-card"), "share-card-basketball.png");
+    await expect(page.getByTestId("position-C")).toBeVisible();
+    await expect(page.getByTestId("position-GK")).toHaveCount(0);
+    await expect(page.getByTestId("position-CB")).toHaveCount(0);
+    const chipC = await page.getByTestId("position-C").boundingBox();
+    const chipPf = await page.getByTestId("position-PF").boundingBox();
+    const chipSf = await page.getByTestId("position-SF").boundingBox();
+    const chipSg = await page.getByTestId("position-SG").boundingBox();
+    const chipPg = await page.getByTestId("position-PG").boundingBox();
+    expect(chipC && chipPf && chipSf && chipSg && chipPg).toBeTruthy();
+    expect(chipC!.y).toBeLessThan(chipPf!.y);
+    expect(Math.abs(chipPf!.y - chipSf!.y)).toBeLessThan(12);
+    expect(chipSg!.y).toBeGreaterThan(chipPf!.y);
+    expect(centerX(chipSf!) - centerX(chipPf!)).toBeGreaterThan(
+      centerX(chipPg!) - centerX(chipSg!),
+    );
+
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Tuesday run — powered by SKWAD",
+    );
+    await expect(
+      page.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Tue 20:00 · Court 1");
+
+    await expect(page.getByLabel("Your name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${BASKETBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(page.getByLabel("Your name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
+    );
+    await saveShot(page.getByTestId("guest-name"), "athlete-placeholder.png");
+    await page.screenshot({
+      path: join(SCREENSHOT_DIR, "athlete-placeholder-page.png"),
+    });
+    await page.getByLabel("Your name").fill("Dan");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-PG").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expect(page.getByTestId("rsvp-confirmed")).toContainText(/going/i);
+    await expectShareCard(page, { title: "Tuesday run", sport: "basketball" });
+    await guest.close();
+
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Dan");
+    await expect(orgPage.getByTestId("roster")).toContainText("PG");
+    await saveShot(court, "basketball-halfcourt-going.png");
+
+    await organiser.close();
+  });
+
+  test("empty slots show muted abbr only, Going CB fills a CB slot", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+pitch+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Coach board");
+    await orgPage.getByLabel("Details (optional)").fill("Thu 20:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    await expect(orgPage.getByTestId("squad-heading")).toHaveText("Squad");
+    await expect(orgPage.getByTestId("coach-board").getByText(/Need /)).toHaveCount(
+      0,
+    );
+    await expect(orgPage.getByTestId("slot-empty-CB-1")).toBeVisible();
+    await expect(orgPage.getByTestId("slot-empty-CB-1")).toHaveText("CB");
+    const pitch = orgPage.getByTestId("half-pitch");
+    await expect(pitch).toBeVisible();
+    const box = await pitch.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.width / box!.height).toBeGreaterThan(0.65);
+    expect(box!.width / box!.height).toBeLessThan(0.9);
+    const gk = await orgPage.getByTestId("slot-empty-GK-0").boundingBox();
+    const cf = await orgPage.getByTestId("slot-empty-CF-0").boundingBox();
+    expect(gk && cf).toBeTruthy();
+    expect(gk!.y).toBeGreaterThan(cf!.y);
+    await expect(orgPage.getByTestId("bench")).toContainText("Bench");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Bench / Any");
+    await expect(orgPage.getByTestId("bench")).toContainText(
+      "Nobody on the bench yet.",
+    );
+    await expect(orgPage.getByTestId("coach-banner")).toContainText(
+      /Squad fills as players tap Going/i,
+    );
+
+    const shareUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    await expect(orgPage.getByTestId("slot-filled-CB")).toContainText("Nok");
+    await expect(orgPage.getByTestId("slot-lead-CB")).toHaveText("Nok");
+    await expect(orgPage.getByTestId("slot-abbr-CB")).toHaveText("CB");
+    await expect(orgPage.getByTestId("slot-overflow-CB")).toHaveCount(0);
+    const occupiedNameSize = await fontSizeOf(orgPage.getByTestId("slot-lead-CB"));
+    const occupiedAbbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-CB"));
+    expect(occupiedNameSize).toBeGreaterThan(occupiedAbbrSize);
+    await saveChipShot(orgPage.getByTestId("slot-filled-CB"), "occupied-chip.png");
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await organiser.close();
+  });
+
+  test("edit title and when/where", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+edit+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Sunday kickabout");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 17:00\nLumphini");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Sunday kickabout" })).toBeVisible();
+    await expect(orgPage.getByTestId("when-where")).toHaveText("Sun 17:00 · Lumphini");
+
+    await orgPage.getByRole("link", { name: /^edit$/i }).click();
+    await expect(orgPage.locator('textarea[name="whenWhere"]')).toHaveValue(
+      "Sun 17:00\nLumphini",
+    );
+    await orgPage.getByLabel("Title").fill("Monday 5s");
+    await orgPage.getByLabel("Details (optional)").fill("Mon 20:00\nCourt 1");
+    await orgPage.getByTestId("edit-formation-4-1-4-1").click();
+    await orgPage.getByRole("button", { name: /^save$/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Monday 5s" })).toBeVisible();
+    await expect(orgPage.getByTestId("when-where")).toHaveText("Mon 20:00 · Court 1");
+    await expect(orgPage.getByTestId("formation-4-1-4-1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await organiser.close();
+  });
+
+  test("cancel match: guest sees cancelled page; live RSVP still works; delete stays gone", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+cancel+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Saturday 5s");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 18:00 · Court 2");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.getByTestId("cancel-matchday").click();
+    await expect(orgPage.getByTestId("cancel-match-sheet")).toBeVisible();
+    await orgPage.getByTestId("cancel-matchday-confirm").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await expect(orgPage.getByTestId("history-toggle")).toHaveText("History");
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeHidden();
+    await orgPage.getByTestId("history-toggle").click();
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeVisible();
+    await expect(orgPage.getByRole("link", { name: /Saturday 5s/ })).toBeVisible();
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-cancelled")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "This match was cancelled" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("when-where")).toHaveText("Sat 18:00 · Court 2");
+    await expect(
+      page.getByText("Ask your captain if there’s a new date."),
+    ).toBeVisible();
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await expect(page.getByTestId("status-going")).toHaveCount(0);
+    await expect(page.getByTestId("status-out")).toHaveCount(0);
+    await expect(page.getByTestId("rsvp-submit")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("To delete after cancel");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 10:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const deleteUrl = await shareUrlOf(orgPage);
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+
+    const goneGuest = await browser.newContext();
+    const gonePage = await goneGuest.newPage();
+    await gonePage.goto(deleteUrl);
+    await expect(gonePage.getByTestId("matchday-gone")).toContainText(/deleted/i);
+    await expect(gonePage.getByLabel("Your name")).toHaveCount(0);
+    await goneGuest.close();
+    await organiser.close();
+  });
+
+  test("mark completed: guest sees read-only roster; cancel and delete still work", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+done+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Friday kickabout");
+    await orgPage.getByLabel("Details (optional)").fill("Fri 19:00 · Pitch 1");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.getByTestId("complete-matchday").click();
+    await expect(orgPage.getByTestId("complete-match-sheet")).toBeVisible();
+    await orgPage.getByTestId("complete-matchday-confirm").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await orgPage.getByTestId("history-toggle").click();
+    await expect(orgPage.getByTestId("completed-chip")).toHaveText("Completed");
+    await expect(orgPage.getByTestId("cancelled-chip")).toHaveCount(0);
+    await expect(orgPage.getByRole("link", { name: /Friday kickabout/ })).toBeVisible();
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-completed")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Match completed" })).toBeVisible();
+    await expect(page.getByText("This match was cancelled")).toHaveCount(0);
+    await expect(page.getByTestId("when-where")).toHaveText("Fri 19:00 · Pitch 1");
+    await expect(page.getByTestId("roster")).toContainText("Nok");
+    await expect(page.getByTestId("coach-board")).toBeVisible();
+    await expect(page.getByTestId("formation-4-3-3")).toHaveCount(0);
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await expect(page.getByTestId("status-going")).toHaveCount(0);
+    await expect(page.getByTestId("rsvp-submit")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Still live then cancel");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 09:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const cancelUrl = await shareUrlOf(orgPage);
+    await orgPage.getByTestId("cancel-matchday").click();
+    await orgPage.getByTestId("cancel-matchday-confirm").click();
+    await orgPage.getByTestId("history-toggle").click();
+    await expect(orgPage.getByTestId("cancelled-chip")).toBeVisible();
+
+    const cancelGuest = await browser.newContext();
+    const cancelPage = await cancelGuest.newPage();
+    await cancelPage.goto(cancelUrl);
+    await expect(cancelPage.getByTestId("matchday-cancelled")).toBeVisible();
+    await expect(cancelPage.getByTestId("roster")).toHaveCount(0);
+    await expect(cancelPage.getByLabel("Your name")).toHaveCount(0);
+    await cancelGuest.close();
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Wipe after complete");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 11:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const deleteUrl = await shareUrlOf(orgPage);
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+
+    const goneGuest = await browser.newContext();
+    const gonePage = await goneGuest.newPage();
+    await gonePage.goto(deleteUrl);
+    await expect(gonePage.getByTestId("matchday-gone")).toContainText(/deleted/i);
+    await goneGuest.close();
+    await organiser.close();
+  });
+
+  test("delete matchday: guest sees deleted state", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+del+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("To delete");
+    await orgPage.getByLabel("Details (optional)").fill("Fri 19:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("delete-matchday").click();
+    await expect(orgPage).toHaveURL(/\/board\/?$/);
+    await expect(orgPage.getByRole("link", { name: "To delete" })).toHaveCount(0);
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("matchday-gone")).toContainText(
+      /deleted/i,
+    );
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await guest.close();
+    await organiser.close();
+  });
+
+  test("guest sees Going list sorted back→front then Any", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+sort+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Sorted roster");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 16:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-1-4-1").click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    const roster = page.getByTestId("roster");
+    await expect(roster).toBeVisible();
+    const cta = page.getByTestId("rsvp-submit");
+    await expect(cta).toBeVisible();
+    const ctaBox = await cta.boundingBox();
+    const rosterBox = await roster.boundingBox();
+    expect(ctaBox && rosterBox).toBeTruthy();
+    expect(ctaBox!.y).toBeLessThan(rosterBox!.y);
+    await expect(page.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await expect(page.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
+      "true",
+    );
+    await page.getByTestId("roster-toggle").click();
+    await expect(page.getByTestId("roster")).toHaveCount(0);
+    await expect(page.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await expect(page.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
+      "false",
+    );
+    await page.getByTestId("roster-toggle").click();
+    await expect(page.getByTestId("roster")).toBeVisible();
+    await expect(roster.locator("li")).toHaveText([
+      /Aek\s*GK/,
+      /Bee\s*Any/,
+      /Nok\s*CB/,
+    ]);
+    await guest.close();
+    await organiser.close();
+  });
+
+  test("Any fills a remaining vacancy", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+any+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Any strip");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 10:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("bench")).toContainText(
+      "Nobody on the bench yet.",
+    );
+    await expect(orgPage.locator("[data-testid^=slot-filled-]")).toContainText(
+      "Bee",
+    );
+    await expect(orgPage.getByTestId("roster")).toContainText("Bee");
+
+    await organiser.close();
+  });
+
+  test("guest adds a friend with added by, then edits and deletes them", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+friend+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Bring a friend");
+    await orgPage.getByLabel("Details (optional)").fill("Sun 11:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    const shareUrl = await shareUrlOf(orgPage);
+
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(shareUrl);
+    await page.getByLabel("Your name").fill("Nok");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-CB").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expect(page.getByTestId("rsvp-confirmed")).toBeVisible();
+    await expect(page.getByTestId("event-card")).toBeVisible();
+    await expect(page.getByTestId("add-friend")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /i.?m going/i })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole("heading", { name: /add someone else/i }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Friend's name")).toHaveAttribute(
+      "placeholder",
+      new RegExp(`^(${FOOTBALL_FIRST_NAMES.join("|")})$`),
+    );
+    await expect(page.getByLabel("Friend's name")).not.toHaveAttribute(
+      "placeholder",
+      /^(Bee|Nok)$/i,
+    );
+    await expect(
+      page.getByRole("heading", { name: /add someone else/i }),
+    ).toBeVisible();
+
+    await page.getByTestId("friend-name").fill("Bee");
+    await page.getByTestId("friend-submit-going").click();
+    await page.getByTestId("friend-submit-position-ANY").click();
+    await page.getByTestId("friend-submit").click();
+    await expect(page.getByTestId("added-by")).toContainText("added by Nok");
+    await expect(page.getByTestId("roster")).toContainText("Bee");
+    await expect(page.getByTestId("my-extras")).toContainText("Bee");
+
+    await page.getByRole("button", { name: /^edit$/i }).click();
+    await page.getByTestId("extra-name").fill("Bee2");
+    await page.getByRole("button", { name: /^save$/i }).click();
+    await expect(page.getByTestId("roster")).toContainText("Bee2");
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.locator('[data-testid^="extra-delete-"]').click();
+    await expect(page.getByTestId("roster")).not.toContainText("Bee2");
+    await expect(page.getByTestId("my-extras")).toHaveCount(0);
+
+    const other = await browser.newContext();
+    const otherPage = await other.newPage();
+    await otherPage.goto(shareUrl);
+    await otherPage.getByLabel("Your name").fill("Aek");
+    await otherPage.getByTestId("status-going").click();
+    await otherPage.getByTestId("position-GK").click();
+    await otherPage.getByTestId("rsvp-submit").click();
+    await expect(otherPage.getByTestId("add-friend")).toBeVisible();
+    await expect(otherPage.getByTestId("my-extras")).toHaveCount(0);
+    await expect(otherPage.getByRole("button", { name: /^delete$/i })).toHaveCount(
+      0,
+    );
+    await other.close();
+    await guest.close();
+    await organiser.close();
+  });
+
+  test("crowded chip keeps the name with stroked +N on the pill; CAM/CDM sit on CM; Out collapses", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+    });
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+stack+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("LW stack");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 19:00");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    await expect(orgPage.getByTestId("sport-label")).toHaveText("Football");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
+    const shareUrl = await shareUrlOf(orgPage);
+
+    await guestGoing(browser, shareUrl, "Dan", "LW");
+    await guestGoing(browser, shareUrl, "Tim", "LW");
+    await guestGoing(browser, shareUrl, "Mit", "LW");
+    await guestGoing(browser, shareUrl, "Job", "RW");
+    await guestGoing(browser, shareUrl, "Pat", "RW");
+    await guestGoing(browser, shareUrl, "Sam", "RW");
+    await guestGoing(browser, shareUrl, "Joe", "CAM");
+    await guestGoing(browser, shareUrl, "Wee", "CDM");
+    await guestGoing(browser, shareUrl, "Jet", "GK");
+    await guestGoing(browser, shareUrl, "Ben", "GK");
+
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    const slot = orgPage.getByTestId("slot-filled-LW");
+    await expect(slot).toContainText("Dan");
+    await expect(slot).not.toContainText("Tim");
+    await expect(slot).not.toContainText("Mit");
+    await expect(slot).toContainText("LW");
+    const name = orgPage.getByTestId("slot-lead-LW");
+    const nameSize = await fontSizeOf(name);
+    const abbrSize = await fontSizeOf(orgPage.getByTestId("slot-abbr-LW"));
+    expect(nameSize).toBeGreaterThan(abbrSize);
+    expect(nameSize).toBeGreaterThanOrEqual(18);
+    const badge = orgPage.getByTestId("slot-overflow-LW");
+    await expect(badge).toHaveText("+2");
+    await expect(badge).not.toHaveClass(/rounded-full/);
+    await expect(badge).not.toHaveClass(/\bring-/);
+    const badgeLook = await badge.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return {
+        background: s.backgroundColor,
+        radius: s.borderRadius,
+        color: s.color,
+        stroke: s.getPropertyValue("-webkit-text-stroke"),
+        paintOrder: s.paintOrder,
+        width: el.getBoundingClientRect().width,
+        height: el.getBoundingClientRect().height,
+      };
+    });
+    expect(badgeLook.background).toMatch(/rgba?\(0,\s*0,\s*0,\s*0\)|transparent/);
+    expect(Number.parseFloat(badgeLook.radius) || 0).toBe(0);
+    expect(badgeLook.color).toMatch(/rgb\(\s*26,\s*23,\s*20\s*\)/);
+    expect(badgeLook.stroke).toMatch(/px/);
+    const strokePx = Number.parseFloat(badgeLook.stroke);
+    expect(strokePx).toBeGreaterThanOrEqual(3);
+    expect(strokePx).toBeLessThanOrEqual(3.5);
+    expect(badgeLook.paintOrder).toMatch(/stroke/i);
+    expect(badgeLook.width).toBeGreaterThan(badgeLook.height);
+    await assertOverflowOnPill(orgPage, "LW", "+2");
+    await saveChipShot(slot, "name-plus-n.png");
+    await expect(orgPage.getByTestId("slot-filled-RW")).toContainText("Job");
+    await assertOverflowOnPill(orgPage, "RW", "+2");
+    await saveChipShot(orgPage.getByTestId("slot-filled-RW"), "crowded-chip-job.png");
+    await expect(orgPage.getByTestId("slot-filled-GK")).toContainText("Jet");
+    await assertOverflowOnPill(orgPage, "GK", "+1");
+    await saveChipShot(orgPage.getByTestId("slot-filled-GK"), "crowded-chip-jet.png");
+    await saveShot(orgPage.getByTestId("half-pitch"), "crowded-pitch-mobile.png");
+    const cmText = (
+      await orgPage.getByTestId("slot-filled-CM").allTextContents()
+    ).join(" ");
+    expect(cmText).toContain("Joe");
+    expect(cmText).toContain("Wee");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Dan");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Joe");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Wee");
+
+    await slot.click();
+    const sheet = orgPage.getByTestId("slot-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByTestId("slot-sheet-row")).toHaveCount(3);
+    await expect(sheet).toContainText("Tim");
+    await expect(sheet).toContainText("Dan");
+    await expect(sheet).toContainText("Mit");
+    await orgPage.getByTestId("slot-sheet-close").click();
+    await expect(orgPage.getByTestId("slot-sheet")).toHaveCount(0);
+
+    await guestOut(browser, shareUrl, "Aek");
+    await orgPage.reload();
+    await orgPage.getByTestId("formation-4-3-3").click();
+    await expect(orgPage.getByTestId("out-toggle")).toContainText("Out · 1");
+    await expect(orgPage.getByTestId("out-list")).toHaveCount(0);
+    await orgPage.getByTestId("out-toggle").click();
+    await expect(orgPage.getByTestId("out-list")).toContainText("Aek");
+
+    await orgPage.goto("/board");
+    await expect(orgPage.getByTestId("sport-chip")).toContainText("Football");
+
+    await organiser.close();
+  });
+
+  test("home tabs Invited and Hosting; OG image", async ({ browser }) => {
+    const landing = await browser.newPage();
+    await landing.goto("/");
+    await expect(
+      landing.getByRole("heading", {
+        name: "Paste a link. Get your squad signed up.",
+      }),
+    ).toBeVisible();
+    await expect(
+      landing.getByText(
+        "Create friendly matches — football, basketball, and more. Get the squad signed up and manage the roster in one link.",
+      ),
+    ).toBeVisible();
+    await expect(landing.locator('meta[property="og:description"]')).toHaveAttribute(
+      "content",
+      "Paste a link. Get your squad signed up.",
+    );
+    const landingOg = await landing.request.get("/opengraph-image");
+    expect(landingOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-landing.png"), await landingOg.body());
+    await landing.close();
+
+    const host = await browser.newContext();
+    const hostPage = await host.newPage();
+    await signIn(hostPage, `mark+host+${Date.now()}@example.com`);
+    await expect(
+      hostPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Paste a link. Get your squad signed up.");
+    const boardOg = await hostPage.request.get("/board/opengraph-image");
+    expect(boardOg.ok()).toBeTruthy();
+    writeFileSync(join(SCREENSHOT_DIR, "og-board.png"), await boardOg.body());
+    await expect(
+      hostPage.getByRole("link", { name: "+ New matchday" }),
+    ).toBeVisible();
+    await expect(hostPage.getByTestId("tab-invited")).toBeVisible();
+    await expect(hostPage.getByTestId("tab-hosting")).toBeVisible();
+    await expect(hostPage.getByTestId("tab-hosting")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    await hostPage.getByRole("link", { name: "+ New matchday" }).click();
+    await hostPage.getByLabel("Title").fill("Hosted game");
+    await hostPage.getByLabel("Details (optional)").fill("Sat 18:00");
+    await hostPage.getByRole("button", { name: /create matchday/i }).click();
+    const hostedShare = await shareUrlOf(hostPage);
+
+    const player = await browser.newContext();
+    const playerPage = await player.newPage();
+    await signIn(playerPage, `mark+play+${Date.now()}@example.com`);
+    await playerPage.getByRole("link", { name: "+ New matchday" }).click();
+    await playerPage.getByLabel("Title").fill("My hosting");
+    await playerPage.getByLabel("Details (optional)").fill("Sun 12:00");
+    await playerPage.getByRole("button", { name: /create matchday/i }).click();
+    await playerPage.goto("/board");
+    await expect(playerPage.getByRole("link", { name: "My hosting" })).toBeVisible();
+    await playerPage.getByTestId("tab-invited").click();
+    await expect(playerPage.getByRole("link", { name: "My hosting" })).toHaveCount(
+      0,
+    );
+
+    await playerPage.goto(hostedShare);
+    await playerPage.getByLabel("Your name").fill("Nok");
+    await playerPage.getByTestId("status-going").click();
+    await playerPage.getByTestId("position-CB").click();
+    await playerPage.getByTestId("rsvp-submit").click();
+    await expect(playerPage.getByTestId("rsvp-confirmed")).toContainText(
+      /going/i,
+    );
+    await playerPage.getByRole("link", { name: "Skwad", exact: true }).click();
+    await expect(playerPage).toHaveURL(/\/board/);
+    await expect(playerPage.getByTestId("tab-hosting")).toBeVisible();
+    await playerPage.getByTestId("tab-invited").click();
+    await expect(playerPage.getByTestId("tab-invited")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(
+      playerPage.getByRole("link", { name: "Hosted game" }),
+    ).toBeVisible();
+    await expect(
+      playerPage.getByRole("link", { name: "My hosting" }),
+    ).toHaveCount(0);
+    await playerPage.getByTestId("tab-hosting").click();
+    await expect(
+      playerPage.getByRole("link", { name: "My hosting" }),
+    ).toBeVisible();
+    await expect(
+      playerPage.getByRole("link", { name: "Hosted game" }),
+    ).toHaveCount(0);
+    await saveShot(playerPage.getByTestId("home-tabs"), "home-tabs.png");
+    await playerPage.screenshot({
+      path: join(SCREENSHOT_DIR, "home-tabs-page.png"),
+      fullPage: true,
+    });
+
+    const og = await playerPage.request.get(`${hostedShare}/opengraph-image`);
+    expect(og.ok()).toBeTruthy();
+    expect(og.headers()["content-type"]).toMatch(/image\/png/);
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-image.png"), await og.body());
+
+    await player.close();
+    await host.close();
+  });
+
+  test("Copy invitation stays clean; OG Low stamp and pulse body", async ({
+    browser,
+  }) => {
+    test.setTimeout(45_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+pulse+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("Pulse game");
+    await orgPage.getByLabel("Details (optional)").fill("Sat 18:00 · Court 2");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
+    await orgPage.screenshot({
+      path: join(SCREENSHOT_DIR, "copy-invitation-board.png"),
+      fullPage: true,
+    });
+    const shareUrl = await shareUrlOf(orgPage);
+    expect(shareUrl).toMatch(/\/m\/[^/?]+$/);
+    expect(shareUrl).not.toContain("?v=");
+
+    const guestPage = await browser.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Pulse game — powered by SKWAD",
+    );
+    await expect(
+      guestPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "Sat 18:00 · Court 2");
+    await guestPage.close();
+
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestGoing(browser, shareUrl, "Bee", "GK");
+    await guestOut(browser, shareUrl, "Nok");
+
+    const pulsed = await browser.newPage();
+    await pulsed.goto(shareUrl);
+    await expect(pulsed.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Signup now for Pulse game — powered by SKWAD",
+    );
+    await expect(
+      pulsed.locator('meta[property="og:description"]'),
+    ).toHaveAttribute(
+      "content",
+      "2 Going · 1 Out · Too many GKs · need a CB · Sat 18:00 · Court 2",
+    );
+    const ogImage = pulsed.locator('meta[property="og:image"]');
+    await expect(ogImage).toHaveAttribute("content", /opengraph-image\?v=/);
+    const lowOg = await pulsed.request.get(`${shareUrl}/opengraph-image`);
+    expect(lowOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "og-stamp-low.png"), await lowOg.body());
+    await pulsed.close();
+
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    expect(await shareUrlOf(orgPage)).toBe(shareUrl);
+
+    await organiser.close();
+  });
+
+  test("OG stamps Enough and Enough+Out; completed keeps Copy invitation", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+enough+${Date.now()}@example.com`);
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByTestId("sport-basketball").click();
+    await orgPage.getByLabel("Title").fill("Enough run");
+    await orgPage.getByLabel("Details (optional)").fill("Tue 20:00 · Court 1");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
+    const enoughUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, enoughUrl, "Dan", "C");
+    await guestGoing(browser, enoughUrl, "Pat", "PF");
+    await guestGoing(browser, enoughUrl, "Sam", "SF");
+    await guestGoing(browser, enoughUrl, "Joe", "SG");
+    await guestGoing(browser, enoughUrl, "Wee", "PG");
+
+    const enoughPage = await browser.newPage();
+    await enoughPage.goto(enoughUrl);
+    await expect(
+      enoughPage.locator('meta[property="og:title"]'),
+    ).toHaveAttribute(
+      "content",
+      "Signup now for Enough run — powered by SKWAD",
+    );
+    await expect(
+      enoughPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "5 Going · Tue 20:00 · Court 1");
+    const enoughOg = await enoughPage.request.get(
+      `${enoughUrl}/opengraph-image`,
+    );
+    expect(enoughOg.ok()).toBeTruthy();
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(
+      join(SCREENSHOT_DIR, "og-stamp-enough.png"),
+      await enoughOg.body(),
+    );
+    await enoughPage.close();
+
+    await guestOut(browser, enoughUrl, "Aek");
+    const outPage = await browser.newPage();
+    await outPage.goto(enoughUrl);
+    await expect(
+      outPage.locator('meta[property="og:description"]'),
+    ).toHaveAttribute("content", "5 Going · 1 Out · Tue 20:00 · Court 1");
+    const outOg = await outPage.request.get(`${enoughUrl}/opengraph-image`);
+    expect(outOg.ok()).toBeTruthy();
+    writeFileSync(
+      join(SCREENSHOT_DIR, "og-stamp-enough-out.png"),
+      await outOg.body(),
+    );
+    await outPage.close();
+
+    await orgPage.getByTestId("complete-matchday").click();
+    await orgPage.getByTestId("complete-matchday-confirm").click();
+    await orgPage.getByTestId("history-toggle").click();
+    await orgPage.getByRole("link", { name: "Enough run" }).click();
+    await expect(orgPage.getByTestId("completed-chip")).toBeVisible();
+    await expect(orgPage.getByTestId("share-update")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-link")).toBeVisible();
+
+    const cron = await orgPage.request.get("/api/cron/og-refresh");
+    expect(cron.ok()).toBeTruthy();
+    const cronBody = (await cron.json()) as { ok: boolean };
+    expect(cronBody.ok).toBe(true);
+
+    await organiser.close();
+  });
+
+  test("manager can remove Going and Out; guest cannot; duplicate Going is blocked", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+remove+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST remove");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST remove" })).toBeVisible();
+    await expect(orgPage.getByTestId("remove-rsvp")).toHaveCount(0);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const peek = await browser.newContext();
+    const peekPage = await peek.newPage();
+    await peekPage.goto(shareUrl);
+    await expect(peekPage.getByTestId("remove-rsvp")).toHaveCount(0);
+    await peek.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestOut(browser, shareUrl, "Bee");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toBeVisible();
+
+    const dup = await browser.newContext();
+    const dupPage = await dup.newPage();
+    await dupPage.goto(shareUrl);
+    await expect(dupPage.getByTestId("remove-rsvp")).toHaveCount(0);
+    await dupPage.getByLabel("Your name").fill("nok");
+    await dupPage.getByTestId("status-going").click();
+    await dupPage.getByTestId("position-CB").click();
+    await dupPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
+    await dupPage.getByTestId("rsvp-submit").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
+    expect(
+      await dupPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "dupe_warn_shown",
+          ).length,
+      ),
+    ).toBe(1);
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toContainText(
+      "“Nok” is already on the list — change status instead?",
+    );
+    await dupPage.getByTestId("duplicate-cancel").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toHaveCount(0);
+    await dupPage.getByTestId("rsvp-submit").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
+    await dupPage.getByTestId("duplicate-change-status").click();
+    await expect(dupPage.getByTestId("duplicate-name-sheet")).toHaveCount(0);
+    await expect(dupPage.getByTestId("rsvp-confirmed")).toHaveCount(0);
+    await dup.close();
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByTestId("roster").getByText("Nok")).toHaveCount(1);
+
+    await orgPage.getByRole("button", { name: "Remove Nok" }).click();
+    const sheet = orgPage.getByTestId("remove-rsvp-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("heading")).toHaveText("Remove Nok?");
+    await expect(sheet).toContainText("They’ll need to sign up again.");
+    await orgPage.getByTestId("remove-rsvp-cancel").click();
+    await expect(sheet).toHaveCount(0);
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+
+    await orgPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
+    await orgPage.getByRole("button", { name: "Remove Nok" }).click();
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByRole("heading", { name: "Going · 0" })).toBeVisible();
+    expect(
+      await orgPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "rsvp_removed",
+          ).length,
+      ),
+    ).toBe(1);
+    await expect(orgPage.getByTestId("roster")).toHaveCount(0);
+    await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toHaveCount(0);
+
+    await orgPage.getByTestId("out-toggle").click();
+    await expect(orgPage.getByTestId("out-list")).toContainText("Bee");
+    await orgPage.getByRole("button", { name: "Remove Bee" }).click();
+    await expect(orgPage.getByTestId("remove-rsvp-sheet")).toContainText(
+      "Remove Bee?",
+    );
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByTestId("out-section")).toHaveCount(0);
+
+    await organiser.close();
+  });
+
+  test("manager can remove a Bench Going chip", async ({ browser }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+benchrm+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByTestId("sport-basketball").click();
+    await orgPage.getByLabel("Title").fill("TEST bench remove");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST bench remove" })).toBeVisible();
+    const shareUrl = await shareUrlOf(orgPage);
+    await guestGoing(browser, shareUrl, "Dan", "C");
+    await guestGoing(browser, shareUrl, "Pat", "PF");
+    await guestGoing(browser, shareUrl, "Sam", "SF");
+    await guestGoing(browser, shareUrl, "Joe", "SG");
+    await guestGoing(browser, shareUrl, "Wee", "PG");
+    await guestGoing(browser, shareUrl, "Nok", "ANY");
+    await orgPage.reload();
+    const bench = orgPage.getByTestId("bench");
+    await expect(bench).toContainText("Nok");
+    await bench.getByRole("button", { name: "Remove Nok" }).click();
+    await expect(orgPage.getByTestId("remove-rsvp-sheet")).toContainText(
+      "Remove Nok?",
+    );
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
+    await expect(orgPage.getByTestId("bench")).not.toContainText("Nok");
+    await expect(orgPage.getByTestId("roster")).not.toContainText("Nok");
+    await organiser.close();
+  });
+
+  test("Copy roster pastes Going names on the manager board", async ({
+    browser,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+copyroster+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST Copy roster");
+    await pickDate(orgPage, "2026-10-03");
+    await pickTime(orgPage, "20:00", "22:00");
+    await pickPlace(
+      orgPage,
+      "Court 1",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST Copy roster" })).toBeVisible();
+    await expect(orgPage.getByTestId("copy-roster")).toHaveCount(0);
+    await expect(orgPage.getByTestId("position-counts")).toBeVisible();
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("copy-roster")).toHaveCount(0);
+    await guest.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestOut(browser, shareUrl, "Bee");
+    await orgPage.reload();
+    await expect(orgPage.getByTestId("roster")).toContainText("Nok");
+    await expect(orgPage.getByTestId("roster")).toContainText("Aek");
+    await expect(orgPage.getByTestId("roster")).not.toContainText("Bee");
+    const expected = [
+      "TEST Copy roster",
+      "3 Oct 2026 - 20:00–22:00",
+      "",
+      "@ Court 1",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+      "",
+      "1. Aek · GK",
+      "2. Nok · CB",
+    ].join("\n");
+    const button = orgPage.getByTestId("copy-roster");
+    await expect(button).toBeVisible();
+    await expect(button).toHaveText("Copy roster");
+    await expect(button).toHaveCSS("color", "rgb(107, 114, 128)");
+    const buttonBox = await button.boundingBox();
+    const countsBox = await orgPage.getByTestId("position-counts").boundingBox();
+    expect(buttonBox && countsBox).toBeTruthy();
+    expect(Math.abs(buttonBox!.y - countsBox!.y)).toBeLessThan(24);
+    await expect(button).toHaveAttribute("data-paste", expected);
+    await organiser.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await orgPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
+    await button.click();
+    await expect(orgPage.getByTestId("roster-copied-toast")).toHaveText(
+      "Roster copied",
+    );
+    expect(
+      await orgPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "roster_copied",
+          ).length,
+      ),
+    ).toBe(1);
+    expect(await orgPage.evaluate(() => navigator.clipboard.readText())).toBe(
+      expected,
+    );
+    mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    writeFileSync(join(SCREENSHOT_DIR, "copy-roster-paste.txt"), expected);
+    await saveShot(orgPage.getByTestId("copy-roster"), "copy-roster-button.png");
+
+    await expect(orgPage.getByTestId("manager-going")).toBeVisible();
+    await expect(orgPage.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await expect(orgPage.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
+      "true",
+    );
+    await orgPage.getByTestId("roster-toggle").click();
+    await expect(orgPage.getByTestId("roster-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    await expect(orgPage.getByTestId("roster-chevron")).toHaveAttribute(
+      "data-open",
+      "false",
+    );
+    await expect(orgPage.getByTestId("roster")).toHaveCount(0);
+    await expect(orgPage.getByTestId("position-counts")).toHaveCount(0);
+    await expect(orgPage.getByTestId("copy-roster")).toBeVisible();
+    await orgPage.getByTestId("roster-toggle").click();
+    await expect(orgPage.getByTestId("roster")).toBeVisible();
+    await expect(orgPage.getByTestId("position-counts")).toBeVisible();
+    await expect(orgPage.getByTestId("copy-roster")).toBeVisible();
+    await organiser.close();
+  });
+
+  test("History is collapsed; empty History hidden; event card + calendar", async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+event+${Date.now()}@example.com`);
+    await expect(orgPage.getByTestId("history")).toHaveCount(0);
+    await expect(orgPage.getByTestId("active-empty")).toContainText(
+      "No upcoming matches — create one.",
+    );
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await expect(orgPage.getByTestId("add-date-row")).toHaveText("Add date");
+    await expect(orgPage.getByTestId("add-time-row")).toHaveText("Add time");
+    await expect(orgPage.getByTestId("add-time-row")).toBeDisabled();
+    await expect(orgPage.getByTestId("add-place-row")).toHaveText("Add place");
+    await orgPage.getByLabel("Title").fill("Dated kickabout");
+    await orgPage.getByLabel("Details (optional)").fill(
+      "Jersey : Red\nBring a ball\nWater at the gate\nNo metal studs",
+    );
+    await pickDate(orgPage, "2026-10-03");
+    await expect(orgPage.getByTestId("date-sheet")).toHaveCount(0);
+    await expect(orgPage.getByTestId("when-summary")).toHaveText("Sat 3 Oct");
+    await expect(orgPage.getByTestId("edit-date")).toHaveText("Edit");
+    await expect(orgPage.getByTestId("add-time-row")).toBeEnabled();
+    await pickTime(orgPage, "20:00", "22:00");
+    await expect(orgPage.getByTestId("time-sheet")).toHaveCount(0);
+    await expect(orgPage.getByTestId("when-summary")).toHaveText(
+      "Sat 3 Oct · 20:00–22:00",
+    );
+    await expect(orgPage.getByTestId("time-summary")).toHaveText("20:00–22:00");
+    await expect(orgPage.getByTestId("edit-time")).toHaveText("Edit");
+    await pickPlace(
+      orgPage,
+      "Lumphini pitch 2",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
+    await expect(orgPage.getByTestId("place-summary")).toHaveText(
+      "Lumphini pitch 2",
+    );
+    await expect(orgPage.getByTestId("place-map-chip")).toHaveText(
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
+    );
+    await expect(orgPage.getByTestId("edit-place")).toHaveText("Edit");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "Dated kickabout" })).toBeVisible();
+    await expect(orgPage.getByTestId("when-where")).toHaveText(
+      "Sat 3 Oct 2026 · 20:00–22:00 · Lumphini pitch 2",
+    );
+
+    await orgPage.getByRole("link", { name: /^edit$/i }).click();
+    await expect(orgPage.getByTestId("start-date")).toHaveValue("2026-10-03");
+    await expect(orgPage.getByTestId("start-time")).toHaveValue("20:00");
+    await expect(orgPage.getByTestId("end-time")).toHaveValue("22:00");
+    await pickPlace(orgPage, "Court 1", "https://maps.app.goo.gl/yvCNh8AbCdEfGh");
+    await orgPage.getByRole("button", { name: /^save$/i }).click();
+    await expect(orgPage.getByTestId("when-where")).toHaveText(
+      "Sat 3 Oct 2026 · 20:00–22:00 · Court 1",
+    );
+
+    const datedUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const page = await guest.newPage();
+    await page.goto(datedUrl);
+    await expect(page.getByTestId("signup-helper")).toBeVisible();
+    await expect(page.getByTestId("event-when")).toHaveText(
+      "Sat 3 Oct 2026 · 20:00–22:00",
+    );
+    await expectShareCard(page, {
+      title: "Dated kickabout",
+      sport: "football",
+      when: "Sat 3 Oct · 20:00–22:00",
+    });
+    await saveShot(page.getByTestId("share-card"), "share-card-when.png");
+    await expect(page.getByTestId("share-card")).not.toContainText("Court 1");
+    await expect(page.getByTestId("event-where")).toHaveText("Court 1");
+    await expect(page.getByTestId("event-where")).not.toContainText("maps.app");
+    await expect(page.getByTestId("event-map-row")).toBeVisible();
+    await expect(page.getByTestId("event-map")).toHaveText(
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
+    );
+    await expect(page.getByTestId("event-map")).toHaveAttribute(
+      "href",
+      "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+    );
+    await expect(page.getByTestId("event-map")).toHaveCSS(
+      "text-decoration-line",
+      "underline",
+    );
+    await expect(page.getByTestId("event-details")).toContainText("Jersey : Red");
+    await expect(page.getByTestId("event-details")).toContainText("Bring a ball");
+    await expect(page.getByTestId("event-details")).toContainText(
+      "Water at the gate",
+    );
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
+    );
+    await expect(page.getByTestId("more-whenwhere")).toHaveText("More");
+    await page.getByTestId("more-whenwhere").click();
+    await expect(page.getByTestId("event-details")).toContainText(
+      "No metal studs",
+    );
+    await expect(page.getByTestId("more-whenwhere")).toHaveText("Less");
+    await page.getByTestId("more-whenwhere").click();
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
+    );
+    await expect(page.getByTestId("add-to-calendar")).toHaveCount(0);
+    await page.getByLabel("Your name").fill("Nok");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-CB").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expect(page.getByTestId("event-card")).toBeVisible();
+    await expect(page.getByTestId("event-when")).toHaveText(
+      "Sat 3 Oct 2026 · 20:00–22:00",
+    );
+    await expectShareCard(page, {
+      title: "Dated kickabout",
+      sport: "football",
+      when: "Sat 3 Oct · 20:00–22:00",
+    });
+    await expect(page.getByTestId("share-card")).not.toContainText("Court 1");
+    await expect(page.getByTestId("event-where")).toHaveText("Court 1");
+    await expect(page.getByTestId("event-map-row")).toBeVisible();
+    await expect(page.getByTestId("event-map")).toHaveText(
+      "maps.app.goo.gl/yvCNh8AbCdEf…",
+    );
+    await expect(page.getByTestId("event-counts")).toHaveText("Going · 1");
+    await expect(page.getByTestId("event-details")).toContainText("Jersey : Red");
+    await expect(page.getByTestId("event-details")).not.toContainText(
+      "No metal studs",
+    );
+    await expect(page.getByTestId("add-to-calendar")).toBeVisible();
+    await expect(page.getByTestId("change-status")).toHaveText("Change status");
+    const ics = await page.request.get(`${datedUrl}/calendar`);
+    expect(ics.ok()).toBeTruthy();
+    expect(ics.headers()["content-type"]).toMatch(/text\/calendar/);
+    const icsBody = await ics.text();
+    expect(icsBody).toContain("DTSTART:20261003T130000Z");
+    expect(icsBody).toContain("DTEND:20261003T150000Z");
+    expect(icsBody).toContain("LOCATION:Court 1");
+
+    await page.getByTestId("change-status").click();
+    await expect(page.getByRole("heading", { name: /i.?m going/i })).toBeVisible();
+    await page.getByTestId("status-out").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expect(page.getByTestId("rsvp-confirmed")).toContainText(/out/i);
+    await expect(page.getByTestId("event-counts")).toHaveText(
+      "Going · 0 · Out · 1",
+    );
+    await guest.close();
+
+    await orgPage.goto("/board");
+    await expect(orgPage.getByTestId("history")).toHaveCount(0);
+    await expect(orgPage.getByTestId("active-matchdays")).toContainText(
+      "Dated kickabout",
+    );
+
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TBD night");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByTestId("when-where")).toHaveText("TBD");
+    const tbdUrl = await shareUrlOf(orgPage);
+    const tbdGuest = await browser.newContext();
+    const tbdPage = await tbdGuest.newPage();
+    await tbdPage.goto(tbdUrl);
+    await tbdPage.getByLabel("Your name").fill("Bee");
+    await tbdPage.getByTestId("status-going").click();
+    await tbdPage.getByTestId("position-CB").click();
+    await tbdPage.getByTestId("rsvp-submit").click();
+    await expect(tbdPage.getByTestId("event-when")).toHaveText("TBD");
+    await expectShareCard(tbdPage, { title: "TBD night", sport: "football" });
+    await expect(tbdPage.getByTestId("event-where")).toHaveText("TBD");
+    await expect(tbdPage.getByTestId("event-map")).toHaveCount(0);
+    await expect(tbdPage.getByTestId("add-to-calendar")).toHaveCount(0);
+    const missing = await tbdPage.request.get(`${tbdUrl}/calendar`);
+    expect(missing.status()).toBe(404);
+    await tbdGuest.close();
+
+    await orgPage.getByTestId("complete-matchday").click();
+    await orgPage.getByTestId("complete-matchday-confirm").click();
+    await expect(orgPage.getByTestId("history")).toBeVisible();
+    await expect(orgPage.getByTestId("completed-chip")).toBeHidden();
+    await orgPage.getByTestId("history-toggle").click();
+    await expect(orgPage.getByTestId("completed-chip")).toHaveText("Completed");
+
+    await organiser.close();
+  });
+
+  test("manager football lineups: tap-assign, snapshot, bench, cap 4, delete; guest hidden", async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+lineup+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST lineups");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST lineups" })).toBeVisible();
+    const going = orgPage.getByRole("heading", { name: /Going/ });
+    const lineups = orgPage.getByTestId("lineups");
+    await expect(lineups).toBeVisible();
+    await expect(orgPage.getByTestId("create-lineup")).toBeVisible();
+    const goingBox = await going.boundingBox();
+    const lineupsBox = await lineups.boundingBox();
+    expect(goingBox && lineupsBox).toBeTruthy();
+    expect(goingBox!.y).toBeLessThan(lineupsBox!.y);
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(0);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const peek = await browser.newContext();
+    const peekPage = await peek.newPage();
+    await peekPage.goto(shareUrl);
+    await expect(peekPage.getByTestId("lineups")).toHaveCount(0);
+    await expect(peekPage.getByTestId("create-lineup")).toHaveCount(0);
+    await peek.close();
+
+    await guestGoing(browser, shareUrl, "Nok", "CB");
+    await guestGoing(browser, shareUrl, "Aek", "GK");
+    await guestGoing(browser, shareUrl, "Bee", "ANY");
+    await orgPage.reload();
+
+    await orgPage.setViewportSize({ width: 390, height: 844 });
+    await orgPage.getByTestId("create-lineup").click();
+    const editor = orgPage.getByTestId("lineup-editor");
+    await expect(editor).toBeVisible();
+    await expect(editor.getByRole("heading", { name: "Create lineup" })).toHaveCount(0);
+    await expect(editor.getByRole("heading", { name: "Edit lineup" })).toHaveCount(0);
+    await expect(editor.getByText("Formation", { exact: true })).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-name")).toHaveValue("Q1");
+    await expect(orgPage.getByTestId("lineup-close")).toBeVisible();
+    const nameBox = await orgPage.getByTestId("lineup-name").boundingBox();
+    const closeBox = await orgPage.getByTestId("lineup-close").boundingBox();
+    expect(nameBox && closeBox).toBeTruthy();
+    expect(Math.abs(nameBox!.y - closeBox!.y)).toBeLessThan(16);
+    await expect(orgPage.getByTestId("lineup-formation-4-3-3")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(orgPage.getByTestId("lineup-formation-4-1-4-1")).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-formation-4-2-3-1")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-pool")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-pitch")).toBeVisible();
+    const gk = editor.locator('[data-slot-key="GK"]');
+    const footer = orgPage.getByTestId("lineup-editor-footer");
+    await expect(gk).toBeVisible();
+    const gkBox = await gk.boundingBox();
+    const footerBox = await footer.boundingBox();
+    expect(gkBox && footerBox).toBeTruthy();
+    expect(gkBox!.height).toBeGreaterThanOrEqual(36);
+    expect(gkBox!.y + gkBox!.height).toBeLessThanOrEqual(footerBox!.y + 2);
+    const pitchBox = await editor.getByTestId("lineup-pitch").boundingBox();
+    const lbBox = await editor.locator('[data-slot-key="LB"]').first().boundingBox();
+    const rbBox = await editor.locator('[data-slot-key="RB"]').first().boundingBox();
+    expect(pitchBox && lbBox && rbBox).toBeTruthy();
+    expect(lbBox!.x - pitchBox!.x).toBeLessThan(pitchBox!.width * 0.22);
+    expect(pitchBox!.x + pitchBox!.width - (rbBox!.x + rbBox!.width)).toBeLessThan(
+      pitchBox!.width * 0.22,
+    );
+    expect(rbBox!.x - lbBox!.x).toBeGreaterThan(pitchBox!.width * 0.45);
+    const cbBoxes = await editor.locator('[data-slot-key="CB"]').all();
+    const defCenters = [
+      lbBox!,
+      await cbBoxes[0]!.boundingBox(),
+      await cbBoxes[1]!.boundingBox(),
+      rbBox!,
+    ].map((box) => {
+      expect(box).toBeTruthy();
+      return box!.x + box!.width / 2;
+    });
+    for (let i = 0; i < 4; i += 1) {
+      const expected = pitchBox!.x + ((i + 0.5) / 4) * pitchBox!.width;
+      expect(Math.abs(defCenters[i]! - expected)).toBeLessThan(pitchBox!.width * 0.08);
+    }
+    const stBox = await editor.locator('[data-slot-key="ST"]').first().boundingBox();
+    expect(stBox).toBeTruthy();
+    expect(stBox!.y + stBox!.height / 2 - pitchBox!.y).toBeLessThan(pitchBox!.height * 0.38);
+    expect(gkBox!.y + gkBox!.height / 2 - pitchBox!.y).toBeGreaterThan(pitchBox!.height * 0.75);
+    expect(stBox!.y + stBox!.height).toBeLessThan(gkBox!.y - pitchBox!.height * 0.28);
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="false"]')
+      .first()
+      .click();
+    const picker = orgPage.getByTestId("lineup-picker");
+    await expect(picker).toBeVisible();
+    await expect(picker.getByRole("heading", { name: "Add player · CB" })).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-picker-search")).toHaveAttribute(
+      "placeholder",
+      "Search players",
+    );
+    await expect(orgPage.getByTestId("lineup-picker-new")).toHaveCount(0);
+    await orgPage.getByTestId("lineup-picker-search").fill("Nok");
+    await expect(
+      orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Aek" }),
+    ).toHaveCount(0);
+    const nok = orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Nok" });
+    await expect(nok).toContainText("CB");
+    await nok.click();
+    await expect(picker).toHaveCount(0);
+    await expect(
+      orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="true"]'),
+    ).toHaveCount(1);
+    await orgPage.getByTestId("lineup-save").click();
+    await expect(editor).toHaveCount(0);
+    const card = orgPage.getByTestId("lineup-card");
+    await expect(card).toHaveCount(1);
+    const carousel = orgPage.getByTestId("lineup-carousel");
+    const startGutter = orgPage.getByTestId("lineup-carousel-start");
+    const endGutter = orgPage.getByTestId("lineup-carousel-end");
+    await expect(startGutter).toBeAttached();
+    await expect(endGutter).toBeAttached();
+    const lineupHeading = orgPage
+      .getByTestId("lineups")
+      .getByRole("heading", { name: "Lineups", exact: true });
+    const headingBox = await lineupHeading.boundingBox();
+    const cardBox = await card.boundingBox();
+    const startBox = await startGutter.boundingBox();
+    const carouselBox = await carousel.boundingBox();
+    const viewport = orgPage.viewportSize();
+    expect(headingBox && cardBox && startBox && carouselBox && viewport).toBeTruthy();
+    expect(startBox!.width).toBeGreaterThanOrEqual(16);
+    expect(startBox!.x).toBeLessThanOrEqual(carouselBox!.x + 2);
+    expect(cardBox!.x).toBeGreaterThanOrEqual(16);
+    expect(cardBox!.x - startBox!.x).toBeGreaterThanOrEqual(16);
+    expect(Math.abs(cardBox!.x - headingBox!.x)).toBeLessThan(12);
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-3-3");
+    await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Aek");
+    await expect(orgPage.getByTestId("lineup-card-bench")).toContainText("Bee");
+    await expect(orgPage.getByTestId("lineup-card-bench")).not.toContainText("Nok");
+
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("lineups")).toHaveCount(0);
+    await guest.close();
+
+    await orgPage.getByTestId("create-lineup").click();
+    await expect(orgPage.getByTestId("lineup-name")).toHaveValue("Q2");
+    await expect(orgPage.getByRole("heading", { name: "Create lineup" })).toHaveCount(0);
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="GK"][data-filled="false"]')
+      .click();
+    const q2Picker = orgPage.getByTestId("lineup-picker");
+    await expect(q2Picker).toBeVisible();
+    const q2People = q2Picker.getByTestId("lineup-picker-person");
+    await expect(q2People).toHaveCount(3);
+    await expect(q2People).toHaveText([/Aek/, /Bee/, /Nok/]);
+    await expect(
+      q2Picker.getByTestId("lineup-picker-person").filter({ hasText: "Aek" }).getByTestId("lineup-picker-new"),
+    ).toHaveText("New");
+    await expect(
+      q2Picker.getByTestId("lineup-picker-person").filter({ hasText: "Bee" }).getByTestId("lineup-picker-new"),
+    ).toHaveText("New");
+    await expect(
+      q2Picker.getByTestId("lineup-picker-person").filter({ hasText: "Nok" }).getByTestId("lineup-picker-new"),
+    ).toHaveCount(0);
+    await orgPage.getByLabel("Close picker").click();
+    await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
+    await orgPage.getByTestId("lineup-close").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(1);
+
+    await orgPage.getByTestId("lineup-card-open").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toBeVisible();
+    await expect(orgPage.getByRole("heading", { name: "Edit lineup" })).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-name")).toHaveValue("Q1");
+    await expect(orgPage.getByTestId("lineup-close")).toBeVisible();
+    await orgPage.getByTestId("lineup-formation-4-1-4-1").click();
+    await expect(
+      orgPage.locator('[data-testid="lineup-editor"] [data-filled="true"]'),
+    ).toHaveCount(0);
+    const pitch4141 = await orgPage.getByTestId("lineup-pitch").boundingBox();
+    const st4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"]')
+      .first()
+      .boundingBox();
+    const cdm4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="CDM"]')
+      .boundingBox();
+    const lb4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="LB"]')
+      .boundingBox();
+    const gk4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="GK"]')
+      .boundingBox();
+    expect(pitch4141 && st4141 && cdm4141 && lb4141 && gk4141).toBeTruthy();
+    expect(st4141!.y).toBeLessThan(cdm4141!.y);
+    expect(cdm4141!.y).toBeLessThan(lb4141!.y);
+    expect(lb4141!.y).toBeLessThan(gk4141!.y);
+    expect(st4141!.y + st4141!.height / 2 - pitch4141!.y).toBeLessThan(
+      pitch4141!.height * 0.38,
+    );
+    expect(gk4141!.y + gk4141!.height / 2 - pitch4141!.y).toBeGreaterThan(
+      pitch4141!.height * 0.75,
+    );
+    const lwBox = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="LW"]')
+      .first()
+      .boundingBox();
+    const rwBox = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="RW"]')
+      .first()
+      .boundingBox();
+    const cmBoxes = [
+      await orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="CM"]').nth(0).boundingBox(),
+      await orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="CM"]').nth(1).boundingBox(),
+    ];
+    expect(lwBox && rwBox && cmBoxes[0] && cmBoxes[1]).toBeTruthy();
+    const midCenters = [lwBox!, cmBoxes[0]!, cmBoxes[1]!, rwBox!].map(
+      (box) => box.x + box.width / 2,
+    );
+    for (let i = 0; i < 4; i += 1) {
+      const expected = pitch4141!.x + ((i + 0.5) / 4) * pitch4141!.width;
+      expect(Math.abs(midCenters[i]! - expected)).toBeLessThan(pitch4141!.width * 0.08);
+    }
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="false"]')
+      .first()
+      .click();
+    await expect(orgPage.getByTestId("lineup-picker")).toBeVisible();
+    await expect(
+      orgPage.getByRole("heading", { name: "Add player · ST" }),
+    ).toBeVisible();
+    await orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Nok" }).click();
+    await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="true"]')
+      .first()
+      .click();
+    await expect(orgPage.getByTestId("lineup-picker-clear")).toHaveText("Clear slot");
+    await orgPage.getByTestId("lineup-picker-clear").click();
+    await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
+    await expect(
+      orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="true"]'),
+    ).toHaveCount(0);
+    await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="false"]')
+      .first()
+      .click();
+    await orgPage.getByTestId("lineup-picker-person").filter({ hasText: "Nok" }).click();
+    await orgPage.getByTestId("lineup-save").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-1-4-1");
+
+    await orgPage.getByRole("button", { name: "Remove Nok" }).first().click();
+    await orgPage.getByTestId("remove-rsvp-confirm").click();
+    await expect(orgPage.getByRole("heading", { name: "Going · 2" })).toBeVisible();
+    await expect(orgPage.getByTestId("lineup-card-title")).toHaveText("Q1 — 4-1-4-1");
+    await expect(card).toContainText("Nok");
+
+    for (const label of ["Q2", "Q3", "Q4"]) {
+      await orgPage.getByTestId("create-lineup").click();
+      await expect(orgPage.getByTestId("lineup-name")).toHaveValue(label);
+      await orgPage.getByTestId("lineup-save").click();
+      await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    }
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(4);
+    await expect(orgPage.getByTestId("create-lineup")).toHaveCount(0);
+    const firstAfterCap = orgPage.getByTestId("lineup-card").first();
+    const firstAfterBox = await firstAfterCap.boundingBox();
+    expect(firstAfterBox).toBeTruthy();
+    expect(firstAfterBox!.x).toBeGreaterThanOrEqual(16);
+    const peekCard = orgPage.getByTestId("lineup-card").nth(1);
+    const peekBox = await peekCard.boundingBox();
+    expect(peekBox && viewport).toBeTruthy();
+    expect(peekBox!.x).toBeLessThan(viewport!.width);
+    expect(peekBox!.x).toBeGreaterThan(200);
+
+    await orgPage.getByTestId("lineup-card").filter({ hasText: "Q4 —" }).getByTestId("lineup-card-open").click();
+    orgPage.once("dialog", (dialog) => dialog.accept());
+    await orgPage.getByTestId("lineup-delete").click();
+    await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
+    await expect(orgPage.getByTestId("lineup-card")).toHaveCount(3);
+    await expect(orgPage.getByTestId("create-lineup")).toBeVisible();
+
+    await organiser.close();
+  });
+});
+
+async function openDateSheet(page: Page) {
+  const edit = page.getByTestId("edit-date");
+  if ((await edit.count()) > 0) {
+    await edit.click();
+  } else {
+    await page.getByTestId("add-date-row").click();
+  }
+}
+
+async function pickDate(page: Page, iso: string) {
+  await openDateSheet(page);
+  await expect(page.getByTestId("date-sheet")).toBeVisible();
+  await expect(page.getByTestId("date-sheet").getByTestId("start-hour")).toHaveCount(0);
+  await expect(page.getByTestId("add-end-time")).toHaveCount(0);
+  const targetMonth = iso.slice(0, 7);
+  for (let i = 0; i < 36; i += 1) {
+    const current = await page.getByTestId("cal-month").getAttribute("data-month");
+    if (current === targetMonth) break;
+    if ((current ?? "") < targetMonth) {
+      await page.getByTestId("cal-next").click();
+    } else {
+      await page.getByTestId("cal-prev").click();
+    }
+  }
+  await expect(page.getByTestId("cal-month")).toHaveAttribute(
+    "data-month",
+    targetMonth,
+  );
+  await page.getByTestId(`cal-day-${iso}`).click();
+  await page.getByTestId("date-sheet-done").click();
+  await expect(page.getByTestId("date-sheet")).toHaveCount(0);
+}
+
+async function openTimeSheet(page: Page) {
+  const edit = page.getByTestId("edit-time");
+  if ((await edit.count()) > 0) {
+    await edit.click();
+  } else {
+    await page.getByTestId("add-time-row").click();
+  }
+}
+
+async function pickTime(page: Page, start: string, end?: string) {
+  await openTimeSheet(page);
+  await expect(page.getByTestId("time-sheet")).toBeVisible();
+  await expect(page.getByTestId("time-sheet")).not.toContainText(/AM|PM/);
+  const [startHour, startMinute] = start.split(":");
+  await page.getByTestId("start-hour").selectOption(startHour!);
+  await page.getByTestId("start-minute").selectOption(startMinute!);
+  await expect(page.getByTestId("start-minute").locator("option[value='00']")).toHaveCount(1);
+  await expect(page.getByTestId("start-minute").locator("option[value='15']")).toHaveCount(1);
+  await expect(page.getByTestId("start-minute").locator("option[value='30']")).toHaveCount(1);
+  await expect(page.getByTestId("start-minute").locator("option[value='45']")).toHaveCount(1);
+  await expect(page.getByTestId("start-minute").locator('option[value="10"]')).toHaveCount(0);
+  await expect(page.getByTestId("start-hour").locator('option[value="17"]')).toHaveCount(1);
+  if (end) {
+    await page.getByTestId("add-end-time").click();
+    const plusOne = addOneHour(start).time;
+    const [plusHour, plusMinute] = plusOne.split(":");
+    await expect(page.getByTestId("end-hour")).toHaveValue(plusHour!);
+    await expect(page.getByTestId("end-minute")).toHaveValue(plusMinute!);
+    const [endHour, endMinute] = end.split(":");
+    await page.getByTestId("end-hour").selectOption(endHour!);
+    await page.getByTestId("end-minute").selectOption(endMinute!);
+  }
+  await page.getByTestId("time-sheet-done").click();
+  await expect(page.getByTestId("time-sheet")).toHaveCount(0);
+}
+
+async function pickPlace(page: Page, venue: string, mapUrl?: string) {
+  const edit = page.getByTestId("edit-place");
+  if ((await edit.count()) > 0) {
+    await edit.click();
+  } else {
+    await page.getByTestId("add-place-row").click();
+  }
+  await expect(page.getByTestId("place-sheet")).toBeVisible();
+  await page.getByTestId("venue-input").fill(venue);
+  if (mapUrl) {
+    await page.getByTestId("map-url-input").fill(mapUrl);
+  }
+  await page.getByTestId("place-sheet-done").click();
+  await expect(page.getByTestId("place-sheet")).toHaveCount(0);
+}
+
+async function expectShareCard(
+  page: Page,
+  opts: { title: string; sport: "football" | "basketball"; when?: string },
+) {
+  const card = page.getByTestId("share-card");
+  await expect(card).toBeVisible();
+  const shareTitle = page.getByTestId("share-card-title");
+  await expect(shareTitle).toHaveText(opts.title);
+  await expect(shareTitle).toHaveCSS("text-align", "center");
+  const pageTitle = page.getByRole("heading", { name: opts.title, exact: true });
+  await expect(pageTitle).toBeVisible();
+  await expect(pageTitle).toHaveCSS("text-align", /^(left|start)$/);
+  const whenLine = page.getByTestId("share-card-when");
+  if (opts.when) {
+    await expect(whenLine).toHaveText(opts.when);
+    await expect(whenLine).toHaveCSS("text-align", "center");
+    await expect(whenLine).not.toContainText(/Court|Lumphini|maps\.app|TBD/i);
+    const titleBox = await shareTitle.boundingBox();
+    const whenBox = await whenLine.boundingBox();
+    const boardBox = await page.getByTestId("share-card-board").boundingBox();
+    expect(titleBox && whenBox && boardBox).toBeTruthy();
+    expect(titleBox!.y).toBeLessThan(whenBox!.y);
+    expect(whenBox!.y).toBeLessThan(boardBox!.y);
+  } else {
+    await expect(whenLine).toHaveCount(0);
+  }
+  const footer = page.getByTestId("share-card-footer");
+  await expect(footer).toContainText("Powered by");
+  await expect(footer).not.toContainText("SKWAD");
+  const mark = footer.getByTestId("share-card-mark");
+  await expect(mark).toBeVisible();
+  const powered = footer.getByText("Powered by", { exact: true });
+  const poweredBox = await powered.boundingBox();
+  const markBox = await mark.boundingBox();
+  expect(poweredBox && markBox).toBeTruthy();
+  expect(poweredBox!.x).toBeLessThan(markBox!.x);
+  await expect(page.getByRole("button", { name: /screenshot/i })).toHaveCount(0);
+  const roster = page.getByTestId("guest-roster");
+  const rosterBox = await roster.boundingBox();
+  const cardBox = await card.boundingBox();
+  expect(rosterBox && cardBox).toBeTruthy();
+  expect(rosterBox!.y).toBeLessThan(cardBox!.y);
+  if (opts.sport === "football") {
+    await expect(card.getByTestId("half-pitch")).toBeVisible();
+    await expect(card.getByTestId("half-court")).toHaveCount(0);
+  } else {
+    await expect(card.getByTestId("half-court")).toBeVisible();
+    await expect(card.getByTestId("half-pitch")).toHaveCount(0);
+  }
+  await expect(card.getByTestId("squad-heading")).toHaveCount(0);
+  await expect(page.getByTestId("copy-roster")).toHaveCount(0);
+  await expect(page.getByTestId("remove-rsvp")).toHaveCount(0);
+  await expect(page.getByTestId("lineups")).toHaveCount(0);
+  await expect(page.getByTestId("create-lineup")).toHaveCount(0);
+}
+
+async function signIn(page: Page, email: string) {
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: /magic link/i }).click();
+  await expect(page.getByTestId("magic-link-sent")).toHaveCount(0);
+  const magic = page.getByTestId("debug-magic-link");
+  await expect(magic).toBeVisible();
+  await magic.click();
+  await expect(page).toHaveURL(/\/board/, { timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "+ New matchday" })).toBeVisible();
+  await expect(page.getByTestId("tab-invited")).toBeVisible();
+  await expect(page.getByTestId("tab-hosting")).toBeVisible();
+  await expect(
+    page.getByText("No upcoming matches — create one."),
+  ).toBeVisible();
+  await expect(page.getByTestId("history")).toHaveCount(0);
+}
+
+async function shareUrlOf(page: Page) {
+  const raw = await page.getByTestId("share-url").textContent();
+  return (raw ?? "").replace(/\s+/g, "").trim();
+}
+
+function centerX(box: { x: number; width: number }) {
+  return box.x + box.width / 2;
+}
+
+async function saveShot(
+  locator: { screenshot: (opts: { path: string }) => Promise<Buffer> },
+  filename: string,
+) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await locator.screenshot({ path: join(SCREENSHOT_DIR, filename) });
+}
+
+/** Chip crop with padding so rim-nudged +N is not clipped. */
+async function saveChipShot(locator: Locator, filename: string) {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await locator.scrollIntoViewIfNeeded();
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error(`no bounding box for ${filename}`);
+  }
+  const pad = 28;
+  const page = locator.page();
+  const vp = page.viewportSize() ?? { width: 1280, height: 720 };
+  const x = Math.min(Math.max(0, box.x - pad), Math.max(0, vp.width - 1));
+  const y = Math.min(Math.max(0, box.y - pad), Math.max(0, vp.height - 1));
+  const width = Math.max(1, Math.min(vp.width - x, box.width + pad * 2));
+  const height = Math.max(1, Math.min(vp.height - y, box.height + pad * 2));
+  await page.screenshot({
+    path: join(SCREENSHOT_DIR, filename),
+    clip: { x, y, width, height },
+  });
+}
+
+/** +N center sits on the teal top-right rim (~half on-pill). Centered name; slight overlap OK. */
+async function assertOverflowOnPill(
+  page: Page,
+  slotKey: string,
+  label: string,
+) {
+  const slot = page.getByTestId(`slot-filled-${slotKey}`);
+  const name = page.getByTestId(`slot-lead-${slotKey}`);
+  const badge = page.getByTestId(`slot-overflow-${slotKey}`);
+  await expect(badge).toHaveText(label);
+  const slotBox = await slot.boundingBox();
+  const nameBox = await name.boundingBox();
+  const badgeBox = await badge.boundingBox();
+  expect(slotBox && nameBox && badgeBox).toBeTruthy();
+  const nameCx = nameBox!.x + nameBox!.width / 2;
+  const slotCx = slotBox!.x + slotBox!.width / 2;
+  expect(Math.abs(nameCx - slotCx)).toBeLessThan(8);
+  const badgeCx = badgeBox!.x + badgeBox!.width / 2;
+  const badgeCy = badgeBox!.y + badgeBox!.height / 2;
+  const alongX = (badgeCx - slotBox!.x) / slotBox!.width;
+  const alongY = (badgeCy - slotBox!.y) / slotBox!.height;
+  expect(alongX).toBeGreaterThan(0.72);
+  expect(alongX).toBeLessThan(0.98);
+  expect(alongY).toBeGreaterThan(0.02);
+  expect(alongY).toBeLessThan(0.32);
+  const overlapX =
+    Math.min(badgeBox!.x + badgeBox!.width, slotBox!.x + slotBox!.width) -
+    Math.max(badgeBox!.x, slotBox!.x);
+  const overlapY =
+    Math.min(badgeBox!.y + badgeBox!.height, slotBox!.y + slotBox!.height) -
+    Math.max(badgeBox!.y, slotBox!.y);
+  const onPill = Math.max(0, overlapX) * Math.max(0, overlapY);
+  const ratio = onPill / (badgeBox!.width * badgeBox!.height);
+  expect(ratio).toBeGreaterThanOrEqual(0.35);
+}
+
+async function fontSizeOf(locator: Locator) {
+  return locator.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
+}
+
+async function guestGoing(
+  browser: Browser,
+  shareUrl: string,
+  name: string,
+  position: string,
+) {
+  const context = await browser.newContext();
+  const page: Page = await context.newPage();
+  await page.goto(shareUrl);
+  await expect(page.getByRole("link", { name: "Skwad", exact: true })).toBeVisible();
+  await page.getByLabel("Your name").fill(name);
+  await page.getByTestId("status-going").click();
+  await page.getByTestId(`position-${position}`).click();
+  await page.getByTestId("rsvp-submit").click();
+  await expect(page.getByTestId("rsvp-confirmed")).toContainText(/going/i);
+  await context.close();
+}
+
+async function guestOut(browser: Browser, shareUrl: string, name: string) {
+  const context = await browser.newContext();
+  const page: Page = await context.newPage();
+  await page.goto(shareUrl);
+  await page.getByLabel("Your name").fill(name);
+  await page.getByTestId("status-out").click();
+  await page.getByTestId("rsvp-submit").click();
+  await expect(page.getByTestId("rsvp-confirmed")).toContainText(/out/i);
+  await context.close();
+}
