@@ -7,6 +7,7 @@ import { GoingList } from "@/components/GoingList";
 import { GuestRoster } from "@/components/GuestRoster";
 import { GuestShareCard } from "@/components/GuestShareCard";
 import { InvitationCard } from "@/components/InvitationCard";
+import { PrivacyLink } from "@/components/PrivacyLink";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
@@ -102,6 +103,7 @@ export default async function GuestMatchdayPage({
             The share link is no longer active.
           </p>
         </main>
+        <PrivacyLink />
       </div>
     );
   }
@@ -132,6 +134,7 @@ export default async function GuestMatchdayPage({
             Ask your captain if there’s a new date.
           </p>
         </main>
+        <PrivacyLink />
       </div>
     );
   }
@@ -193,6 +196,7 @@ export default async function GuestMatchdayPage({
             <GoingList going={going} empty="No one went." />
           </section>
         </main>
+        <PrivacyLink />
       </div>
     );
   }
@@ -262,6 +266,7 @@ export default async function GuestMatchdayPage({
             hasTime={matchday.hasTime}
           />
         </main>
+        <PrivacyLink />
       </div>
       </AnalyticsScope>
     );
@@ -304,6 +309,7 @@ export default async function GuestMatchdayPage({
           hasTime={matchday.hasTime}
         />
       </main>
+      <PrivacyLink />
     </div>
     </AnalyticsScope>
   );

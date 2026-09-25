@@ -8,6 +8,7 @@ import { CancelMatchdayButton } from "@/components/CancelMatchdayButton";
 import { CompleteMatchdayButton } from "@/components/CompleteMatchdayButton";
 import { DeleteMatchdayButton } from "@/components/DeleteMatchdayButton";
 import { GoingList } from "@/components/GoingList";
+import { PrivacyLink } from "@/components/PrivacyLink";
 import { RemovedToast } from "@/components/RemovedToast";
 import { ImbalanceBanner } from "@/components/ImbalanceBanner";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -193,6 +194,7 @@ export default async function OrganiserMatchdayPage({
           />
         </section>
       </main>
+      <PrivacyLink />
       <RemovedToast />
     </div>
     </AnalyticsScope>

@@ -655,6 +655,60 @@ test.describe("analytics helper", () => {
   });
 });
 
+test.describe("privacy", () => {
+  test("Privacy link on landing and match pages opens the stub", async ({
+    browser,
+  }) => {
+    const landing = await browser.newPage();
+    await landing.goto("/");
+    const landingLink = landing.getByTestId("privacy-link");
+    await expect(landingLink).toBeVisible();
+    await expect(landingLink).toHaveText("Privacy");
+    await expect(landingLink).toHaveCSS("color", "rgb(156, 163, 175)");
+    await expect(landingLink).toHaveCSS("font-size", "12px");
+    await expect(landing.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
+      0,
+    );
+    await landingLink.click();
+    await expect(landing).toHaveURL(/\/privacy$/);
+    await expect(landing.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
+    await expect(landing.getByTestId("privacy-page")).toContainText(
+      "thedanniest@gmail.com",
+    );
+    await expect(landing.getByRole("heading", { name: "What we store" })).toBeVisible();
+    await expect(
+      landing.getByRole("heading", { name: "Analytics (when on)" }),
+    ).toBeVisible();
+    await landing.close();
+
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+privacy+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST privacy");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST privacy" })).toBeVisible();
+    const boardLink = orgPage.getByTestId("privacy-link");
+    await expect(boardLink).toBeVisible();
+    await expect(boardLink).toHaveText("Privacy");
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.getByTestId("privacy-link")).toBeVisible();
+    await guestPage.getByTestId("privacy-link").click();
+    await expect(guestPage).toHaveURL(/\/privacy$/);
+    await expect(guestPage.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
+    await expect(guestPage.getByText("thedanniest@gmail.com")).toBeVisible();
+    await expect(guestPage.getByRole("button", { name: /accept|i agree/i })).toHaveCount(
+      0,
+    );
+    await guest.close();
+    await organiser.close();
+  });
+});
+
 test.describe("share pulse", () => {
   test("capacity is formation slot count", () => {
     expect(squadCapacity("football", "4-3-3")).toBe(11);
