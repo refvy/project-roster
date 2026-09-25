@@ -36,6 +36,12 @@ import {
   shouldCollapseWhenWhere,
   detailsPreview,
 } from "../lib/when-where";
+import {
+  analyticsFromMatchday,
+  capture,
+  getPosthogKey,
+  isAnalyticsEnabled,
+} from "../lib/analytics";
 import { collidingGoingName } from "../lib/rsvp-name";
 import {
   buildRosterNameLines,
@@ -545,6 +551,107 @@ test.describe("public origin", () => {
       if (prevA === undefined) delete process.env.APP_URL;
       else process.env.APP_URL = prevA;
     }
+  });
+});
+
+test.describe("analytics helper", () => {
+  const sample = {
+    sport: "football",
+    going_count: 2,
+    has_datetime: true,
+    has_map: false,
+    role: "manager" as const,
+  };
+
+  test("capture is a silent no-op when the key is absent", async () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    const logs: unknown[][] = [];
+    const origLog = console.log;
+    const origInfo = console.info;
+    const origWarn = console.warn;
+    const origError = console.error;
+    console.log = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.info = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.warn = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    console.error = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    try {
+      expect(getPosthogKey()).toBe("");
+      expect(isAnalyticsEnabled()).toBe(false);
+      await capture("match_created", sample);
+      await capture("invite_copied", sample);
+      expect(logs).toEqual([]);
+    } finally {
+      console.log = origLog;
+      console.info = origInfo;
+      console.warn = origWarn;
+      console.error = origError;
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("whitespace key stays off", () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "   ";
+    try {
+      expect(getPosthogKey()).toBe("");
+      expect(isAnalyticsEnabled()).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("props come from the matchday, not player names", () => {
+    expect(
+      analyticsFromMatchday(
+        {
+          sport: "basketball",
+          startsAt: new Date("2026-10-03T13:00:00.000Z"),
+          hasTime: true,
+          mapUrl: "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+          publicId: "pub_abc",
+        },
+        4,
+        "guest",
+      ),
+    ).toEqual({
+      sport: "basketball",
+      going_count: 4,
+      has_datetime: true,
+      has_map: true,
+      role: "guest",
+      match_id: "pub_abc",
+    });
+    expect(
+      analyticsFromMatchday(
+        {
+          sport: "football",
+          startsAt: new Date("2026-10-03T00:00:00.000Z"),
+          hasTime: false,
+          mapUrl: "  ",
+          publicId: "pub_tbd",
+        },
+        0,
+        "manager",
+      ),
+    ).toEqual({
+      sport: "football",
+      going_count: 0,
+      has_datetime: false,
+      has_map: false,
+      role: "manager",
+      match_id: "pub_tbd",
+    });
   });
 });
 
@@ -1685,8 +1792,19 @@ test.describe("matchday board", () => {
     await dupPage.getByLabel("Your name").fill("nok");
     await dupPage.getByTestId("status-going").click();
     await dupPage.getByTestId("position-CB").click();
+    await dupPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
     await dupPage.getByTestId("rsvp-submit").click();
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
+    expect(
+      await dupPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "dupe_warn_shown",
+          ).length,
+      ),
+    ).toBe(1);
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toContainText(
       "“Nok” is already on the list — change status instead?",
     );
@@ -1711,10 +1829,21 @@ test.describe("matchday board", () => {
     await expect(sheet).toHaveCount(0);
     await expect(orgPage.getByTestId("roster")).toContainText("Nok");
 
+    await orgPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
     await orgPage.getByRole("button", { name: "Remove Nok" }).click();
     await orgPage.getByTestId("remove-rsvp-confirm").click();
     await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
     await expect(orgPage.getByRole("heading", { name: "Going · 0" })).toBeVisible();
+    expect(
+      await orgPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "rsvp_removed",
+          ).length,
+      ),
+    ).toBe(1);
     await expect(orgPage.getByTestId("roster")).toHaveCount(0);
     await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toHaveCount(0);
 
@@ -1815,10 +1944,21 @@ test.describe("matchday board", () => {
     expect(Math.abs(buttonBox!.y - countsBox!.y)).toBeLessThan(24);
     await expect(button).toHaveAttribute("data-paste", expected);
     await organiser.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await orgPage.evaluate(() => {
+      window.__SKWAD_ANALYTICS__ = [];
+    });
     await button.click();
     await expect(orgPage.getByTestId("roster-copied-toast")).toHaveText(
       "Roster copied",
     );
+    expect(
+      await orgPage.evaluate(
+        () =>
+          (window.__SKWAD_ANALYTICS__ ?? []).filter(
+            (row) => row.event === "roster_copied",
+          ).length,
+      ),
+    ).toBe(1);
     expect(await orgPage.evaluate(() => navigator.clipboard.readText())).toBe(
       expected,
     );

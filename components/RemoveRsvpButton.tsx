@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { removeOrganiserRsvp } from "@/app/actions/rsvp";
+import { useTrack } from "@/components/AnalyticsScope";
 import { Sheet } from "@/components/Sheet";
 import { markRemovedToast } from "@/components/RemovedToast";
 
@@ -18,6 +19,7 @@ export function RemoveRsvpButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [, startTransition] = useTransition();
+  const track = useTrack();
 
   return (
     <>
@@ -59,6 +61,7 @@ export function RemoveRsvpButton({
               setOpen(false);
               startTransition(async () => {
                 await removeOrganiserRsvp(data);
+                track("rsvp_removed");
                 router.refresh();
               });
             }}

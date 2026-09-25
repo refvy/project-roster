@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { useTrack } from "@/components/AnalyticsScope";
 import { Sheet } from "@/components/Sheet";
 
 export function DuplicateNameSheet({
@@ -11,6 +13,19 @@ export function DuplicateNameSheet({
   onCancel: () => void;
   onChangeStatus: () => void;
 }) {
+  const track = useTrack();
+  const shownFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!name) {
+      shownFor.current = null;
+      return;
+    }
+    if (shownFor.current === name) return;
+    shownFor.current = name;
+    track("dupe_warn_shown");
+  }, [name, track]);
+
   return (
     <Sheet
       open={Boolean(name)}

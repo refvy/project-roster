@@ -1,4 +1,5 @@
 import { AddFriendPanel } from "@/components/AddFriendPanel";
+import { AnalyticsScope } from "@/components/AnalyticsScope";
 import { CoachBoard } from "@/components/CoachBoard";
 import { GuestEventCard } from "@/components/GuestEventCard";
 import { GuestRsvpForm } from "@/components/GuestRsvpForm";
@@ -9,6 +10,7 @@ import { InvitationCard } from "@/components/InvitationCard";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
+import { analyticsFromMatchday } from "@/lib/analytics";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
@@ -195,6 +197,7 @@ export default async function GuestMatchdayPage({
     );
   }
 
+  const analytics = analyticsFromMatchday(matchday, going.length, "guest");
   const positions = parsePositions(matchday.positions);
   const guestId = await getGuestId();
   const rememberedName = await getRememberedGuestName();
@@ -208,6 +211,7 @@ export default async function GuestMatchdayPage({
 
   if (existing) {
     return (
+      <AnalyticsScope value={analytics}>
       <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
         <header>
           <Wordmark href="/board" />
@@ -259,10 +263,12 @@ export default async function GuestMatchdayPage({
           />
         </main>
       </div>
+      </AnalyticsScope>
     );
   }
 
   return (
+    <AnalyticsScope value={analytics}>
     <div className="mx-auto flex min-h-full w-full max-w-xl flex-col px-6 py-8">
       <header>
         <Wordmark href="/board" />
@@ -299,5 +305,6 @@ export default async function GuestMatchdayPage({
         />
       </main>
     </div>
+    </AnalyticsScope>
   );
 }

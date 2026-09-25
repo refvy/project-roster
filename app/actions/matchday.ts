@@ -168,7 +168,7 @@ export async function createMatchday(
   });
 
   revalidatePath("/board");
-  redirect(`/board/${matchday.id}`);
+  redirect(`/board/${matchday.id}?created=1`);
 }
 
 export async function updateMatchday(

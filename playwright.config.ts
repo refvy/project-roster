@@ -29,6 +29,9 @@ export default defineConfig({
       AUTH_DEBUG: "true",
       // Never send live Resend mail from Playwright (local .env must not leak).
       RESEND_API_KEY: "",
+      // Analytics stays a no-op in the suite — key present would hit PostHog.
+      NEXT_PUBLIC_POSTHOG_KEY: "",
+      NEXT_PUBLIC_POSTHOG_HOST: "",
     },
   },
 });

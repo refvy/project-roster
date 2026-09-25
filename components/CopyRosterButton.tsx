@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useTrack } from "@/components/AnalyticsScope";
 
 export function CopyRosterButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const track = useTrack();
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      track("roster_copied");
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);

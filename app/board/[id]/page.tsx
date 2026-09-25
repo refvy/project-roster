@@ -1,4 +1,6 @@
 import { logoutAction } from "@/app/actions/auth";
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
+import { AnalyticsScope } from "@/components/AnalyticsScope";
 import { CoachBoard } from "@/components/CoachBoard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { CopyRosterButton } from "@/components/CopyRosterButton";
@@ -12,6 +14,7 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
+import { analyticsFromMatchday } from "@/lib/analytics";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
@@ -24,13 +27,16 @@ import { notFound, redirect } from "next/navigation";
 
 export default async function OrganiserMatchdayPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string }>;
 }) {
   const organiser = await getOrganiser();
   if (!organiser) redirect("/");
 
   const { id } = await params;
+  const query = await searchParams;
   const matchday = await prisma.matchday.findUnique({
     where: { id },
     include: { rsvps: { orderBy: { createdAt: "asc" } } },
@@ -64,9 +70,12 @@ export default async function OrganiserMatchdayPage({
     going: ordered,
     positions,
   });
+  const analytics = analyticsFromMatchday(matchday, going.length, "manager");
 
   return (
+    <AnalyticsScope value={analytics}>
     <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8">
+      {query.created === "1" ? <AnalyticsBeacon props={analytics} /> : null}
       <LiveRefresh />
       <header className="flex items-center justify-between gap-4">
         <Wordmark href="/board" />
@@ -186,5 +195,6 @@ export default async function OrganiserMatchdayPage({
       </main>
       <RemovedToast />
     </div>
+    </AnalyticsScope>
   );
 }

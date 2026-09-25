@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Outfit } from "next/font/google";
+import { AnalyticsInit } from "@/components/AnalyticsInit";
 import { getAppUrl } from "@/lib/env";
 import "./globals.css";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} h-full antialiased`}>
       <body className="min-h-full bg-cream font-sans font-normal text-ink">
+        <AnalyticsInit />
         {children}
       </body>
     </html>
