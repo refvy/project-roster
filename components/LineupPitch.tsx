@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { firstName } from "@/lib/pitch";
-import { lineupLines, type LineupSlotSnap } from "@/lib/lineup";
+import { lineupLines, type LineupLine, type LineupSlotDef, type LineupSlotSnap } from "@/lib/lineup";
 
 const TEAL = "#00D4C8";
 const CREAM = "#f7f4ef";
@@ -25,6 +26,25 @@ export function LineupPitch({
   const byId = new Map(slots.map((slot) => [slot.id, slot]));
   const lines = lineupLines(formation);
 
+  function renderChip(slot: (typeof lines)[number]["slots"][number]) {
+    const snap = byId.get(slot.id);
+    const name = snap?.name ?? null;
+    const filled = Boolean(name);
+    return (
+      <SlotChip
+        slotId={slot.id}
+        slotKey={slot.key}
+        name={name}
+        compact={compact}
+        fit={fit}
+        selected={selectedSlotId === slot.id}
+        interactive={Boolean(onSlot)}
+        onClick={onSlot ? () => onSlot(slot.id) : undefined}
+        filled={filled}
+      />
+    );
+  }
+
   return (
     <div
       data-testid={testId}
@@ -45,42 +65,96 @@ export function LineupPitch({
       }
     >
       <HalfPitchMarks />
+      {fit ? (
+        <FitLines lines={lines} renderChip={renderChip} />
+      ) : (
+        <div
+          className={`absolute inset-0 z-10 flex flex-col-reverse justify-between ${
+            compact
+              ? "px-1.5 pb-2.5 pt-6 sm:px-2.5 sm:pb-3 sm:pt-8"
+              : "px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
+          }`}
+        >
+          {lines.map((line, lineIndex) => (
+            <div
+              key={`${line.area}-${lineIndex}`}
+              className="flex items-center justify-evenly"
+            >
+              {line.slots.map((slot) => (
+                <div key={slot.id}>{renderChip(slot)}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FitLines({
+  lines,
+  renderChip,
+}: {
+  lines: LineupLine[];
+  renderChip: (slot: LineupSlotDef) => ReactNode;
+}) {
+  const keeper = lines.filter((line) => line.area === "the keeper");
+  const defence = lines.filter((line) => line.area === "defence");
+  const midfield = lines.filter((line) => line.area === "midfield");
+  const attack = lines.filter((line) => line.area === "attack");
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col-reverse">
       <div
-        className={`absolute inset-0 z-10 flex flex-col-reverse ${
-          fit
-            ? "justify-center gap-2.5 px-2 pb-3 pt-7 sm:gap-3 sm:px-3"
-            : compact
-              ? "justify-between px-1.5 pb-2.5 pt-6 sm:px-2.5 sm:pb-3 sm:pt-8"
-              : "justify-between px-3 pb-5 pt-12 sm:px-4 sm:pb-6 sm:pt-14"
-        }`}
+        className="flex items-end justify-center pb-2.5"
+        style={{ height: "13%" }}
       >
-        {lines.map((line, lineIndex) => (
-          <div
-            key={`${line.area}-${lineIndex}`}
-            className="flex items-center justify-evenly"
-          >
-            {line.slots.map((slot) => {
-              const snap = byId.get(slot.id);
-              const name = snap?.name ?? null;
-              const filled = Boolean(name);
-              return (
-                <SlotChip
-                  key={slot.id}
-                  slotId={slot.id}
-                  slotKey={slot.key}
-                  name={name}
-                  compact={compact}
-                  fit={fit}
-                  selected={selectedSlotId === slot.id}
-                  interactive={Boolean(onSlot)}
-                  onClick={onSlot ? () => onSlot(slot.id) : undefined}
-                  filled={filled}
-                />
-              );
-            })}
-          </div>
+        {keeper.map((line, index) => (
+          <EvenRow key={`${line.area}-${index}`} line={line} renderChip={renderChip} />
         ))}
       </div>
+      <div className="flex min-h-0 flex-1 flex-col-reverse">
+        <OutfieldBand lines={defence} renderChip={renderChip} />
+        <OutfieldBand lines={midfield} renderChip={renderChip} />
+        <OutfieldBand lines={attack} renderChip={renderChip} />
+      </div>
+    </div>
+  );
+}
+
+function OutfieldBand({
+  lines,
+  renderChip,
+}: {
+  lines: LineupLine[];
+  renderChip: (slot: LineupSlotDef) => ReactNode;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col-reverse justify-evenly">
+      {lines.map((line, index) => (
+        <EvenRow key={`${line.area}-${index}`} line={line} renderChip={renderChip} />
+      ))}
+    </div>
+  );
+}
+
+function EvenRow({
+  line,
+  renderChip,
+}: {
+  line: LineupLine;
+  renderChip: (slot: LineupSlotDef) => ReactNode;
+}) {
+  return (
+    <div className="flex w-full items-center">
+      {line.slots.map((slot) => (
+        <div
+          key={slot.id}
+          className="flex flex-1 items-center justify-center"
+        >
+          {renderChip(slot)}
+        </div>
+      ))}
     </div>
   );
 }

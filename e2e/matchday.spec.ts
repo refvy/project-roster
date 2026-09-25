@@ -2407,6 +2407,25 @@ test.describe("matchday board", () => {
       pitchBox!.width * 0.22,
     );
     expect(rbBox!.x - lbBox!.x).toBeGreaterThan(pitchBox!.width * 0.45);
+    const cbBoxes = await editor.locator('[data-slot-key="CB"]').all();
+    const defCenters = [
+      lbBox!,
+      await cbBoxes[0]!.boundingBox(),
+      await cbBoxes[1]!.boundingBox(),
+      rbBox!,
+    ].map((box) => {
+      expect(box).toBeTruthy();
+      return box!.x + box!.width / 2;
+    });
+    for (let i = 0; i < 4; i += 1) {
+      const expected = pitchBox!.x + ((i + 0.5) / 4) * pitchBox!.width;
+      expect(Math.abs(defCenters[i]! - expected)).toBeLessThan(pitchBox!.width * 0.08);
+    }
+    const stBox = await editor.locator('[data-slot-key="ST"]').first().boundingBox();
+    expect(stBox).toBeTruthy();
+    expect(stBox!.y + stBox!.height / 2 - pitchBox!.y).toBeLessThan(pitchBox!.height * 0.38);
+    expect(gkBox!.y + gkBox!.height / 2 - pitchBox!.y).toBeGreaterThan(pitchBox!.height * 0.75);
+    expect(stBox!.y + stBox!.height).toBeLessThan(gkBox!.y - pitchBox!.height * 0.28);
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="CB"][data-filled="false"]')
       .first()
@@ -2499,6 +2518,51 @@ test.describe("matchday board", () => {
     await expect(
       orgPage.locator('[data-testid="lineup-editor"] [data-filled="true"]'),
     ).toHaveCount(0);
+    const pitch4141 = await orgPage.getByTestId("lineup-pitch").boundingBox();
+    const st4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="ST"]')
+      .first()
+      .boundingBox();
+    const cdm4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="CDM"]')
+      .boundingBox();
+    const lb4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="LB"]')
+      .boundingBox();
+    const gk4141 = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="GK"]')
+      .boundingBox();
+    expect(pitch4141 && st4141 && cdm4141 && lb4141 && gk4141).toBeTruthy();
+    expect(st4141!.y).toBeLessThan(cdm4141!.y);
+    expect(cdm4141!.y).toBeLessThan(lb4141!.y);
+    expect(lb4141!.y).toBeLessThan(gk4141!.y);
+    expect(st4141!.y + st4141!.height / 2 - pitch4141!.y).toBeLessThan(
+      pitch4141!.height * 0.38,
+    );
+    expect(gk4141!.y + gk4141!.height / 2 - pitch4141!.y).toBeGreaterThan(
+      pitch4141!.height * 0.75,
+    );
+    const lwBox = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="LW"]')
+      .first()
+      .boundingBox();
+    const rwBox = await orgPage
+      .locator('[data-testid="lineup-editor"] [data-slot-key="RW"]')
+      .first()
+      .boundingBox();
+    const cmBoxes = [
+      await orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="CM"]').nth(0).boundingBox(),
+      await orgPage.locator('[data-testid="lineup-editor"] [data-slot-key="CM"]').nth(1).boundingBox(),
+    ];
+    expect(lwBox && rwBox && cmBoxes[0] && cmBoxes[1]).toBeTruthy();
+    const midCenters = [lwBox!, cmBoxes[0]!, cmBoxes[1]!, rwBox!].map(
+      (box) => box.x + box.width / 2,
+    );
+    for (let i = 0; i < 4; i += 1) {
+      const expected = pitch4141!.x + ((i + 0.5) / 4) * pitch4141!.width;
+      expect(Math.abs(midCenters[i]! - expected)).toBeLessThan(pitch4141!.width * 0.08);
+    }
+    void midRow;
     await orgPage
       .locator('[data-testid="lineup-editor"] [data-slot-key="ST"][data-filled="false"]')
       .first()
