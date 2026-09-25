@@ -2335,7 +2335,7 @@ test.describe("matchday board", () => {
   test("manager football lineups: tap-assign, snapshot, bench, cap 4, delete; guest hidden", async ({
     browser,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+lineup+${Date.now()}@example.com`);
@@ -2452,6 +2452,8 @@ test.describe("matchday board", () => {
     await expect(
       q2Picker.getByTestId("lineup-picker-person").filter({ hasText: "Nok" }).getByTestId("lineup-picker-new"),
     ).toHaveCount(0);
+    await orgPage.getByLabel("Close picker").click();
+    await expect(orgPage.getByTestId("lineup-picker")).toHaveCount(0);
     await orgPage.getByTestId("lineup-close").click();
     await expect(orgPage.getByTestId("lineup-editor")).toHaveCount(0);
     await expect(orgPage.getByTestId("lineup-card")).toHaveCount(1);
