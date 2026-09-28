@@ -968,6 +968,7 @@ test.describe("indexing", () => {
     const body = await res.text();
     expect(body).toContain("https://getskwad.com/</loc>");
     expect(body).toContain("https://getskwad.com/privacy");
+    expect(body).not.toMatch(/lastmod/i);
     expect(body).not.toContain("/board");
     expect(body).not.toContain("/m/");
   });
