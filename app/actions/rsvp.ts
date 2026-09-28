@@ -10,6 +10,7 @@ import { randomToken } from "@/lib/crypto";
 import { isKnownPosition, parsePositions } from "@/lib/positions";
 import { isMatchdayLive } from "@/lib/matchday-status";
 import { normalizePersonName } from "@/lib/rsvp-name";
+import { emitPlayerRsvp, planRsvpCapture } from "@/lib/server-analytics";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
 
@@ -90,6 +91,13 @@ export async function submitRsvp(
   }
   await rememberGuestName(name);
 
+  const existing = await prisma.rsvp.findUnique({
+    where: {
+      matchdayId_guestId: { matchdayId: matchday.id, guestId },
+    },
+    select: { status: true },
+  });
+
   await prisma.rsvp.upsert({
     where: {
       matchdayId_guestId: { matchdayId: matchday.id, guestId },
@@ -114,6 +122,9 @@ export async function submitRsvp(
     where: { matchdayId: matchday.id, addedByGuestId: guestId },
     data: { addedByName: name },
   });
+
+  const planned = planRsvpCapture(existing?.status ?? null, status);
+  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
 
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);
@@ -170,6 +181,9 @@ export async function addFriendRsvp(
       positionKey: status === "GOING" ? positionKey : null,
     },
   });
+
+  const planned = planRsvpCapture(null, status);
+  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
 
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);
@@ -228,6 +242,9 @@ export async function updateFriendRsvp(
       positionKey: status === "GOING" ? positionKey : null,
     },
   });
+
+  const planned = planRsvpCapture(extra.status, status);
+  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
 
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);

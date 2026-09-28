@@ -43,6 +43,14 @@ import {
   isAnalyticsEnabled,
 } from "../lib/analytics";
 import {
+  buildCaptureBody,
+  emitMatchCreated,
+  emitPlayerRsvp,
+  planRsvpCapture,
+  playerRsvpProperties,
+  publicCaptureKeys,
+} from "../lib/server-analytics";
+import {
   LINEUP_CAP,
   LINEUP_FORMATION_CHIPS,
   assignToSlot,
@@ -665,6 +673,145 @@ test.describe("analytics helper", () => {
       role: "manager",
       match_id: "pub_tbd",
     });
+  });
+});
+
+test.describe("server analytics", () => {
+  test("Going then Out sends two anonymous player_rsvp captures", async () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+    const bodies: Record<string, unknown>[] = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+    try {
+      const created = planRsvpCapture(null, "GOING");
+      const updated = planRsvpCapture("GOING", "OUT");
+      expect(created).toEqual({ status: "going", change: "create" });
+      expect(updated).toEqual({ status: "out", change: "update" });
+      await emitPlayerRsvp("pub_match", created!);
+      await emitPlayerRsvp("pub_match", updated!);
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0]).toEqual({
+        api_key: "phc_test_key",
+        event: "player_rsvp",
+        distinct_id: "match:pub_match",
+        properties: {
+          match_id: "pub_match",
+          status: "going",
+          change: "create",
+          $process_person_profile: false,
+        },
+      });
+      expect(bodies[1]).toEqual({
+        api_key: "phc_test_key",
+        event: "player_rsvp",
+        distinct_id: "match:pub_match",
+        properties: {
+          match_id: "pub_match",
+          status: "out",
+          change: "update",
+          $process_person_profile: false,
+        },
+      });
+      for (const body of bodies) {
+        const properties = body.properties as Record<string, unknown>;
+        expect(publicCaptureKeys(properties)).toEqual([
+          "change",
+          "match_id",
+          "status",
+        ]);
+        expect(properties).not.toHaveProperty("name");
+        expect(properties).not.toHaveProperty("position");
+        expect(properties).not.toHaveProperty("ip");
+        expect(properties).not.toHaveProperty("$ip");
+        expect(properties).not.toHaveProperty("user_agent");
+        expect(playerRsvpProperties("pub_match", {
+          status: properties.status as "going" | "out",
+          change: properties.change as "create" | "update",
+        })).toEqual({
+          match_id: properties.match_id,
+          status: properties.status,
+          change: properties.change,
+        });
+      }
+    } finally {
+      globalThis.fetch = origFetch;
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("a thrown capture does not fail the RSVP emit", async () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+    const origFetch = globalThis.fetch;
+    const origError = console.error;
+    console.error = () => {};
+    globalThis.fetch = (async () => {
+      throw new Error("posthog down");
+    }) as typeof fetch;
+    try {
+      await expect(
+        emitPlayerRsvp("pub_match", { status: "going", change: "create" }),
+      ).resolves.toBeUndefined();
+    } finally {
+      globalThis.fetch = origFetch;
+      console.error = origError;
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("match_created is anonymous match_id only and survives a capture throw", async () => {
+    const prev = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+    const bodies: Record<string, unknown>[] = [];
+    const origFetch = globalThis.fetch;
+    const origError = console.error;
+    console.error = () => {};
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+    try {
+      await emitMatchCreated("pub_new");
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0]).toEqual({
+        api_key: "phc_test_key",
+        event: "match_created",
+        distinct_id: "match:pub_new",
+        properties: {
+          match_id: "pub_new",
+          $process_person_profile: false,
+        },
+      });
+      expect(
+        publicCaptureKeys(bodies[0]!.properties as Record<string, unknown>),
+      ).toEqual(["match_id"]);
+      expect(buildCaptureBody("match_created", "pub_new").properties).not.toHaveProperty(
+        "name",
+      );
+      globalThis.fetch = (async () => {
+        throw new Error("posthog down");
+      }) as typeof fetch;
+      await expect(emitMatchCreated("pub_new")).resolves.toBeUndefined();
+    } finally {
+      globalThis.fetch = origFetch;
+      console.error = origError;
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prev;
+    }
+  });
+
+  test("create then same-status save is not a second capture", () => {
+    expect(planRsvpCapture(null, "GOING")).toEqual({
+      status: "going",
+      change: "create",
+    });
+    expect(planRsvpCapture("GOING", "GOING")).toBeNull();
   });
 });
 

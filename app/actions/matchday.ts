@@ -7,6 +7,7 @@ import { publicId } from "@/lib/crypto";
 import { isMatchdayLive } from "@/lib/matchday-status";
 import { parseFormation } from "@/lib/pitch";
 import { parseSport, positionsForSport } from "@/lib/positions";
+import { emitMatchCreated } from "@/lib/server-analytics";
 import { prisma } from "@/lib/prisma";
 import { parseMapUrl } from "@/lib/map-url";
 import { addCalendarDays, isQuarterTime } from "@/lib/time-options";
@@ -167,8 +168,10 @@ export async function createMatchday(
     },
   });
 
+  await emitMatchCreated(matchday.publicId);
+
   revalidatePath("/board");
-  redirect(`/board/${matchday.id}?created=1`);
+  redirect(`/board/${matchday.id}`);
 }
 
 export async function updateMatchday(

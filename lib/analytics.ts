@@ -1,10 +1,8 @@
 import { parseSport } from "./positions";
 
 export const ANALYTICS_EVENTS = {
-  match_created: "match_created",
   invite_copied: "invite_copied",
   share_update_copied: "share_update_copied",
-  player_rsvp: "player_rsvp",
   roster_copied: "roster_copied",
   rsvp_removed: "rsvp_removed",
   dupe_warn_shown: "dupe_warn_shown",

@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
-import { useTrack } from "@/components/AnalyticsScope";
 import { AthleteNameInput } from "@/components/AthleteNameInput";
 import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
@@ -41,8 +40,6 @@ export function GuestRsvpForm({
   const [status, setStatus] = useState<"GOING" | "OUT">(defaultStatus);
   const [position, setPosition] = useState(defaultPosition ?? "");
   const [duplicate, setDuplicate] = useState<string | null>(null);
-  const track = useTrack();
-  const capturedOk = useRef(Boolean(confirmed));
   const [state, action, pending] = useActionState<RsvpState, FormData>(
     submitRsvp,
     confirmed ? { ok: true } : null,
@@ -51,12 +48,6 @@ export function GuestRsvpForm({
   useEffect(() => {
     if (state?.ok) onSaved?.();
   }, [state?.ok]);
-
-  useEffect(() => {
-    if (!state?.ok || capturedOk.current) return;
-    capturedOk.current = true;
-    track("player_rsvp");
-  }, [state?.ok, track]);
 
   useEffect(() => {
     if (state?.duplicate) setDuplicate(state.duplicate);
