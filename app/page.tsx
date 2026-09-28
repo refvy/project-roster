@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { LoginForm } from "@/components/LoginForm";
 import { PrivacyLink } from "@/components/PrivacyLink";
 import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default async function HomePage({
   searchParams,

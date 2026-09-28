@@ -3,6 +3,7 @@ import { Wordmark } from "@/components/Wordmark";
 
 export const metadata: Metadata = {
   title: "Privacy",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

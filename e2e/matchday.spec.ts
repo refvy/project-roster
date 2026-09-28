@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import nextConfig from "../next.config";
 import { describeImbalance } from "../lib/imbalance";
 import {
   BASKETBALL_LINES,
@@ -981,6 +982,61 @@ test.describe("indexing", () => {
     expect(buf.subarray(0, 4).toString("hex")).toBe("00000100");
   });
 
+  test("www.getskwad.com permanently redirects to getskwad.com", async ({
+    request,
+  }) => {
+    const redirects = (await nextConfig.redirects?.()) ?? [];
+    expect(redirects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "/",
+          has: [{ type: "host", value: "www.getskwad.com" }],
+          destination: "https://getskwad.com/",
+          permanent: true,
+        }),
+        expect.objectContaining({
+          source: "/:path*",
+          has: [{ type: "host", value: "www.getskwad.com" }],
+          destination: "https://getskwad.com/:path*",
+          permanent: true,
+        }),
+      ]),
+    );
+    expect(JSON.stringify(redirects)).not.toMatch(/skwad\.link/);
+
+    const root = await request.get("/", {
+      headers: { host: "www.getskwad.com" },
+      maxRedirects: 0,
+    });
+    expect([301, 308]).toContain(root.status());
+    expect(root.headers()["location"]).toBe("https://getskwad.com/");
+
+    const nested = await request.get("/privacy?from=www", {
+      headers: { host: "www.getskwad.com" },
+      maxRedirects: 0,
+    });
+    expect([301, 308]).toContain(nested.status());
+    expect(nested.headers()["location"]).toBe(
+      "https://getskwad.com/privacy?from=www",
+    );
+  });
+
+  test("landing and privacy have canonicals; boards do not", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "https://getskwad.com/",
+    );
+
+    await page.goto("/privacy");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "https://getskwad.com/privacy",
+    );
+  });
+
   test("board and guest match pages are noindex, nofollow", async ({
     browser,
     request,
@@ -988,6 +1044,7 @@ test.describe("indexing", () => {
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+noindex+${Date.now()}@example.com`);
+    await expect(orgPage.locator('link[rel="canonical"]')).toHaveCount(0);
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("TEST noindex");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
@@ -996,6 +1053,7 @@ test.describe("indexing", () => {
       "content",
       /noindex/,
     );
+    await expect(orgPage.locator('link[rel="canonical"]')).toHaveCount(0);
     const boardRes = await orgPage.request.get(orgPage.url());
     expect(boardRes.headers()["x-robots-tag"]).toMatch(/noindex/i);
     expect(boardRes.headers()["x-robots-tag"]).toMatch(/nofollow/i);
@@ -1011,6 +1069,7 @@ test.describe("indexing", () => {
       "content",
       /noindex/,
     );
+    await expect(guestPage.locator('link[rel="canonical"]')).toHaveCount(0);
     await guest.close();
     await organiser.close();
   });

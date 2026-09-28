@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Outfit } from "next/font/google";
 import { AnalyticsInit } from "@/components/AnalyticsInit";
-import { getAppUrl } from "@/lib/env";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -14,7 +13,7 @@ const title = "Skwad — matchday board";
 const description = "Paste a link. Get your squad signed up.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(getAppUrl()),
+  metadataBase: new URL("https://getskwad.com"),
   applicationName: "Skwad",
   title,
   description,

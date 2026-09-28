@@ -4,6 +4,7 @@ import { NO_INDEX_ROBOTS } from "@/lib/seo";
 
 export const metadata: Metadata = {
   robots: NO_INDEX_ROBOTS,
+  alternates: { canonical: null },
 };
 
 export default function BoardLayout({ children }: { children: ReactNode }) {

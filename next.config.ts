@@ -11,6 +11,22 @@ const nextConfig: NextConfig = {
       { source: "/board/:path*", headers: noIndex },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/",
+        has: [{ type: "host", value: "www.getskwad.com" }],
+        destination: "https://getskwad.com/",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.getskwad.com" }],
+        destination: "https://getskwad.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
