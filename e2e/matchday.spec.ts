@@ -951,6 +951,71 @@ test.describe("privacy", () => {
   });
 });
 
+test.describe("indexing", () => {
+  test("robots allows crawl and points at the sitemap", async ({ request }) => {
+    const res = await request.get("/robots.txt");
+    expect(res.ok()).toBeTruthy();
+    const body = await res.text();
+    expect(body).toMatch(/Allow:\s*\//);
+    expect(body).not.toMatch(/Disallow:\s*\/(m|board)/);
+    expect(body).toContain("Sitemap: https://getskwad.com/sitemap.xml");
+  });
+
+  test("sitemap lists only the landing and privacy URLs", async ({ request }) => {
+    const res = await request.get("/sitemap.xml");
+    expect(res.ok()).toBeTruthy();
+    const body = await res.text();
+    expect(body).toContain("https://getskwad.com/</loc>");
+    expect(body).toContain("https://getskwad.com/privacy");
+    expect(body).not.toContain("/board");
+    expect(body).not.toContain("/m/");
+  });
+
+  test("favicon.ico is served from the Skwad icon", async ({ request }) => {
+    const res = await request.get("/favicon.ico");
+    expect(res.status()).toBe(200);
+    const type = res.headers()["content-type"] ?? "";
+    expect(type).toMatch(/icon|octet-stream|image/i);
+    const buf = await res.body();
+    expect(buf.byteLength).toBeGreaterThan(16);
+    expect(buf.subarray(0, 4).toString("hex")).toBe("00000100");
+  });
+
+  test("board and guest match pages are noindex, nofollow", async ({
+    browser,
+    request,
+  }) => {
+    const organiser = await browser.newContext();
+    const orgPage = await organiser.newPage();
+    await signIn(orgPage, `mark+noindex+${Date.now()}@example.com`);
+    await orgPage.getByRole("link", { name: /new matchday/i }).click();
+    await orgPage.getByLabel("Title").fill("TEST noindex");
+    await orgPage.getByRole("button", { name: /create matchday/i }).click();
+    await expect(orgPage.getByRole("heading", { name: "TEST noindex" })).toBeVisible();
+    await expect(orgPage.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex/,
+    );
+    const boardRes = await orgPage.request.get(orgPage.url());
+    expect(boardRes.headers()["x-robots-tag"]).toMatch(/noindex/i);
+    expect(boardRes.headers()["x-robots-tag"]).toMatch(/nofollow/i);
+
+    const shareUrl = await shareUrlOf(orgPage);
+    const guestRes = await request.get(shareUrl);
+    expect(guestRes.headers()["x-robots-tag"]).toMatch(/noindex/i);
+    expect(guestRes.headers()["x-robots-tag"]).toMatch(/nofollow/i);
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    await guestPage.goto(shareUrl);
+    await expect(guestPage.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex/,
+    );
+    await guest.close();
+    await organiser.close();
+  });
+});
+
 test.describe("share pulse", () => {
   test("capacity is formation slot count", () => {
     expect(squadCapacity("football", "4-3-3")).toBe(11);
