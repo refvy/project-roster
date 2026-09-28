@@ -1027,7 +1027,7 @@ test.describe("indexing", () => {
     await page.goto("/");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
-      "https://getskwad.com/",
+      "https://getskwad.com",
     );
 
     await page.goto("/privacy");
