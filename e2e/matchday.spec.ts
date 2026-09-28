@@ -704,6 +704,7 @@ test.describe("server analytics", () => {
           status: "going",
           change: "create",
           $process_person_profile: false,
+          $geoip_disable: true,
         },
       });
       expect(bodies[1]).toEqual({
@@ -715,10 +716,12 @@ test.describe("server analytics", () => {
           status: "out",
           change: "update",
           $process_person_profile: false,
+          $geoip_disable: true,
         },
       });
       for (const body of bodies) {
         const properties = body.properties as Record<string, unknown>;
+        expect(properties.$geoip_disable).toBe(true);
         expect(publicCaptureKeys(properties)).toEqual([
           "change",
           "match_id",
@@ -787,8 +790,12 @@ test.describe("server analytics", () => {
         properties: {
           match_id: "pub_new",
           $process_person_profile: false,
+          $geoip_disable: true,
         },
       });
+      expect(
+        (bodies[0]!.properties as Record<string, unknown>).$geoip_disable,
+      ).toBe(true);
       expect(
         publicCaptureKeys(bodies[0]!.properties as Record<string, unknown>),
       ).toEqual(["match_id"]);

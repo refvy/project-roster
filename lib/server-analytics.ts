@@ -62,6 +62,7 @@ export function buildCaptureBody(
   const properties: Record<string, unknown> = {
     match_id: matchId,
     $process_person_profile: false,
+    $geoip_disable: true,
   };
   if (event === "player_rsvp" && extra) {
     properties.status = extra.status;
