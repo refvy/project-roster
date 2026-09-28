@@ -5,8 +5,23 @@ import { Wordmark } from "@/components/Wordmark";
 import { getOrganiser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
+const title =
+  "Skwad: football sign-up sheet and lineup maker, no app needed";
+const description =
+  "Free to start. Paste one link in LINE or WhatsApp. Players tap Going and pick a position, no app or login. Copy the roster and build lineups with subs.";
+
 export const metadata: Metadata = {
+  title: { absolute: title },
+  description,
   alternates: { canonical: "/" },
+  openGraph: {
+    title,
+    description,
+  },
+  twitter: {
+    title,
+    description,
+  },
 };
 
 export default async function HomePage({

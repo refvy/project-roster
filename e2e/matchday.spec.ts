@@ -1037,6 +1037,40 @@ test.describe("indexing", () => {
     );
   });
 
+  test("homepage has the approved title and description", async ({ page }) => {
+    const title =
+      "Skwad: football sign-up sheet and lineup maker, no app needed";
+    const description =
+      "Free to start. Paste one link in LINE or WhatsApp. Players tap Going and pick a position, no app or login. Copy the roster and build lineups with subs.";
+
+    await page.goto("/");
+    await expect(page).toHaveTitle(title);
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      "content",
+      description,
+    );
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      title,
+    );
+    await expect(page.locator('meta[property="og:description"]')).toHaveAttribute(
+      "content",
+      description,
+    );
+    await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute(
+      "content",
+      title,
+    );
+    await expect(
+      page.locator('meta[name="twitter:description"]'),
+    ).toHaveAttribute("content", description);
+    await expect(
+      page.getByRole("heading", {
+        name: "Paste a link. Get your squad signed up.",
+      }),
+    ).toBeVisible();
+  });
+
   test("board and guest match pages are noindex, nofollow", async ({
     browser,
     request,
@@ -1044,6 +1078,7 @@ test.describe("indexing", () => {
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
     await signIn(orgPage, `mark+noindex+${Date.now()}@example.com`);
+    await expect(orgPage).toHaveTitle("Skwad — matchday board");
     await expect(orgPage.locator('link[rel="canonical"]')).toHaveCount(0);
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("TEST noindex");
@@ -1949,9 +1984,12 @@ test.describe("matchday board", () => {
         "Create friendly matches — football, basketball, and more. Get the squad signed up and manage the roster in one link.",
       ),
     ).toBeVisible();
+    await expect(landing).toHaveTitle(
+      "Skwad: football sign-up sheet and lineup maker, no app needed",
+    );
     await expect(landing.locator('meta[property="og:description"]')).toHaveAttribute(
       "content",
-      "Paste a link. Get your squad signed up.",
+      "Free to start. Paste one link in LINE or WhatsApp. Players tap Going and pick a position, no app or login. Copy the roster and build lineups with subs.",
     );
     const landingOg = await landing.request.get("/opengraph-image");
     expect(landingOg.ok()).toBeTruthy();
@@ -1962,6 +2000,7 @@ test.describe("matchday board", () => {
     const host = await browser.newContext();
     const hostPage = await host.newPage();
     await signIn(hostPage, `mark+host+${Date.now()}@example.com`);
+    await expect(hostPage).toHaveTitle("Skwad — matchday board");
     await expect(
       hostPage.locator('meta[property="og:description"]'),
     ).toHaveAttribute("content", "Paste a link. Get your squad signed up.");
