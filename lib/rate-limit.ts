@@ -1,4 +1,3 @@
-import { ipAddress } from "@vercel/functions";
 import { randomToken } from "./crypto";
 import { isLocalDev } from "./env";
 import { prisma } from "./prisma";
@@ -6,6 +5,7 @@ import { prisma } from "./prisma";
 export {
   GUEST_ADD_LIMIT_MESSAGE,
   MAGIC_LINK_LIMIT_MESSAGE,
+  SELF_RSVP_LIMIT_MESSAGE,
 } from "./rate-limit-copy";
 
 /** Magic-link emails per address. Enough for a typo and a couple of retries. */
@@ -26,6 +26,21 @@ export const GUEST_ADD_WINDOW_MS = 60 * 60 * 1000;
 /** Same cap per IP per match, so clearing the guest cookie does not reset it. */
 export const GUEST_ADD_IP_LIMIT = 40;
 export const GUEST_ADD_IP_WINDOW_MS = 60 * 60 * 1000;
+
+/** Self-RSVP writes per client IP per match. A flood, not a normal evening. */
+export const SELF_RSVP_IP_LIMIT = 60;
+export const SELF_RSVP_IP_WINDOW_MS = 60 * 60 * 1000;
+
+/** Keep a bucket until its window has ended and another day has passed. */
+export const RATE_LIMIT_BUCKET_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** Copy pings per match per event. The clipboard still succeeds when this trips. */
+export const COPY_EVENT_MATCH_LIMIT = 30;
+export const COPY_EVENT_MATCH_WINDOW_MS = 15 * 60 * 1000;
+
+/** Copy pings per client IP, across matches. Uses resolveClientIp. Skipped for loopback in local dev. */
+export const COPY_EVENT_IP_LIMIT = 60;
+export const COPY_EVENT_IP_WINDOW_MS = 15 * 60 * 1000;
 
 export const RATE_LIMIT_ERROR_MESSAGE =
   "Something went wrong. Try again in a moment.";
@@ -57,20 +72,40 @@ export function clientIp(headerStore: {
   );
 }
 
+/** Vercel sets VERCEL_ENV, or VERCEL=1. Local and CI set neither. */
 function onVercel(): boolean {
-  return Boolean(process.env.VERCEL?.trim());
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (typeof vercelEnv === "string" && vercelEnv.length > 0) return true;
+  return process.env.VERCEL === "1";
+}
+
+function envLabel(name: "VERCEL" | "VERCEL_ENV") {
+  const value = process.env[name];
+  return value === undefined || value === "" ? "unset" : value;
+}
+
+let loggedClientIpRuntime = false;
+
+function logClientIpRuntime(source: "x-real-ip" | "header-chain") {
+  if (loggedClientIpRuntime) return;
+  loggedClientIpRuntime = true;
+  console.log(
+    `[client-ip] runtime VERCEL=${envLabel("VERCEL")} VERCEL_ENV=${envLabel("VERCEL_ENV")} source=${source}`,
+  );
 }
 
 /**
- * On Vercel, `ipAddress()` from `@vercel/functions` (the platform `x-real-ip`).
- * Off Vercel (local or CI), the header chain above. A missing address skips
- * the per-IP cap and warns once for this request. No shared bucket.
+ * On Vercel, the left-most `x-real-ip`. Off Vercel, the header chain above.
+ * A missing address skips the per-IP cap and warns once for this request.
+ * No shared bucket.
  */
 export function resolveClientIp(headerStore: {
   get(name: string): string | null;
 }): string | null {
-  const resolved = onVercel()
-    ? leftMostAddress(ipAddress(headerStore as Headers))
+  const vercel = onVercel();
+  logClientIpRuntime(vercel ? "x-real-ip" : "header-chain");
+  const resolved = vercel
+    ? leftMostAddress(headerStore.get("x-real-ip"))
     : clientIp(headerStore);
   if (!resolved) {
     console.warn(
@@ -124,4 +159,30 @@ export async function releaseRateLimitSlot(key: string, windowMs: number) {
     SET "count" = GREATEST("count" - 1, 0)
     WHERE "key" = ${key} AND "windowStart" = ${windowStart}
   `;
+}
+
+function longestRateLimitWindowMs() {
+  return Math.max(
+    MAGIC_LINK_EMAIL_WINDOW_MS,
+    MAGIC_LINK_IP_WINDOW_MS,
+    GUEST_ADD_WINDOW_MS,
+    GUEST_ADD_IP_WINDOW_MS,
+    SELF_RSVP_IP_WINDOW_MS,
+    COPY_EVENT_MATCH_WINDOW_MS,
+    COPY_EVENT_IP_WINDOW_MS,
+  );
+}
+
+/** Window start strictly older than this has been finished for more than a day. */
+export function rateLimitBucketExpiredBefore(now = new Date()) {
+  return new Date(
+    now.getTime() - RATE_LIMIT_BUCKET_GRACE_MS - longestRateLimitWindowMs(),
+  );
+}
+
+export async function deleteExpiredRateLimitBuckets(now = new Date()) {
+  const result = await prisma.rateLimitBucket.deleteMany({
+    where: { windowStart: { lt: rateLimitBucketExpiredBefore(now) } },
+  });
+  return result.count;
 }

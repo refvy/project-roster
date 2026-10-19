@@ -1,18 +1,28 @@
 import { expect, test, type Page } from "@playwright/test";
+import { POST as postCopyEvent } from "../app/api/analytics/copy/route";
 import { GUEST_ID_COOKIE, requestMagicLinkForEmail } from "../lib/auth";
 import { isAuthDebug } from "../lib/env";
 import { addFriendForGuest } from "../lib/friend-add";
 import { prisma } from "../lib/prisma";
 import { FOOTBALL_POSITIONS } from "../lib/positions";
 import {
+  COPY_EVENT_IP_LIMIT,
+  COPY_EVENT_IP_WINDOW_MS,
+  COPY_EVENT_MATCH_LIMIT,
   GUEST_ADD_LIMIT,
   GUEST_ADD_LIMIT_MESSAGE,
+  SELF_RSVP_LIMIT_MESSAGE,
   MAGIC_LINK_EMAIL_LIMIT,
   MAGIC_LINK_IP_LIMIT,
   MAGIC_LINK_LIMIT_MESSAGE,
+  SELF_RSVP_IP_LIMIT,
   clientIp,
+  deleteExpiredRateLimitBuckets,
+  rateLimitBucketExpiredBefore,
   resolveClientIp,
+  takeRateLimitSlot,
 } from "../lib/rate-limit";
+import { saveGuestRsvp } from "../lib/self-rsvp";
 
 async function withEnv<T>(
   updates: Record<string, string | undefined>,
@@ -72,6 +82,9 @@ test.describe("magic-link rate limit", () => {
         expect("error" in result ? result.error : "").toBe(
           MAGIC_LINK_LIMIT_MESSAGE,
         );
+        expect("rateLimited" in result ? result.rateLimited : undefined).toBe(
+          true,
+        );
       }
       for (let i = 0; i < 5; i += 1) {
         expect(results[i]?.ok, `request ${i + 1}`).toBe(true);
@@ -80,6 +93,11 @@ test.describe("magic-link rate limit", () => {
       expect(results[5] && "error" in results[5] ? results[5].error : "").toBe(
         MAGIC_LINK_LIMIT_MESSAGE,
       );
+      expect(
+        results[5] && "rateLimited" in results[5]
+          ? results[5].rateLimited
+          : false,
+      ).toBe(true);
       const fourteenth = results[13];
       expect(fourteenth?.ok).toBe(false);
       expect(fourteenth && "error" in fourteenth ? fourteenth.error : "").toBe(
@@ -132,6 +150,9 @@ test.describe("magic-link rate limit", () => {
       for (const result of refused) {
         expect("error" in result ? result.error : "").toBe(
           MAGIC_LINK_LIMIT_MESSAGE,
+        );
+        expect("rateLimited" in result ? result.rateLimited : undefined).toBe(
+          true,
         );
       }
       const organiser = await prisma.organiser.findUnique({
@@ -282,6 +303,21 @@ test.describe("magic-link rate limit", () => {
     await page.getByRole("button", { name: "Email me a magic link" }).click();
     await expectLimitNote(page, MAGIC_LINK_LIMIT_MESSAGE);
   });
+
+  test("VERCEL_ENV alone trusts x-real-ip over a forged x-forwarded-for", () => {
+    return withEnv({ VERCEL: undefined, VERCEL_ENV: "preview" }, () => {
+      expect(
+        resolveClientIp(
+          new Headers({
+            "x-forwarded-for": "203.0.113.77, 198.51.100.1",
+            "x-vercel-forwarded-for": "203.0.113.99",
+            "x-real-ip": "198.51.100.10",
+            "x-client-ip": "1.2.3.4",
+          }),
+        ),
+      ).toBe("198.51.100.10");
+    });
+  });
 });
 
 test.describe("guest add rate limit", () => {
@@ -335,6 +371,7 @@ test.describe("guest add rate limit", () => {
     });
     expect(refused.state.ok).toBe(false);
     expect(refused.state.error).toBe(GUEST_ADD_LIMIT_MESSAGE);
+    expect(refused.state.rateLimited).toBe(true);
     expect(refused.revalidate).toBeUndefined();
     expect(
       await prisma.rsvp.count({
@@ -460,5 +497,285 @@ test.describe("migration gate", () => {
     expect(skipped.stdout).toContain("skipped");
     expect(skipped.stdout).toContain("VERCEL is set and VERCEL_ENV is missing");
     expect(skipped.stdout).not.toContain("applying migrations");
+  });
+});
+
+test.describe("copy analytics endpoint", () => {
+  test("rejects a bad body, unknown matches, and a flooded match or IP", async ({
+    request,
+  }) => {
+    const bad = await request.post("/api/analytics/copy", {
+      data: { event: "player_rsvp", publicId: "nope" },
+    });
+    expect(bad.status()).toBe(400);
+
+    const missing = await request.post("/api/analytics/copy", {
+      data: { event: "invite_copied", publicId: "missingmatch" },
+    });
+    expect(missing.status()).toBe(404);
+
+    const stamp = `${Date.now()}`;
+    const organiser = await prisma.organiser.create({
+      data: { email: `copy-cap-${stamp}@example.com` },
+    });
+    const matchday = await prisma.matchday.create({
+      data: {
+        publicId: `copy${stamp}`,
+        organiserId: organiser.id,
+        title: "Copy cap",
+        positions: FOOTBALL_POSITIONS.map((position) => ({ ...position })),
+        sport: "football",
+      },
+    });
+
+    const ok = await request.post("/api/analytics/copy", {
+      data: { event: "roster_copied", publicId: matchday.publicId },
+    });
+    expect(ok.status()).toBe(204);
+
+    for (let i = 1; i < COPY_EVENT_MATCH_LIMIT; i += 1) {
+      const next = await request.post("/api/analytics/copy", {
+        data: { event: "roster_copied", publicId: matchday.publicId },
+      });
+      expect(next.status(), `copy ${i + 1}`).toBe(204);
+    }
+    const refused = await request.post("/api/analytics/copy", {
+      data: { event: "roster_copied", publicId: matchday.publicId },
+    });
+    expect(refused.status()).toBe(429);
+
+    const other = await request.post("/api/analytics/copy", {
+      data: { event: "invite_copied", publicId: matchday.publicId },
+    });
+    expect(other.status()).toBe(204);
+
+    const real = `198.51.100.${stamp.slice(-2)}`;
+    for (let i = 0; i < COPY_EVENT_IP_LIMIT; i += 1) {
+      await takeRateLimitSlot(
+        `copy-ip:${real}`,
+        COPY_EVENT_IP_LIMIT,
+        COPY_EVENT_IP_WINDOW_MS,
+      );
+    }
+    const ipRefused = await request.post("/api/analytics/copy", {
+      headers: {
+        "x-vercel-forwarded-for": `${real}, 203.0.113.9`,
+        "x-real-ip": real,
+        "x-forwarded-for": "203.0.113.50, 10.0.0.1",
+        "x-client-ip": "192.0.2.8",
+        "cf-connecting-ip": "8.8.8.8",
+      },
+      data: { event: "invite_copied", publicId: "doesnotexist01" },
+    });
+    expect(ipRefused.status()).toBe(429);
+
+    const ignoredSpoof = await request.post("/api/analytics/copy", {
+      headers: {
+        "x-forwarded-for": "203.0.113.77",
+        "x-client-ip": real,
+        "cf-connecting-ip": real,
+      },
+      data: { event: "invite_copied", publicId: "doesnotexist01" },
+    });
+    expect(ignoredSpoof.status()).toBe(404);
+  });
+
+  test("on Vercel a missing IP skips the copy cap and warns", async () => {
+    const warnings: unknown[][] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+    try {
+      await withEnv({ VERCEL: "1", VERCEL_ENV: "production" }, async () => {
+        const skipped = await postCopyEvent(
+          new Request("http://localhost/api/analytics/copy", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-vercel-forwarded-for": "198.51.100.20",
+              "x-forwarded-for": "203.0.113.77",
+              "x-client-ip": "1.2.3.4",
+            },
+            body: JSON.stringify({
+              event: "invite_copied",
+              publicId: "doesnotexist01",
+            }),
+          }),
+        );
+        expect(skipped.status).toBe(404);
+
+        const real = "198.51.100.64";
+        for (let i = 0; i < COPY_EVENT_IP_LIMIT; i += 1) {
+          await takeRateLimitSlot(
+            `copy-ip:${real}`,
+            COPY_EVENT_IP_LIMIT,
+            COPY_EVENT_IP_WINDOW_MS,
+          );
+        }
+        const refused = await postCopyEvent(
+          new Request("http://localhost/api/analytics/copy", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-real-ip": real,
+              "x-vercel-forwarded-for": "203.0.113.9",
+              "x-forwarded-for": "203.0.113.50",
+            },
+            body: JSON.stringify({
+              event: "invite_copied",
+              publicId: "doesnotexist01",
+            }),
+          }),
+        );
+        expect(refused.status).toBe(429);
+      });
+    } finally {
+      console.warn = original;
+    }
+    expect(
+      warnings.some((args) => String(args[0]).includes("no client IP")),
+    ).toBe(true);
+  });
+});
+
+test.describe("self-rsvp rate limit", () => {
+  test("the 60th self-RSVP from one IP is accepted and the 61st is refused", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    expect(SELF_RSVP_IP_LIMIT).toBe(60);
+    const stamp = `${Date.now()}`;
+    const ip = `198.51.100.${stamp.slice(-2)}`;
+    const organiser = await prisma.organiser.create({
+      data: { email: `self-cap-${stamp}@example.com` },
+    });
+    const matchday = await prisma.matchday.create({
+      data: {
+        publicId: `self${stamp}`,
+        organiserId: organiser.id,
+        title: "Self cap",
+        positions: FOOTBALL_POSITIONS.map((position) => ({ ...position })),
+        sport: "football",
+      },
+    });
+
+    for (let i = 0; i < SELF_RSVP_IP_LIMIT; i += 1) {
+      const result = await saveGuestRsvp({
+        publicId: matchday.publicId,
+        name: `Mate ${i}`,
+        status: "GOING",
+        positionKeyRaw: "ANY",
+        guestId: `self-${stamp}-${i}`,
+        ip,
+      });
+      expect(result.ok, `rsvp ${i + 1}`).toBe(true);
+      expect(result.rateLimited).toBeUndefined();
+    }
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+
+    const refused = await saveGuestRsvp({
+      publicId: matchday.publicId,
+      name: "One More",
+      status: "GOING",
+      positionKeyRaw: "ANY",
+      guestId: `self-${stamp}-late`,
+      ip,
+    });
+    expect(refused.ok).toBe(false);
+    expect(refused.error).toBe(SELF_RSVP_LIMIT_MESSAGE);
+    expect(refused.rateLimited).toBe(true);
+    expect(refused.revalidate).toBeUndefined();
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+
+    await page.context().addCookies([
+      {
+        name: GUEST_ID_COOKIE,
+        value: `self-ui-${stamp}`,
+        url: "http://localhost:3000",
+      },
+    ]);
+    await page.setExtraHTTPHeaders({ "x-vercel-forwarded-for": ip });
+    await page.goto(`/m/${matchday.publicId}`);
+    await page.getByLabel("Your name").fill("Still waiting");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-ANY").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expectLimitNote(page, SELF_RSVP_LIMIT_MESSAGE);
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+
+    const skipped = await saveGuestRsvp({
+      publicId: matchday.publicId,
+      name: "No Address",
+      status: "GOING",
+      positionKeyRaw: "ANY",
+      guestId: `self-${stamp}-noip`,
+      ip: null,
+    });
+    expect(skipped.ok).toBe(true);
+    expect(skipped.rateLimited).toBeUndefined();
+  });
+});
+
+test.describe("rate-limit cleanup", () => {
+  test("the daily cron deletes buckets whose window ended more than a day ago", async ({
+    request,
+  }) => {
+    const now = new Date();
+    const cutoff = rateLimitBucketExpiredBefore(now);
+    const staleKey = `stale-${now.getTime()}`;
+    const edgeKey = `edge-${now.getTime()}`;
+    const freshKey = `fresh-${now.getTime()}`;
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: staleKey,
+        windowStart: new Date(cutoff.getTime() - 1000),
+        count: 4,
+      },
+    });
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: edgeKey,
+        windowStart: new Date(cutoff.getTime() + 1000),
+        count: 1,
+      },
+    });
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: freshKey,
+        windowStart: now,
+        count: 1,
+      },
+    });
+
+    const removed = await deleteExpiredRateLimitBuckets(now);
+    expect(removed).toBeGreaterThanOrEqual(1);
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: staleKey } }),
+    ).toBeNull();
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: edgeKey } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: freshKey } }),
+    ).not.toBeNull();
+
+    const cron = await request.get("/api/cron/og-refresh");
+    expect(cron.ok()).toBeTruthy();
+    const body = (await cron.json()) as {
+      ok: boolean;
+      rateLimitBucketsDeleted: number;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.rateLimitBucketsDeleted).toBeGreaterThanOrEqual(0);
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: freshKey } }),
+    ).not.toBeNull();
   });
 });

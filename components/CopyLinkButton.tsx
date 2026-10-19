@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useTrack } from "@/components/AnalyticsScope";
+import { reportServerCopy } from "@/lib/analytics";
 
-export function CopyLinkButton({ url }: { url: string }) {
+export function CopyLinkButton({
+  url,
+  publicId,
+}: {
+  url: string;
+  publicId: string;
+}) {
   const [copied, setCopied] = useState(false);
-  const track = useTrack();
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      track("invite_copied");
+      reportServerCopy("invite_copied", publicId);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);

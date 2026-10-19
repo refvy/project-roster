@@ -55,6 +55,75 @@ body {
   letter-spacing: -0.025em;
 }
 
+/* Editor pitch chips. Width is the name (a pill), capped at the cell
+   minus 4px, so a GK or a pair of strikers does not become a bar.
+   14px / 12px side padding, stepping to 12px / 8px on a row of 5 and
+   on every row at 320px. A row of 4 under 360px steps to 11px / 4px
+   so about eight letters stay visible. A row of 5 under 360px is the
+   only row that fills its cell: 2px gap, 4px side padding, 11px name. */
+.lineup-fit-pitch {
+  container-type: inline-size;
+}
+.lineup-fit-chip {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.lineup-fit-name {
+  font-size: 14px;
+}
+.lineup-fit-chip[data-dense="true"] {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.lineup-fit-chip[data-dense="true"] .lineup-fit-name {
+  font-size: 12px;
+}
+@media (max-width: 320px) {
+  .lineup-fit-chip {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .lineup-fit-name {
+    font-size: 12px;
+  }
+}
+@media (max-width: 359px) {
+  .lineup-fit-chip[data-count="4"] {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .lineup-fit-chip[data-count="4"] .lineup-fit-name {
+    font-size: 11px;
+  }
+  .lineup-fit-chip[data-dense="true"] {
+    width: calc(100% - 2px);
+    max-width: calc(100% - 2px);
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .lineup-fit-chip[data-dense="true"] .lineup-fit-name {
+    font-size: 11px;
+  }
+}
+@container (max-width: 359px) {
+  .lineup-fit-chip[data-count="4"] {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .lineup-fit-chip[data-count="4"] .lineup-fit-name {
+    font-size: 11px;
+  }
+  .lineup-fit-chip[data-dense="true"] {
+    width: calc(100% - 2px);
+    max-width: calc(100% - 2px);
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .lineup-fit-chip[data-dense="true"] .lineup-fit-name {
+    font-size: 11px;
+  }
+}
+
 /* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge.
    paint-order draws the white stroke first, then the black fill on top so
    a thick outline cannot cover the numeral. */

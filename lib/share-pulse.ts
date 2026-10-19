@@ -13,12 +13,22 @@ export const STAMP_OUT_GRAY = "#6B7280";
 export const STAMP_LOW_TILT_DEG = -12;
 export const STAMP_ENOUGH_TILT_DEG = 12;
 export const STAMP_BORDER_PX = 14;
+/** NEED and "n MORE" share one size. "n GOING" stays 65 unless the line is long. */
+export const STAMP_LINE_PX = 65;
+export const STAMP_GOING_LONG_PX = 50;
+/** Grey "n OUT" on the Enough stamp. */
+export const STAMP_OUT_PX = 36;
+
+function goingLineSize(text: string) {
+  return text.length > 9 ? STAMP_GOING_LONG_PX : STAMP_LINE_PX;
+}
 
 export type StampKind = "low" | "enough-out" | "enough";
 
 export type StampLine = {
   text: string;
   color: string;
+  fontSize: number;
 };
 
 export type StampView = {
@@ -92,16 +102,19 @@ export function stampView(
       tiltDeg: STAMP_LOW_TILT_DEG,
       border: STAMP_CORAL,
       fill: "#ffffff",
-      line1: { text: "NEED", color: STAMP_CORAL },
+      line1: { text: "NEED", color: STAMP_CORAL, fontSize: STAMP_LINE_PX },
       line2: {
         text: `${needMoreCount(going, capacity)} MORE`,
         color: STAMP_CORAL,
+        fontSize: STAMP_LINE_PX,
       },
     };
   }
+  const goingText = `${going} GOING`;
   const goingLine: StampLine = {
-    text: `${going} GOING`,
+    text: goingText,
     color: STAMP_INK,
+    fontSize: goingLineSize(goingText),
   };
   if (kind === "enough-out") {
     return {
@@ -110,7 +123,7 @@ export function stampView(
       border: STAMP_TEAL,
       fill: "#ffffff",
       line1: goingLine,
-      line2: { text: `${out} OUT`, color: STAMP_OUT_GRAY },
+      line2: { text: `${out} OUT`, color: STAMP_OUT_GRAY, fontSize: STAMP_OUT_PX },
     };
   }
   return {

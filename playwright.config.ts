@@ -37,6 +37,7 @@ export default defineConfig({
       // Analytics stays a no-op in the suite — key present would hit PostHog.
       NEXT_PUBLIC_POSTHOG_KEY: "",
       NEXT_PUBLIC_POSTHOG_HOST: "",
+      ORGANISER_ID_SECRET: "playwright-organiser-id-secret",
     },
   },
 });

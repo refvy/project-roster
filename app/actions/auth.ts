@@ -11,6 +11,7 @@ export type MagicLinkState = {
   error?: string;
   debugUrl?: string;
   mailed?: boolean;
+  rateLimited?: boolean;
 } | null;
 
 export async function requestMagicLink(
@@ -29,7 +30,11 @@ export async function requestMagicLink(
     resolveClientIp(headerStore),
   );
   if (!result.ok) {
-    return { ok: false, error: result.error };
+    return {
+      ok: false,
+      error: result.error,
+      rateLimited: "rateLimited" in result ? result.rateLimited : undefined,
+    };
   }
   return {
     ok: true,

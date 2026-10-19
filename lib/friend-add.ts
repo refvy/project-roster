@@ -19,11 +19,12 @@ export type FriendAddState = {
   ok: boolean;
   error?: string;
   duplicate?: string;
+  rateLimited?: boolean;
 };
 
 export type FriendAddResult = {
   state: FriendAddState;
-  revalidate?: { publicId: string; matchdayId: string };
+  revalidate?: { publicId: string; matchdayId: string; organiserId: string };
 };
 
 function validatePerson(name: string) {
@@ -94,7 +95,13 @@ export async function addFriendForGuest(input: {
       GUEST_ADD_WINDOW_MS,
     );
     if (!byGuest.allowed) {
-      return { state: { ok: false, error: GUEST_ADD_LIMIT_MESSAGE } };
+      return {
+        state: {
+          ok: false,
+          error: GUEST_ADD_LIMIT_MESSAGE,
+          rateLimited: true,
+        },
+      };
     }
     const clientIp = ipForRateLimit(input.ip);
     if (clientIp) {
@@ -104,7 +111,13 @@ export async function addFriendForGuest(input: {
         GUEST_ADD_IP_WINDOW_MS,
       );
       if (!byIp.allowed) {
-        return { state: { ok: false, error: GUEST_ADD_LIMIT_MESSAGE } };
+        return {
+          state: {
+            ok: false,
+            error: GUEST_ADD_LIMIT_MESSAGE,
+            rateLimited: true,
+          },
+        };
       }
     }
   } catch (err) {
@@ -126,6 +139,10 @@ export async function addFriendForGuest(input: {
 
   return {
     state: { ok: true },
-    revalidate: { publicId, matchdayId: matchday.id },
+    revalidate: {
+      publicId,
+      matchdayId: matchday.id,
+      organiserId: matchday.organiserId,
+    },
   };
 }

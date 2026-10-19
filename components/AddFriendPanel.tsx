@@ -12,10 +12,7 @@ import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
 import { PositionChipGrid } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
-import {
-  GUEST_ADD_LIMIT_MESSAGE,
-  RATE_LIMIT_NOTE_CLASS,
-} from "@/lib/rate-limit-copy";
+import { RATE_LIMIT_NOTE_CLASS } from "@/lib/rate-limit-copy";
 import { collidingGoingName } from "@/lib/rsvp-name";
 
 export type ExtraRsvp = {
@@ -282,11 +279,11 @@ function FriendForm({
       {state?.error ? (
         <p
           className={
-            state.error === GUEST_ADD_LIMIT_MESSAGE
+            state.rateLimited
               ? RATE_LIMIT_NOTE_CLASS
               : "text-sm font-medium text-danger"
           }
-          role={state.error === GUEST_ADD_LIMIT_MESSAGE ? "status" : "alert"}
+          role={state.rateLimited ? "status" : "alert"}
         >
           {state.error}
         </p>

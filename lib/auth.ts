@@ -80,7 +80,11 @@ export async function requestMagicLinkForEmail(
       MAGIC_LINK_EMAIL_WINDOW_MS,
     );
     if (!byEmail.allowed) {
-      return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
+      return {
+        ok: false as const,
+        error: MAGIC_LINK_LIMIT_MESSAGE,
+        rateLimited: true as const,
+      };
     }
     held.push({
       key: `magic-email:${email}`,
@@ -94,7 +98,11 @@ export async function requestMagicLinkForEmail(
         MAGIC_LINK_IP_WINDOW_MS,
       );
       if (!byIp.allowed) {
-        return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
+        return {
+          ok: false as const,
+          error: MAGIC_LINK_LIMIT_MESSAGE,
+          rateLimited: true as const,
+        };
       }
       held.push({
         key: `magic-ip:${clientIp}`,

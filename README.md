@@ -84,6 +84,7 @@ npm run dev
 | `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
 | `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
 | `CRON_SECRET` | production cron | Bearer token Vercel sends to `/api/cron/og-refresh`. Daily **5am Asia/Bangkok** (`0 22 * * *` UTC) bumps `ogBust` on LIVE matchdays so the next LINE paste can recrawl. Does not ping LINE. Unset locally — Playwright uses `AUTH_DEBUG`. |
+| `ORGANISER_ID_SECRET` | optional | Server-only secret. PostHog match events include `organiser_id`, an HMAC-SHA256 of the organiser’s user id, so test boards can be filtered out. Never an email, a name, or a plain hash of one. If unset, `organiser_id` is omitted and nothing crashes. `openssl rand -base64 32`. |
 
 Local example:
 
@@ -94,6 +95,7 @@ APP_URL="http://localhost:3000"
 AUTH_DEBUG="true"
 RESEND_API_KEY=""
 EMAIL_FROM="Skwad <onboarding@resend.dev>"
+# ORGANISER_ID_SECRET=""
 ```
 
 ## Rate limits
@@ -103,13 +105,20 @@ Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form err
 | Action | Bucket | Limit | Window |
 | --- | --- | --- | --- |
 | Magic-link sign-in | email address | 5 | 15 minutes |
-| Magic-link sign-in | client IP (on Vercel: `ipAddress()` from `@vercel/functions`; local and CI: header chain) | 20 | 15 minutes |
+| Magic-link sign-in | client IP (on Vercel: left-most `x-real-ip`; local and CI: header chain) | 20 | 15 minutes |
 | Add someone else | guest + match | 20 | 1 hour |
 | Add someone else | client IP + match, when the request has one | 40 | 1 hour |
+| Self-RSVP | client IP + match, same helper as sign-in. Skipped, with one warning, when no IP resolves | 60 | 1 hour |
+| Copy invitation / copy roster ping | match + event | 30 | 15 minutes |
+| Copy invitation / copy roster ping | client IP, same helper as sign-in. Skipped, with one warning, when no IP resolves | 60 | 15 minutes |
 
-On Vercel the client IP comes from `ipAddress()` in `@vercel/functions`, which reads the platform `x-real-ip` ([request headers](https://vercel.com/docs/headers/request-headers)). Local and CI builds are not on Vercel, so they fall back to the left-most `x-vercel-forwarded-for`, then `x-real-ip`, then the left-most `x-forwarded-for`. The limiter does not read `x-client-ip` or `cf-connecting-ip`, and it does not use a later address in a list. If no address resolves, that request skips the per-IP cap and logs one warning. It does not share a bucket with other requests. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
+A copy ping that hits the cap returns 429. The clipboard copy still succeeds; the browser does not wait on the ping.
 
-Refusals sit in the same inline spot as other form errors, at the same size, with `role="status"`. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red and keep `role="alert"`. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour."
+On Vercel (`VERCEL_ENV` set to any value, or `VERCEL=1`) the client IP is the left-most `x-real-ip` ([request headers](https://vercel.com/docs/headers/request-headers)). Local and CI, where neither is set, fall back to the left-most `x-vercel-forwarded-for`, then `x-real-ip`, then the left-most `x-forwarded-for`. The limiter does not read `x-client-ip` or `cf-connecting-ip`, and it does not use a later address in a list. If no address resolves, that request skips the per-IP cap and logs one warning. It does not share a bucket with other requests. The first lookup in a server process logs `[client-ip] runtime` once. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
+
+Refusals sit in the same inline spot as other form errors, at the same size, with `role="status"`. The form chooses that note from an explicit `rateLimited` flag. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red and keep `role="alert"`. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour." Self-RSVP: "Lots of sign-ups from this network right now. Try again in an hour."
+
+The 5am Bangkok cron also deletes `RateLimitBucket` rows whose window ended more than 24 hours ago.
 
 ## Tests
 
@@ -125,7 +134,7 @@ npm test
 
 Redeploy **production** so **https://getskwad.com** picks this PR up. Do not dogfood guest magic/share links off `project-roster-tau.vercel.app`.
 
-1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com / skwad.link, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`. Set `CRON_SECRET` (any long random string) so the 5am BKK OG refresh cron is authorized.
+1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`. Set `CRON_SECRET` (any long random string) so the 5am BKK OG refresh cron is authorized. Set `ORGANISER_ID_SECRET` so match events carry `organiser_id`. `skwad.link` and `www.skwad.link` 301 to the same path on https://getskwad.com. `www.getskwad.com` still redirects there too.
 2. Preview/tau may stay on a separate DB. Production `DATABASE_URL` must not be the tau database.
 3. Deploy. `npm run build` runs `prisma generate`, then migrations, then `next build`. Migrations run when `VERCEL_ENV=production`, or when `VERCEL` is unset (a local or CI build). Every other case skips `prisma migrate deploy`, including `VERCEL=1` with `VERCEL_ENV` missing.
 4. Confirm https://getskwad.com loads, request a magic link, open it on getskwad.com, create a matchday, paste the guest link (host getskwad.com or skwad.link) in a private window.
