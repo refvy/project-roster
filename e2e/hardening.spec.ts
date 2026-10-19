@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { requestMagicLinkForEmail } from "../lib/auth";
+import { expect, test, type Page } from "@playwright/test";
+import { GUEST_ID_COOKIE, requestMagicLinkForEmail } from "../lib/auth";
 import { isAuthDebug } from "../lib/env";
 import { addFriendForGuest } from "../lib/friend-add";
 import { prisma } from "../lib/prisma";
@@ -42,8 +42,17 @@ const localDebug = {
   RESEND_API_KEY: "",
 } as const;
 
+const LIMIT_NOTE_COLOR = "rgb(107, 114, 128)";
+const FORM_ERROR_COLOR = "rgb(180, 35, 24)";
+
+async function expectLimitNote(page: Page, message: string) {
+  const note = page.getByRole("alert").filter({ hasText: message });
+  await expect(note).toBeVisible();
+  await expect(note).toHaveCSS("color", LIMIT_NOTE_COLOR);
+}
+
 test.describe("magic-link rate limit", () => {
-  test("requests 1 to 5 succeed and the 6th is refused", async () => {
+  test("requests 1 to 5 succeed and the 6th is refused", async ({ page }) => {
     expect(MAGIC_LINK_EMAIL_LIMIT).toBe(5);
     const email = `burst-${Date.now()}@example.com`;
     await withEnv(localDebug, async () => {
@@ -75,9 +84,24 @@ test.describe("magic-link rate limit", () => {
       });
       expect(organiser?._count.magicLinks).toBe(5);
     });
+
+    await page.goto("/");
+    await page.getByLabel("Email").fill(email);
+    await page.getByRole("button", { name: "Email me a magic link" }).click();
+    await expectLimitNote(page, MAGIC_LINK_LIMIT_MESSAGE);
+
+    await page.getByLabel("Email").fill(`${"a".repeat(110)}@example.com`);
+    await page.getByRole("button", { name: "Email me a magic link" }).click();
+    const invalid = page.getByRole("alert").filter({
+      hasText: "Enter a valid email.",
+    });
+    await expect(invalid).toBeVisible();
+    await expect(invalid).toHaveCSS("color", FORM_ERROR_COLOR);
   });
 
-  test("requests 1 to 20 from one IP succeed and the 21st is refused", async () => {
+  test("requests 1 to 20 from one IP succeed and the 21st is refused", async ({
+    page,
+  }) => {
     expect(MAGIC_LINK_IP_LIMIT).toBe(20);
     const ip = `203.0.113.${Date.now()}`;
     const stamp = Date.now();
@@ -105,9 +129,17 @@ test.describe("magic-link rate limit", () => {
         }),
       ).toBeNull();
     });
+
+    await page.setExtraHTTPHeaders({ "x-vercel-forwarded-for": ip });
+    await page.goto("/");
+    await page.getByLabel("Email").fill(`ip-${stamp}-browser@example.com`);
+    await page.getByRole("button", { name: "Email me a magic link" }).click();
+    await expectLimitNote(page, MAGIC_LINK_LIMIT_MESSAGE);
   });
 
-  test("a spoofed client header cannot reset the per-IP limit", async () => {
+  test("a spoofed client header cannot reset the per-IP limit", async ({
+    page,
+  }) => {
     expect(
       clientIp(
         new Headers({
@@ -166,11 +198,19 @@ test.describe("magic-link rate limit", () => {
         MAGIC_LINK_LIMIT_MESSAGE,
       );
     });
+
+    await page.setExtraHTTPHeaders({ "x-vercel-forwarded-for": real });
+    await page.goto("/");
+    await page.getByLabel("Email").fill(`spoof-${stamp}-browser@example.com`);
+    await page.getByRole("button", { name: "Email me a magic link" }).click();
+    await expectLimitNote(page, MAGIC_LINK_LIMIT_MESSAGE);
   });
 });
 
 test.describe("guest add rate limit", () => {
-  test("the first 20 friend adds succeed and the 21st is refused", async () => {
+  test("the first 20 friend adds succeed and the 21st is refused", async ({
+    page,
+  }) => {
     expect(GUEST_ADD_LIMIT).toBe(20);
     const stamp = `${Date.now()}`;
     const organiser = await prisma.organiser.create({
@@ -224,6 +264,28 @@ test.describe("guest add rate limit", () => {
         where: { matchdayId: matchday.id, addedByGuestId: guestId },
       }),
     ).toBe(20);
+
+    await page.context().addCookies([
+      {
+        name: GUEST_ID_COOKIE,
+        value: guestId,
+        url: "http://localhost:3000",
+      },
+    ]);
+    await page.goto(`/m/${matchday.publicId}`);
+    await page.getByTestId("friend-name").fill("Still red");
+    await page.getByTestId("friend-submit").click();
+    const missingPosition = page.getByRole("alert").filter({
+      hasText: "Pick a position.",
+    });
+    await expect(missingPosition).toBeVisible();
+    await expect(missingPosition).toHaveCSS("color", FORM_ERROR_COLOR);
+
+    await page.getByTestId("friend-name").fill("One More");
+    await page.getByTestId("friend-submit-going").click();
+    await page.getByTestId("friend-submit-position-ANY").click();
+    await page.getByTestId("friend-submit").click();
+    await expectLimitNote(page, GUEST_ADD_LIMIT_MESSAGE);
   });
 });
 

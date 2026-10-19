@@ -2,6 +2,11 @@ import { randomToken } from "./crypto";
 import { isLocalDev } from "./env";
 import { prisma } from "./prisma";
 
+export {
+  GUEST_ADD_LIMIT_MESSAGE,
+  MAGIC_LINK_LIMIT_MESSAGE,
+} from "./rate-limit-copy";
+
 /** Magic-link emails per address. Enough for a typo and a couple of retries. */
 export const MAGIC_LINK_EMAIL_LIMIT = 5;
 export const MAGIC_LINK_EMAIL_WINDOW_MS = 15 * 60 * 1000;
@@ -20,12 +25,6 @@ export const GUEST_ADD_WINDOW_MS = 60 * 60 * 1000;
 /** Same cap per IP per match, so clearing the guest cookie does not reset it. */
 export const GUEST_ADD_IP_LIMIT = 40;
 export const GUEST_ADD_IP_WINDOW_MS = 60 * 60 * 1000;
-
-export const MAGIC_LINK_LIMIT_MESSAGE =
-  "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes.";
-
-export const GUEST_ADD_LIMIT_MESSAGE =
-  "That's the limit for adding people right now. Try again in an hour.";
 
 export const RATE_LIMIT_ERROR_MESSAGE =
   "Something went wrong. Try again in a moment.";
