@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requestMagicLinkForEmail, logoutOrganiser } from "@/lib/auth";
 import { publicAppOrigin } from "@/lib/env";
-import { clientIp } from "@/lib/rate-limit";
+import { resolveClientIp } from "@/lib/rate-limit";
 
 export type MagicLinkState = {
   ok: boolean;
@@ -26,7 +26,7 @@ export async function requestMagicLink(
   const result = await requestMagicLinkForEmail(
     email,
     origin,
-    clientIp(headerStore),
+    resolveClientIp(headerStore),
   );
   if (!result.ok) {
     return { ok: false, error: result.error };

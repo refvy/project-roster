@@ -1,3 +1,4 @@
+import { ipAddress } from "@vercel/functions";
 import { randomToken } from "./crypto";
 import { isLocalDev } from "./env";
 import { prisma } from "./prisma";
@@ -41,14 +42,10 @@ function leftMostAddress(value: string | null | undefined): string | null {
 }
 
 /**
- * Public client IP as Vercel presents it.
+ * Header chain for local and CI, where Vercel has not set the client IP.
+ * Left-most address only. `x-client-ip` and `cf-connecting-ip` are never read.
  *
  * https://vercel.com/docs/headers/request-headers
- * Vercel overwrites an incoming `x-forwarded-for` so a client cannot prepend
- * a fake address, and sets `x-real-ip` to that same public IP.
- * `x-vercel-forwarded-for` is the same value and stays Vercel's if a proxy
- * in front replaces `x-forwarded-for`. Only the left-most address is used.
- * `x-client-ip` and `cf-connecting-ip` are never read.
  */
 export function clientIp(headerStore: {
   get(name: string): string | null;
@@ -58,6 +55,29 @@ export function clientIp(headerStore: {
     leftMostAddress(headerStore.get("x-real-ip")) ||
     leftMostAddress(headerStore.get("x-forwarded-for"))
   );
+}
+
+function onVercel(): boolean {
+  return Boolean(process.env.VERCEL?.trim());
+}
+
+/**
+ * On Vercel, `ipAddress()` from `@vercel/functions` (the platform `x-real-ip`).
+ * Off Vercel (local or CI), the header chain above. A missing address skips
+ * the per-IP cap and warns once for this request. No shared bucket.
+ */
+export function resolveClientIp(headerStore: {
+  get(name: string): string | null;
+}): string | null {
+  const resolved = onVercel()
+    ? leftMostAddress(ipAddress(headerStore as Headers))
+    : clientIp(headerStore);
+  if (!resolved) {
+    console.warn(
+      "[rate-limit] no client IP on this request; skipping the per-IP cap",
+    );
+  }
+  return resolved;
 }
 
 /** Local Playwright and `next dev` share ::1. Production still counts every address. */
@@ -94,4 +114,14 @@ export async function takeRateLimitSlot(
   `;
   const count = Number(rows[0]?.count ?? limit + 1);
   return { allowed: Number.isFinite(count) && count <= limit };
+}
+
+/** Gives back a slot when the attempt crashes after the increment. */
+export async function releaseRateLimitSlot(key: string, windowMs: number) {
+  const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
+  await prisma.$executeRaw`
+    UPDATE "RateLimitBucket"
+    SET "count" = GREATEST("count" - 1, 0)
+    WHERE "key" = ${key} AND "windowStart" = ${windowStart}
+  `;
 }

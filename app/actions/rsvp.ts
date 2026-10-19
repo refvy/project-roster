@@ -11,7 +11,7 @@ import { addFriendForGuest } from "@/lib/friend-add";
 import { isKnownPosition, parsePositions } from "@/lib/positions";
 import { isMatchdayLive } from "@/lib/matchday-status";
 import { normalizePersonName } from "@/lib/rsvp-name";
-import { clientIp } from "@/lib/rate-limit";
+import { resolveClientIp } from "@/lib/rate-limit";
 import { emitPlayerRsvp, planRsvpCapture } from "@/lib/server-analytics";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
@@ -141,7 +141,7 @@ export async function addFriendRsvp(
   const headerStore = await headers();
   const result = await addFriendForGuest({
     ...fields,
-    ip: clientIp(headerStore),
+    ip: resolveClientIp(headerStore),
     getGuestId: getOrCreateGuestId,
   });
   if (result.revalidate) {

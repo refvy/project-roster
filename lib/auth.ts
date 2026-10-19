@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import { hashToken, randomToken, signValue, unsignValue } from "./crypto";
 import { getAppUrl, getResendApiKey, isAuthDebug } from "./env";
@@ -11,6 +12,7 @@ import {
   MAGIC_LINK_LIMIT_MESSAGE,
   RATE_LIMIT_ERROR_MESSAGE,
   ipForRateLimit,
+  releaseRateLimitSlot,
   takeRateLimitSlot,
 } from "./rate-limit";
 
@@ -30,6 +32,31 @@ function cookieBase() {
   };
 }
 
+function isUniqueConflict(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002"
+  );
+}
+
+/**
+ * Prisma's upsert is a read then a write. Parallel first sign-ins for one
+ * new email can both insert and one raises P2002. Re-read instead of crashing.
+ */
+async function findOrCreateOrganiser(email: string) {
+  try {
+    return await prisma.organiser.upsert({
+      where: { email },
+      update: {},
+      create: { email },
+    });
+  } catch (err) {
+    if (!isUniqueConflict(err)) throw err;
+    const existing = await prisma.organiser.findUnique({ where: { email } });
+    if (!existing) throw err;
+    return existing;
+  }
+}
+
 export async function requestMagicLinkForEmail(
   emailRaw: string,
   origin = getAppUrl(),
@@ -40,6 +67,12 @@ export async function requestMagicLinkForEmail(
     return { ok: false as const, error: "Enter a valid email." };
   }
 
+  const held: Array<{ key: string; windowMs: number }> = [];
+  const releaseHeld = () =>
+    Promise.all(
+      held.map((slot) => releaseRateLimitSlot(slot.key, slot.windowMs)),
+    );
+
   try {
     const byEmail = await takeRateLimitSlot(
       `magic-email:${email}`,
@@ -49,6 +82,10 @@ export async function requestMagicLinkForEmail(
     if (!byEmail.allowed) {
       return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
     }
+    held.push({
+      key: `magic-email:${email}`,
+      windowMs: MAGIC_LINK_EMAIL_WINDOW_MS,
+    });
     const clientIp = ipForRateLimit(ip);
     if (clientIp) {
       const byIp = await takeRateLimitSlot(
@@ -59,17 +96,25 @@ export async function requestMagicLinkForEmail(
       if (!byIp.allowed) {
         return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
       }
+      held.push({
+        key: `magic-ip:${clientIp}`,
+        windowMs: MAGIC_LINK_IP_WINDOW_MS,
+      });
     }
   } catch (err) {
+    await releaseHeld();
     console.error("[rate-limit] magic link check failed", err);
     return { ok: false as const, error: RATE_LIMIT_ERROR_MESSAGE };
   }
 
-  const organiser = await prisma.organiser.upsert({
-    where: { email },
-    update: {},
-    create: { email },
-  });
+  let organiser;
+  try {
+    organiser = await findOrCreateOrganiser(email);
+  } catch (err) {
+    await releaseHeld();
+    console.error("[auth] magic link sign-in failed", err);
+    throw err;
+  }
 
   const token = randomToken();
   await prisma.magicLink.create({

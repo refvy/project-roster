@@ -11,6 +11,7 @@ import {
   MAGIC_LINK_IP_LIMIT,
   MAGIC_LINK_LIMIT_MESSAGE,
   clientIp,
+  resolveClientIp,
 } from "../lib/rate-limit";
 
 async function withEnv<T>(
@@ -55,11 +56,21 @@ test.describe("magic-link rate limit", () => {
   test("requests 1 to 5 succeed and the 6th is refused", async ({ page }) => {
     expect(MAGIC_LINK_EMAIL_LIMIT).toBe(5);
     const email = `burst-${Date.now()}@example.com`;
+    await prisma.organiser.create({ data: { email } });
     await withEnv(localDebug, async () => {
       const results = [];
       for (let i = 0; i < 14; i += 1) {
         results.push(
           await requestMagicLinkForEmail(email, "http://localhost:3000", null),
+        );
+      }
+      const accepted = results.filter((result) => result.ok);
+      const refused = results.filter((result) => !result.ok);
+      expect(accepted).toHaveLength(5);
+      expect(refused).toHaveLength(9);
+      for (const result of refused) {
+        expect("error" in result ? result.error : "").toBe(
+          MAGIC_LINK_LIMIT_MESSAGE,
         );
       }
       for (let i = 0; i < 5; i += 1) {
@@ -97,6 +108,38 @@ test.describe("magic-link rate limit", () => {
     });
     await expect(invalid).toBeVisible();
     await expect(invalid).toHaveCSS("color", FORM_ERROR_COLOR);
+  });
+
+  test("14 parallel sign-ins for a new email accept 5 and refuse the rest", async () => {
+    const email = `race-${Date.now()}@example.com`;
+    await withEnv(localDebug, async () => {
+      const settled = await Promise.allSettled(
+        Array.from({ length: 14 }, () =>
+          requestMagicLinkForEmail(email, "http://localhost:3000", null),
+        ),
+      );
+      expect(
+        settled.filter((item) => item.status === "rejected"),
+        "server errors",
+      ).toHaveLength(0);
+      const results = settled.flatMap((item) =>
+        item.status === "fulfilled" ? [item.value] : [],
+      );
+      const accepted = results.filter((result) => result.ok);
+      const refused = results.filter((result) => !result.ok);
+      expect(accepted).toHaveLength(5);
+      expect(refused).toHaveLength(9);
+      for (const result of refused) {
+        expect("error" in result ? result.error : "").toBe(
+          MAGIC_LINK_LIMIT_MESSAGE,
+        );
+      }
+      const organiser = await prisma.organiser.findUnique({
+        where: { email },
+        include: { _count: { select: { magicLinks: true } } },
+      });
+      expect(organiser?._count.magicLinks).toBe(5);
+    });
   });
 
   test("requests 1 to 20 from one IP succeed and the 21st is refused", async ({
@@ -157,6 +200,40 @@ test.describe("magic-link rate limit", () => {
         }),
       ),
     ).toBeNull();
+
+    await withEnv({ VERCEL: "1", VERCEL_ENV: "production" }, () => {
+      expect(
+        resolveClientIp(
+          new Headers({
+            "x-real-ip": "198.51.100.10",
+            "x-forwarded-for": "203.0.113.10, 198.51.100.8",
+            "x-vercel-forwarded-for": "203.0.113.99",
+            "x-client-ip": "1.2.3.4",
+            "cf-connecting-ip": "8.8.8.8",
+          }),
+        ),
+      ).toBe("198.51.100.10");
+
+      const warnings: unknown[][] = [];
+      const original = console.warn;
+      console.warn = (...args: unknown[]) => {
+        warnings.push(args);
+      };
+      try {
+        expect(
+          resolveClientIp(
+            new Headers({
+              "x-forwarded-for": "203.0.113.10",
+              "x-vercel-forwarded-for": "198.51.100.20",
+              "x-client-ip": "1.2.3.4",
+            }),
+          ),
+        ).toBeNull();
+      } finally {
+        console.warn = original;
+      }
+      expect(warnings).toHaveLength(1);
+    });
 
     const real = `198.51.100.${Date.now()}`;
     const stamp = Date.now();
@@ -343,5 +420,45 @@ test.describe("AUTH_DEBUG", () => {
     await withEnv(localDebug, () => {
       expect(isAuthDebug()).toBe(true);
     });
+  });
+});
+
+test.describe("migration gate", () => {
+  test("runs for production and for local or CI, and skips every other case", async () => {
+    const { migrationDecision } = await import("../scripts/migrate-gate.mjs");
+    const { spawnSync } = await import("node:child_process");
+
+    expect(migrationDecision({ VERCEL_ENV: "production", VERCEL: "1" }).run).toBe(
+      true,
+    );
+    expect(migrationDecision({ VERCEL_ENV: "production" }).run).toBe(true);
+    expect(migrationDecision({}).run).toBe(true);
+    expect(migrationDecision({ VERCEL: "", VERCEL_ENV: "  " }).run).toBe(true);
+
+    const missing = migrationDecision({ VERCEL: "1" });
+    expect(missing.run).toBe(false);
+    expect(missing.log).toContain("VERCEL is set and VERCEL_ENV is missing");
+    expect(missing.log).toContain("skipped");
+
+    const preview = migrationDecision({ VERCEL: "1", VERCEL_ENV: "preview" });
+    expect(preview.run).toBe(false);
+    expect(preview.log).toContain("VERCEL_ENV=preview");
+    expect(migrationDecision({ VERCEL_ENV: "preview" }).run).toBe(false);
+    expect(
+      migrationDecision({ VERCEL: "1", VERCEL_ENV: "development" }).run,
+    ).toBe(false);
+
+    const skipped = spawnSync(
+      process.execPath,
+      ["scripts/migrate-if-production.mjs"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, VERCEL: "1", VERCEL_ENV: "" },
+      },
+    );
+    expect(skipped.status).toBe(0);
+    expect(skipped.stdout).toContain("skipped");
+    expect(skipped.stdout).toContain("VERCEL is set and VERCEL_ENV is missing");
+    expect(skipped.stdout).not.toContain("applying migrations");
   });
 });
