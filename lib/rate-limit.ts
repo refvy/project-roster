@@ -1,4 +1,3 @@
-import { ipAddress } from "@vercel/functions";
 import { randomToken } from "./crypto";
 import { isLocalDev } from "./env";
 import { prisma } from "./prisma";
@@ -6,6 +5,7 @@ import { prisma } from "./prisma";
 export {
   GUEST_ADD_LIMIT_MESSAGE,
   MAGIC_LINK_LIMIT_MESSAGE,
+  SELF_RSVP_LIMIT_MESSAGE,
 } from "./rate-limit-copy";
 
 /** Magic-link emails per address. Enough for a typo and a couple of retries. */
@@ -72,20 +72,40 @@ export function clientIp(headerStore: {
   );
 }
 
+/** Vercel sets VERCEL_ENV, or VERCEL=1. Local and CI set neither. */
 function onVercel(): boolean {
-  return Boolean(process.env.VERCEL?.trim());
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (typeof vercelEnv === "string" && vercelEnv.length > 0) return true;
+  return process.env.VERCEL === "1";
+}
+
+function envLabel(name: "VERCEL" | "VERCEL_ENV") {
+  const value = process.env[name];
+  return value === undefined || value === "" ? "unset" : value;
+}
+
+let loggedClientIpRuntime = false;
+
+function logClientIpRuntime(source: "x-real-ip" | "header-chain") {
+  if (loggedClientIpRuntime) return;
+  loggedClientIpRuntime = true;
+  console.log(
+    `[client-ip] runtime VERCEL=${envLabel("VERCEL")} VERCEL_ENV=${envLabel("VERCEL_ENV")} source=${source}`,
+  );
 }
 
 /**
- * On Vercel, `ipAddress()` from `@vercel/functions` (the platform `x-real-ip`).
- * Off Vercel (local or CI), the header chain above. A missing address skips
- * the per-IP cap and warns once for this request. No shared bucket.
+ * On Vercel, the left-most `x-real-ip`. Off Vercel, the header chain above.
+ * A missing address skips the per-IP cap and warns once for this request.
+ * No shared bucket.
  */
 export function resolveClientIp(headerStore: {
   get(name: string): string | null;
 }): string | null {
-  const resolved = onVercel()
-    ? leftMostAddress(ipAddress(headerStore as Headers))
+  const vercel = onVercel();
+  logClientIpRuntime(vercel ? "x-real-ip" : "header-chain");
+  const resolved = vercel
+    ? leftMostAddress(headerStore.get("x-real-ip"))
     : clientIp(headerStore);
   if (!resolved) {
     console.warn(

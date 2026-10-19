@@ -11,6 +11,7 @@ import {
   COPY_EVENT_MATCH_LIMIT,
   GUEST_ADD_LIMIT,
   GUEST_ADD_LIMIT_MESSAGE,
+  SELF_RSVP_LIMIT_MESSAGE,
   MAGIC_LINK_EMAIL_LIMIT,
   MAGIC_LINK_IP_LIMIT,
   MAGIC_LINK_LIMIT_MESSAGE,
@@ -301,6 +302,21 @@ test.describe("magic-link rate limit", () => {
     await page.getByLabel("Email").fill(`spoof-${stamp}-browser@example.com`);
     await page.getByRole("button", { name: "Email me a magic link" }).click();
     await expectLimitNote(page, MAGIC_LINK_LIMIT_MESSAGE);
+  });
+
+  test("VERCEL_ENV alone trusts x-real-ip over a forged x-forwarded-for", () => {
+    return withEnv({ VERCEL: undefined, VERCEL_ENV: "preview" }, () => {
+      expect(
+        resolveClientIp(
+          new Headers({
+            "x-forwarded-for": "203.0.113.77, 198.51.100.1",
+            "x-vercel-forwarded-for": "203.0.113.99",
+            "x-real-ip": "198.51.100.10",
+            "x-client-ip": "1.2.3.4",
+          }),
+        ),
+      ).toBe("198.51.100.10");
+    });
   });
 });
 
@@ -669,7 +685,7 @@ test.describe("self-rsvp rate limit", () => {
       ip,
     });
     expect(refused.ok).toBe(false);
-    expect(refused.error).toBe(GUEST_ADD_LIMIT_MESSAGE);
+    expect(refused.error).toBe(SELF_RSVP_LIMIT_MESSAGE);
     expect(refused.rateLimited).toBe(true);
     expect(refused.revalidate).toBeUndefined();
     expect(
@@ -689,7 +705,7 @@ test.describe("self-rsvp rate limit", () => {
     await page.getByTestId("status-going").click();
     await page.getByTestId("position-ANY").click();
     await page.getByTestId("rsvp-submit").click();
-    await expectLimitNote(page, GUEST_ADD_LIMIT_MESSAGE);
+    await expectLimitNote(page, SELF_RSVP_LIMIT_MESSAGE);
     expect(
       await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
     ).toBe(60);

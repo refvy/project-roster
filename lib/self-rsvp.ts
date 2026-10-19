@@ -3,7 +3,7 @@ import { isMatchdayLive } from "./matchday-status";
 import { normalizePersonName } from "./rsvp-name";
 import { prisma } from "./prisma";
 import {
-  GUEST_ADD_LIMIT_MESSAGE,
+  SELF_RSVP_LIMIT_MESSAGE,
   RATE_LIMIT_ERROR_MESSAGE,
   SELF_RSVP_IP_LIMIT,
   SELF_RSVP_IP_WINDOW_MS,
@@ -97,7 +97,7 @@ export async function saveGuestRsvp(input: {
       if (!slot.allowed) {
         return {
           ok: false,
-          error: GUEST_ADD_LIMIT_MESSAGE,
+          error: SELF_RSVP_LIMIT_MESSAGE,
           rateLimited: true,
         };
       }
