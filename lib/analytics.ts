@@ -39,6 +39,12 @@ export function isAnalyticsEnabled() {
   return Boolean(getPosthogKey());
 }
 
+/** Every capture, client and server. Vercel sets VERCEL_ENV; otherwise local. */
+export function analyticsEnv() {
+  const value = process.env.VERCEL_ENV?.trim() ?? "";
+  return value.length > 0 ? value : "local";
+}
+
 export function analyticsFromMatchday(
   matchday: {
     sport: string;
@@ -71,6 +77,7 @@ function eventPayload(props: AnalyticsProps) {
     role: props.role,
     ...(props.match_id ? { match_id: props.match_id } : {}),
     ...(props.organiser_id ? { organiser_id: props.organiser_id } : {}),
+    env: analyticsEnv(),
   };
 }
 
@@ -139,6 +146,9 @@ export async function capture(
 
 declare global {
   interface Window {
-    __SKWAD_ANALYTICS__?: { event: string; props: AnalyticsProps }[];
+    __SKWAD_ANALYTICS__?: {
+      event: string;
+      props: AnalyticsProps & { env: string };
+    }[];
   }
 }

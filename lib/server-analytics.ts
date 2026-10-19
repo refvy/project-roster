@@ -1,4 +1,9 @@
-import { getPosthogHost, getPosthogKey, isAnalyticsEnabled } from "@/lib/analytics";
+import {
+  analyticsEnv,
+  getPosthogHost,
+  getPosthogKey,
+  isAnalyticsEnabled,
+} from "@/lib/analytics";
 import { organiserAnalyticsId } from "@/lib/organiser-id";
 import { parseSport } from "@/lib/positions";
 
@@ -161,11 +166,15 @@ export async function emitMatchCopy(
 
 async function captureServer(body: CaptureBody) {
   if (!isAnalyticsEnabled() || !body.api_key) return;
+  const payload = {
+    ...body,
+    properties: { ...body.properties, env: analyticsEnv() },
+  };
   try {
     const response = await fetch(`${getPosthogHost()}/capture/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(4000),
     });
     if (!response.ok) {

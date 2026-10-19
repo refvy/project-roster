@@ -39,6 +39,7 @@ import {
   detailsPreview,
 } from "../lib/when-where";
 import {
+  analyticsEnv,
   analyticsFromMatchday,
   capture,
   getPosthogKey,
@@ -680,6 +681,68 @@ test.describe("analytics helper", () => {
       match_id: "pub_tbd",
     });
   });
+
+  test("captured events include env from VERCEL_ENV, or local when unset", async () => {
+    const prevKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    const prevEnv = process.env.VERCEL_ENV;
+    delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    const bodies: Record<string, unknown>[] = [];
+    const origFetch = globalThis.fetch;
+    const sink: { event: string; props: { env?: string } }[] = [];
+    const previousWindow = (globalThis as { window?: unknown }).window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      writable: true,
+      value: { __SKWAD_ANALYTICS__: sink },
+    });
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+    try {
+      for (const value of ["production", "preview", "development"] as const) {
+        process.env.VERCEL_ENV = value;
+        sink.length = 0;
+        bodies.length = 0;
+        await capture("dupe_warn_shown", sample);
+        process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+        await emitMatchCreated("pub_env");
+        delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+        expect(sink).toHaveLength(1);
+        expect(sink[0]?.props.env).toBe(value);
+        expect(bodies).toHaveLength(1);
+        expect(
+          (bodies[0]!.properties as Record<string, unknown>).env,
+        ).toBe(value);
+      }
+      delete process.env.VERCEL_ENV;
+      sink.length = 0;
+      bodies.length = 0;
+      await capture("invite_copied", sample);
+      process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+      await emitPlayerRsvp("pub_env", { status: "going", change: "create" });
+      expect(analyticsEnv()).toBe("local");
+      expect(sink[0]?.props.env).toBe("local");
+      expect(
+        (bodies[0]!.properties as Record<string, unknown>).env,
+      ).toBe("local");
+    } finally {
+      globalThis.fetch = origFetch;
+      if (previousWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window;
+      } else {
+        Object.defineProperty(globalThis, "window", {
+          configurable: true,
+          writable: true,
+          value: previousWindow,
+        });
+      }
+      if (prevKey === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prevKey;
+      if (prevEnv === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = prevEnv;
+    }
+  });
 });
 
 test.describe("server analytics", () => {
@@ -708,6 +771,7 @@ test.describe("server analytics", () => {
           match_id: "pub_match",
           status: "going",
           change: "create",
+          env: analyticsEnv(),
           $process_person_profile: false,
           $geoip_disable: true,
         },
@@ -720,6 +784,7 @@ test.describe("server analytics", () => {
           match_id: "pub_match",
           status: "out",
           change: "update",
+          env: analyticsEnv(),
           $process_person_profile: false,
           $geoip_disable: true,
         },
@@ -729,6 +794,7 @@ test.describe("server analytics", () => {
         expect(properties.$geoip_disable).toBe(true);
         expect(publicCaptureKeys(properties)).toEqual([
           "change",
+          "env",
           "match_id",
           "status",
         ]);
@@ -794,6 +860,7 @@ test.describe("server analytics", () => {
         distinct_id: "match:pub_new",
         properties: {
           match_id: "pub_new",
+          env: analyticsEnv(),
           $process_person_profile: false,
           $geoip_disable: true,
         },
@@ -803,7 +870,7 @@ test.describe("server analytics", () => {
       ).toBe(true);
       expect(
         publicCaptureKeys(bodies[0]!.properties as Record<string, unknown>),
-      ).toEqual(["match_id"]);
+      ).toEqual(["env", "match_id"]);
       expect(buildCaptureBody("match_created", "pub_new").properties).not.toHaveProperty(
         "name",
       );
@@ -846,6 +913,7 @@ test.describe("server analytics", () => {
         distinct_id: "match:pub_new",
         properties: {
           match_id: "pub_new",
+          env: analyticsEnv(),
           $process_person_profile: false,
           $geoip_disable: true,
         },
@@ -893,10 +961,12 @@ test.describe("server analytics", () => {
         expect(encoded).not.toContain("name");
       }
       expect(publicCaptureKeys(bodies[0]!.properties as Record<string, unknown>)).toEqual([
+        "env",
         "match_id",
         "organiser_id",
       ]);
       expect(publicCaptureKeys(bodies[2]!.properties as Record<string, unknown>)).toEqual([
+        "env",
         "going_count",
         "has_datetime",
         "has_map",

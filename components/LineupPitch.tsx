@@ -29,6 +29,7 @@ export function LineupPitch({
   function renderChip(
     slot: (typeof lines)[number]["slots"][number],
     dense = false,
+    count = 1,
   ) {
     const snap = byId.get(slot.id);
     const name = snap?.name ?? null;
@@ -41,6 +42,7 @@ export function LineupPitch({
         compact={compact}
         fit={fit}
         dense={dense}
+        count={count}
         selected={selectedSlotId === slot.id}
         interactive={Boolean(onSlot)}
         onClick={onSlot ? () => onSlot(slot.id) : undefined}
@@ -54,7 +56,7 @@ export function LineupPitch({
       data-testid={testId}
       className={`relative overflow-hidden rounded-3xl bg-cream ring-1 ring-accent/30 ${
         fit
-          ? "max-h-full"
+          ? "lineup-fit-pitch max-h-full"
           : compact
             ? "mx-auto w-full max-w-[18rem]"
             : "mx-auto w-full max-w-md"
@@ -100,7 +102,7 @@ function FitLines({
   renderChip,
 }: {
   lines: LineupLine[];
-  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean, count: number) => ReactNode;
 }) {
   const keeper = lines.filter((line) => line.area === "the keeper");
   const defence = lines.filter((line) => line.area === "defence");
@@ -134,7 +136,7 @@ function OutfieldBand({
   renderChip,
 }: {
   lines: LineupLine[];
-  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean, count: number) => ReactNode;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col-reverse justify-evenly">
@@ -150,9 +152,10 @@ function EvenRow({
   renderChip,
 }: {
   line: LineupLine;
-  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean, count: number) => ReactNode;
 }) {
-  const dense = line.slots.length >= 5;
+  const count = line.slots.length;
+  const dense = count >= 5;
   return (
     <div className="flex w-full min-w-0 items-center">
       {line.slots.map((slot) => (
@@ -160,21 +163,22 @@ function EvenRow({
           key={slot.id}
           className="flex min-w-0 flex-1 items-center justify-center"
         >
-          {renderChip(slot, dense)}
+          {renderChip(slot, dense, count)}
         </div>
       ))}
     </div>
   );
 }
 
-/** Editor chip fills its cell minus a 4px gap. No fixed min-width, so a row of 5 can shrink. */
+/** Pill sized to the name, never wider than the cell minus 4px.
+    A row of 5 under 360px fills its cell from globals.css. */
 function fitChipClass() {
-  return "lineup-fit-chip min-h-[38px] w-[calc(100%-4px)] min-w-0 max-w-full overflow-hidden py-1";
+  return "lineup-fit-chip min-h-[38px] w-auto min-w-0 max-w-[calc(100%-4px)] overflow-hidden py-1";
 }
 
-/** 14px, or 12px on a row of 5+ and on every row at 320px. Sized in globals.css. */
+/** 14px, stepping down in globals.css. Sized there so media queries win. */
 function fitNameClass() {
-  return "lineup-fit-name block w-full min-w-0 truncate text-center font-display leading-none tracking-tight text-ink";
+  return "lineup-fit-name block min-w-0 max-w-full truncate text-center font-display leading-none tracking-tight text-ink";
 }
 
 function chipFirstName(name: string) {
@@ -188,6 +192,7 @@ function SlotChip({
   compact,
   fit = false,
   dense = false,
+  count = 1,
   selected,
   interactive,
   onClick,
@@ -199,6 +204,7 @@ function SlotChip({
   compact: boolean;
   fit?: boolean;
   dense?: boolean;
+  count?: number;
   selected: boolean;
   interactive: boolean;
   onClick?: () => void;
@@ -245,12 +251,17 @@ function SlotChip({
   );
 
   const denseAttr = fit ? (dense ? "true" : "false") : undefined;
+  const countAttr = fit ? String(count) : undefined;
+
+  const label = name ?? undefined;
 
   if (!interactive) {
     return (
       <div
         data-testid={`lineup-slot-${slotId}`}
         data-dense={denseAttr}
+        data-count={countAttr}
+        aria-label={label}
         className={className}
       >
         {inner}
@@ -265,6 +276,8 @@ function SlotChip({
       data-slot-key={slotKey}
       data-filled={filled ? "true" : "false"}
       data-dense={denseAttr}
+      data-count={countAttr}
+      aria-label={label}
       onClick={onClick}
       className={className}
     >
