@@ -27,6 +27,13 @@ export const GUEST_ADD_WINDOW_MS = 60 * 60 * 1000;
 export const GUEST_ADD_IP_LIMIT = 40;
 export const GUEST_ADD_IP_WINDOW_MS = 60 * 60 * 1000;
 
+/** Self-RSVP writes per client IP per match. A flood, not a normal evening. */
+export const SELF_RSVP_IP_LIMIT = 60;
+export const SELF_RSVP_IP_WINDOW_MS = 60 * 60 * 1000;
+
+/** Keep a bucket until its window has ended and another day has passed. */
+export const RATE_LIMIT_BUCKET_GRACE_MS = 24 * 60 * 60 * 1000;
+
 /** Copy pings per match per event. The clipboard still succeeds when this trips. */
 export const COPY_EVENT_MATCH_LIMIT = 30;
 export const COPY_EVENT_MATCH_WINDOW_MS = 15 * 60 * 1000;
@@ -132,4 +139,30 @@ export async function releaseRateLimitSlot(key: string, windowMs: number) {
     SET "count" = GREATEST("count" - 1, 0)
     WHERE "key" = ${key} AND "windowStart" = ${windowStart}
   `;
+}
+
+function longestRateLimitWindowMs() {
+  return Math.max(
+    MAGIC_LINK_EMAIL_WINDOW_MS,
+    MAGIC_LINK_IP_WINDOW_MS,
+    GUEST_ADD_WINDOW_MS,
+    GUEST_ADD_IP_WINDOW_MS,
+    SELF_RSVP_IP_WINDOW_MS,
+    COPY_EVENT_MATCH_WINDOW_MS,
+    COPY_EVENT_IP_WINDOW_MS,
+  );
+}
+
+/** Window start strictly older than this has been finished for more than a day. */
+export function rateLimitBucketExpiredBefore(now = new Date()) {
+  return new Date(
+    now.getTime() - RATE_LIMIT_BUCKET_GRACE_MS - longestRateLimitWindowMs(),
+  );
+}
+
+export async function deleteExpiredRateLimitBuckets(now = new Date()) {
+  const result = await prisma.rateLimitBucket.deleteMany({
+    where: { windowStart: { lt: rateLimitBucketExpiredBefore(now) } },
+  });
+  return result.count;
 }

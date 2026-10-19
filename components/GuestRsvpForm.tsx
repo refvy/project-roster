@@ -5,6 +5,7 @@ import { submitRsvp, type RsvpState } from "@/app/actions/rsvp";
 import { AthleteNameInput } from "@/components/AthleteNameInput";
 import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
+import { RATE_LIMIT_NOTE_CLASS } from "@/lib/rate-limit-copy";
 import { collidingGoingName } from "@/lib/rsvp-name";
 import { groupedPositionRows, type Position } from "@/lib/positions";
 
@@ -142,7 +143,14 @@ export function GuestRsvpForm({
       ) : null}
 
       {state?.error ? (
-        <p className="text-sm font-medium text-danger" role="alert">
+        <p
+          className={
+            state.rateLimited
+              ? RATE_LIMIT_NOTE_CLASS
+              : "text-sm font-medium text-danger"
+          }
+          role={state.rateLimited ? "status" : "alert"}
+        >
           {state.error}
         </p>
       ) : null}

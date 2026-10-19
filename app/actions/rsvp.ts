@@ -12,6 +12,7 @@ import { isKnownPosition, parsePositions } from "@/lib/positions";
 import { isMatchdayLive } from "@/lib/matchday-status";
 import { normalizePersonName } from "@/lib/rsvp-name";
 import { resolveClientIp } from "@/lib/rate-limit";
+import { saveGuestRsvp } from "@/lib/self-rsvp";
 import { emitPlayerRsvp, planRsvpCapture } from "@/lib/server-analytics";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
@@ -20,6 +21,7 @@ export type RsvpState = {
   ok: boolean;
   error?: string;
   duplicate?: string;
+  rateLimited?: boolean;
 } | null;
 
 function readRsvpFields(formData: FormData) {
@@ -61,78 +63,37 @@ export async function submitRsvp(
   _prev: RsvpState,
   formData: FormData,
 ): Promise<NonNullable<RsvpState>> {
-  const { publicId, name, status, positionKeyRaw } = readRsvpFields(formData);
-  if (!publicId) return { ok: false, error: "Missing matchday." };
-  const nameError = validatePerson(name);
+  const fields = readRsvpFields(formData);
+  if (!fields.publicId) return { ok: false, error: "Missing matchday." };
+  const nameError = validatePerson(fields.name);
   if (nameError) return { ok: false, error: nameError };
 
-  const matchday = await prisma.matchday.findUnique({
-    where: { publicId },
-  });
-  if (!matchday || matchday.deletedAt) {
-    return { ok: false, error: "This matchday was deleted." };
-  }
-  if (!isMatchdayLive(matchday)) {
-    return { ok: false, error: "This match was cancelled." };
-  }
-
-  const positions = parsePositions(matchday.positions);
-  const positionKey = positionKeyRaw || null;
-  if (status === "GOING" && !isKnownPosition(positions, positionKey)) {
-    return { ok: false, error: "Pick a position." };
-  }
-
+  const headerStore = await headers();
   const guestId = await getOrCreateGuestId();
-  if (status === "GOING") {
-    const collision = await findGoingNameCollision(matchday.id, name, {
-      guestId,
-    });
-    if (collision) {
-      return { ok: false, duplicate: collision.name };
+  const result = await saveGuestRsvp({
+    ...fields,
+    guestId,
+    ip: resolveClientIp(headerStore),
+  });
+  if (result.ok && result.revalidate && result.capture) {
+    await rememberGuestName(fields.name);
+    const planned = planRsvpCapture(result.capture.from, result.capture.to);
+    if (planned) {
+      await emitPlayerRsvp(
+        result.capture.publicId,
+        planned,
+        result.capture.organiserId,
+      );
     }
+    revalidatePath(`/m/${result.revalidate.publicId}`);
+    revalidatePath(`/board/${result.revalidate.matchdayId}`);
   }
-  await rememberGuestName(name);
-
-  const existing = await prisma.rsvp.findUnique({
-    where: {
-      matchdayId_guestId: { matchdayId: matchday.id, guestId },
-    },
-    select: { status: true },
-  });
-
-  await prisma.rsvp.upsert({
-    where: {
-      matchdayId_guestId: { matchdayId: matchday.id, guestId },
-    },
-    update: {
-      name,
-      status,
-      positionKey: status === "GOING" ? positionKey : null,
-      addedByGuestId: null,
-      addedByName: null,
-    },
-    create: {
-      matchdayId: matchday.id,
-      guestId,
-      name,
-      status,
-      positionKey: status === "GOING" ? positionKey : null,
-    },
-  });
-
-  await prisma.rsvp.updateMany({
-    where: { matchdayId: matchday.id, addedByGuestId: guestId },
-    data: { addedByName: name },
-  });
-
-  const planned = planRsvpCapture(existing?.status ?? null, status);
-  if (planned) {
-    await emitPlayerRsvp(matchday.publicId, planned, matchday.organiserId);
-  }
-
-  revalidatePath(`/m/${publicId}`);
-  revalidatePath(`/board/${matchday.id}`);
-  return { ok: true };
+  return {
+    ok: result.ok,
+    error: result.error,
+    duplicate: result.duplicate,
+    rateLimited: result.rateLimited,
+  };
 }
 
 export async function addFriendRsvp(

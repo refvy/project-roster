@@ -108,6 +108,7 @@ Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form err
 | Magic-link sign-in | client IP (on Vercel: `ipAddress()` from `@vercel/functions`; local and CI: header chain) | 20 | 15 minutes |
 | Add someone else | guest + match | 20 | 1 hour |
 | Add someone else | client IP + match, when the request has one | 40 | 1 hour |
+| Self-RSVP | client IP + match, when the request has one | 60 | 1 hour |
 | Copy invitation / copy roster ping | match + event | 30 | 15 minutes |
 | Copy invitation / copy roster ping | client IP (same Vercel order as sign-in), when the request has one | 60 | 15 minutes |
 
@@ -115,7 +116,9 @@ A copy ping that hits the cap returns 429. The clipboard copy still succeeds; th
 
 On Vercel the client IP comes from `ipAddress()` in `@vercel/functions`, which reads the platform `x-real-ip` ([request headers](https://vercel.com/docs/headers/request-headers)). Local and CI builds are not on Vercel, so they fall back to the left-most `x-vercel-forwarded-for`, then `x-real-ip`, then the left-most `x-forwarded-for`. The limiter does not read `x-client-ip` or `cf-connecting-ip`, and it does not use a later address in a list. If no address resolves, that request skips the per-IP cap and logs one warning. It does not share a bucket with other requests. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
 
-Refusals sit in the same inline spot as other form errors, at the same size, with `role="status"`. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red and keep `role="alert"`. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour."
+Refusals sit in the same inline spot as other form errors, at the same size, with `role="status"`. The form chooses that note from an explicit `rateLimited` flag. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red and keep `role="alert"`. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else and self-RSVP: "That's the limit for adding people right now. Try again in an hour."
+
+The 5am Bangkok cron also deletes `RateLimitBucket` rows whose window ended more than 24 hours ago.
 
 ## Tests
 

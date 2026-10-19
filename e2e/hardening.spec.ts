@@ -13,10 +13,14 @@ import {
   MAGIC_LINK_EMAIL_LIMIT,
   MAGIC_LINK_IP_LIMIT,
   MAGIC_LINK_LIMIT_MESSAGE,
+  SELF_RSVP_IP_LIMIT,
   clientIp,
+  deleteExpiredRateLimitBuckets,
+  rateLimitBucketExpiredBefore,
   resolveClientIp,
   takeRateLimitSlot,
 } from "../lib/rate-limit";
+import { saveGuestRsvp } from "../lib/self-rsvp";
 
 async function withEnv<T>(
   updates: Record<string, string | undefined>,
@@ -84,6 +88,11 @@ test.describe("magic-link rate limit", () => {
       expect(results[5] && "error" in results[5] ? results[5].error : "").toBe(
         MAGIC_LINK_LIMIT_MESSAGE,
       );
+      expect(
+        results[5] && "rateLimited" in results[5]
+          ? results[5].rateLimited
+          : false,
+      ).toBe(true);
       const fourteenth = results[13];
       expect(fourteenth?.ok).toBe(false);
       expect(fourteenth && "error" in fourteenth ? fourteenth.error : "").toBe(
@@ -339,6 +348,7 @@ test.describe("guest add rate limit", () => {
     });
     expect(refused.state.ok).toBe(false);
     expect(refused.state.error).toBe(GUEST_ADD_LIMIT_MESSAGE);
+    expect(refused.state.rateLimited).toBe(true);
     expect(refused.revalidate).toBeUndefined();
     expect(
       await prisma.rsvp.count({
@@ -545,5 +555,135 @@ test.describe("copy analytics endpoint", () => {
       data: { event: "invite_copied", publicId: "doesnotexist01" },
     });
     expect(ignoredSpoof.status()).toBe(404);
+  });
+});
+
+test.describe("self-rsvp rate limit", () => {
+  test("the 60th self-RSVP from one IP is accepted and the 61st is refused", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    expect(SELF_RSVP_IP_LIMIT).toBe(60);
+    const stamp = `${Date.now()}`;
+    const ip = `198.51.100.${stamp.slice(-2)}`;
+    const organiser = await prisma.organiser.create({
+      data: { email: `self-cap-${stamp}@example.com` },
+    });
+    const matchday = await prisma.matchday.create({
+      data: {
+        publicId: `self${stamp}`,
+        organiserId: organiser.id,
+        title: "Self cap",
+        positions: FOOTBALL_POSITIONS.map((position) => ({ ...position })),
+        sport: "football",
+      },
+    });
+
+    for (let i = 0; i < SELF_RSVP_IP_LIMIT; i += 1) {
+      const result = await saveGuestRsvp({
+        publicId: matchday.publicId,
+        name: `Mate ${i}`,
+        status: "GOING",
+        positionKeyRaw: "ANY",
+        guestId: `self-${stamp}-${i}`,
+        ip,
+      });
+      expect(result.ok, `rsvp ${i + 1}`).toBe(true);
+      expect(result.rateLimited).toBeUndefined();
+    }
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+
+    const refused = await saveGuestRsvp({
+      publicId: matchday.publicId,
+      name: "One More",
+      status: "GOING",
+      positionKeyRaw: "ANY",
+      guestId: `self-${stamp}-late`,
+      ip,
+    });
+    expect(refused.ok).toBe(false);
+    expect(refused.error).toBe(GUEST_ADD_LIMIT_MESSAGE);
+    expect(refused.rateLimited).toBe(true);
+    expect(refused.revalidate).toBeUndefined();
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+
+    await page.context().addCookies([
+      {
+        name: GUEST_ID_COOKIE,
+        value: `self-ui-${stamp}`,
+        url: "http://localhost:3000",
+      },
+    ]);
+    await page.setExtraHTTPHeaders({ "x-vercel-forwarded-for": ip });
+    await page.goto(`/m/${matchday.publicId}`);
+    await page.getByLabel("Your name").fill("Still waiting");
+    await page.getByTestId("status-going").click();
+    await page.getByTestId("position-ANY").click();
+    await page.getByTestId("rsvp-submit").click();
+    await expectLimitNote(page, GUEST_ADD_LIMIT_MESSAGE);
+    expect(
+      await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
+    ).toBe(60);
+  });
+});
+
+test.describe("rate-limit cleanup", () => {
+  test("the daily cron deletes buckets whose window ended more than a day ago", async ({
+    request,
+  }) => {
+    const now = new Date();
+    const cutoff = rateLimitBucketExpiredBefore(now);
+    const staleKey = `stale-${now.getTime()}`;
+    const edgeKey = `edge-${now.getTime()}`;
+    const freshKey = `fresh-${now.getTime()}`;
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: staleKey,
+        windowStart: new Date(cutoff.getTime() - 1000),
+        count: 4,
+      },
+    });
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: edgeKey,
+        windowStart: new Date(cutoff.getTime() + 1000),
+        count: 1,
+      },
+    });
+    await prisma.rateLimitBucket.create({
+      data: {
+        key: freshKey,
+        windowStart: now,
+        count: 1,
+      },
+    });
+
+    const removed = await deleteExpiredRateLimitBuckets(now);
+    expect(removed).toBeGreaterThanOrEqual(1);
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: staleKey } }),
+    ).toBeNull();
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: edgeKey } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: freshKey } }),
+    ).not.toBeNull();
+
+    const cron = await request.get("/api/cron/og-refresh");
+    expect(cron.ok()).toBeTruthy();
+    const body = (await cron.json()) as {
+      ok: boolean;
+      rateLimitBucketsDeleted: number;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.rateLimitBucketsDeleted).toBeGreaterThanOrEqual(0);
+    expect(
+      await prisma.rateLimitBucket.findFirst({ where: { key: freshKey } }),
+    ).not.toBeNull();
   });
 });

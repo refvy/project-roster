@@ -2,6 +2,7 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { isAuthDebug } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { deleteExpiredRateLimitBuckets } from "@/lib/rate-limit";
 import { nextOgBust } from "@/lib/share-pulse";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
+  const rateLimitBucketsDeleted = await deleteExpiredRateLimitBuckets();
   const ogBust = nextOgBust();
   const result = await prisma.matchday.updateMany({
     where: { deletedAt: null, status: "LIVE" },
@@ -39,5 +41,6 @@ export async function GET(request: Request) {
     ok: true,
     updated: result.count,
     ogBust,
+    rateLimitBucketsDeleted,
   });
 }

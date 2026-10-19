@@ -19,6 +19,7 @@ export type FriendAddState = {
   ok: boolean;
   error?: string;
   duplicate?: string;
+  rateLimited?: boolean;
 };
 
 export type FriendAddResult = {
@@ -94,7 +95,13 @@ export async function addFriendForGuest(input: {
       GUEST_ADD_WINDOW_MS,
     );
     if (!byGuest.allowed) {
-      return { state: { ok: false, error: GUEST_ADD_LIMIT_MESSAGE } };
+      return {
+        state: {
+          ok: false,
+          error: GUEST_ADD_LIMIT_MESSAGE,
+          rateLimited: true,
+        },
+      };
     }
     const clientIp = ipForRateLimit(input.ip);
     if (clientIp) {
@@ -104,7 +111,13 @@ export async function addFriendForGuest(input: {
         GUEST_ADD_IP_WINDOW_MS,
       );
       if (!byIp.allowed) {
-        return { state: { ok: false, error: GUEST_ADD_LIMIT_MESSAGE } };
+        return {
+          state: {
+            ok: false,
+            error: GUEST_ADD_LIMIT_MESSAGE,
+            rateLimited: true,
+          },
+        };
       }
     }
   } catch (err) {
