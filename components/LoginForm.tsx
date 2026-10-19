@@ -40,7 +40,7 @@ export function LoginForm() {
               ? RATE_LIMIT_NOTE_CLASS
               : "text-sm font-medium text-danger"
           }
-          role="alert"
+          role={state.error === MAGIC_LINK_LIMIT_MESSAGE ? "status" : "alert"}
         >
           {state.error}
         </p>

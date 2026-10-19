@@ -109,7 +109,7 @@ Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form err
 
 On Vercel the client IP is the public address Vercel writes: it overwrites incoming `x-forwarded-for` and sets `x-real-ip` to the same value ([request headers](https://vercel.com/docs/headers/request-headers)). The limiter uses the left-most `x-vercel-forwarded-for`, then `x-real-ip`, then the left-most `x-forwarded-for`. It does not read `x-client-ip` or `cf-connecting-ip`, and it does not use a later address in a list. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
 
-Refusals sit in the same inline spot as other form errors, at the same size, with `role="alert"`. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour."
+Refusals sit in the same inline spot as other form errors, at the same size, with `role="status"`. The text uses the muted `ink-soft` token (`#5e584f`). Other form errors stay red and keep `role="alert"`. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour."
 
 ## Tests
 

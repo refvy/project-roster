@@ -46,7 +46,7 @@ const LIMIT_NOTE_COLOR = "rgb(94, 88, 79)";
 const FORM_ERROR_COLOR = "rgb(180, 35, 24)";
 
 async function expectLimitNote(page: Page, message: string) {
-  const note = page.getByRole("alert").filter({ hasText: message });
+  const note = page.getByRole("status").filter({ hasText: message });
   await expect(note).toBeVisible();
   await expect(note).toHaveCSS("color", LIMIT_NOTE_COLOR);
 }

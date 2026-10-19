@@ -286,7 +286,7 @@ function FriendForm({
               ? RATE_LIMIT_NOTE_CLASS
               : "text-sm font-medium text-danger"
           }
-          role="alert"
+          role={state.error === GUEST_ADD_LIMIT_MESSAGE ? "status" : "alert"}
         >
           {state.error}
         </p>
