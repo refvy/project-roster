@@ -42,7 +42,7 @@ const localDebug = {
   RESEND_API_KEY: "",
 } as const;
 
-const LIMIT_NOTE_COLOR = "rgb(107, 114, 128)";
+const LIMIT_NOTE_COLOR = "rgb(94, 88, 79)";
 const FORM_ERROR_COLOR = "rgb(180, 35, 24)";
 
 async function expectLimitNote(page: Page, message: string) {

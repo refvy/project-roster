@@ -6,8 +6,5 @@ export const MAGIC_LINK_LIMIT_MESSAGE =
 export const GUEST_ADD_LIMIT_MESSAGE =
   "That's the limit for adding people right now. Try again in an hour.";
 
-/**
- * Same size and place as a form error. Grey #6B7280, not danger red.
- * `--ink-soft` is #5e584f, so it is not this colour.
- */
-export const RATE_LIMIT_NOTE_CLASS = "text-sm font-medium text-[#6B7280]";
+/** Same spot and size as a form error, using the muted ink-soft token. */
+export const RATE_LIMIT_NOTE_CLASS = "text-sm font-medium text-ink-soft";
