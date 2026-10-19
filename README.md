@@ -103,11 +103,13 @@ Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form err
 | Action | Bucket | Limit | Window |
 | --- | --- | --- | --- |
 | Magic-link sign-in | email address | 5 | 15 minutes |
-| Magic-link sign-in | client IP, when the request has one (`x-forwarded-for` or `x-real-ip`) | 20 | 15 minutes |
+| Magic-link sign-in | client IP (Vercel: left-most `x-vercel-forwarded-for`, else `x-real-ip`, else left-most `x-forwarded-for`) | 20 | 15 minutes |
 | Add someone else | guest + match | 20 | 1 hour |
 | Add someone else | client IP + match, when the request has one | 40 | 1 hour |
 
-Vercel sends the client IP in `x-forwarded-for`. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
+On Vercel the client IP is the public address Vercel writes: it overwrites incoming `x-forwarded-for` and sets `x-real-ip` to the same value ([request headers](https://vercel.com/docs/headers/request-headers)). The limiter uses the left-most `x-vercel-forwarded-for`, then `x-real-ip`, then the left-most `x-forwarded-for`. It does not read `x-client-ip` or `cf-connecting-ip`, and it does not use a later address in a list. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
+
+Refusals use the same inline form error as the other fields. Sign-in: "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes." Add someone else: "That's the limit for adding people right now. Try again in an hour."
 
 ## Tests
 

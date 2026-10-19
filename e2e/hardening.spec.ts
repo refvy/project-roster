@@ -10,6 +10,7 @@ import {
   MAGIC_LINK_EMAIL_LIMIT,
   MAGIC_LINK_IP_LIMIT,
   MAGIC_LINK_LIMIT_MESSAGE,
+  clientIp,
 } from "../lib/rate-limit";
 
 async function withEnv<T>(
@@ -42,7 +43,8 @@ const localDebug = {
 } as const;
 
 test.describe("magic-link rate limit", () => {
-  test("the 14th rapid request for one email is refused", async () => {
+  test("requests 1 to 5 succeed and the 6th is refused", async () => {
+    expect(MAGIC_LINK_EMAIL_LIMIT).toBe(5);
     const email = `burst-${Date.now()}@example.com`;
     await withEnv(localDebug, async () => {
       const results = [];
@@ -51,8 +53,13 @@ test.describe("magic-link rate limit", () => {
           await requestMagicLinkForEmail(email, "http://localhost:3000", null),
         );
       }
-      expect(results[MAGIC_LINK_EMAIL_LIMIT - 1]?.ok).toBe(true);
-      expect(results[MAGIC_LINK_EMAIL_LIMIT]?.ok).toBe(false);
+      for (let i = 0; i < 5; i += 1) {
+        expect(results[i]?.ok, `request ${i + 1}`).toBe(true);
+      }
+      expect(results[5]?.ok).toBe(false);
+      expect(results[5] && "error" in results[5] ? results[5].error : "").toBe(
+        MAGIC_LINK_LIMIT_MESSAGE,
+      );
       const fourteenth = results[13];
       expect(fourteenth?.ok).toBe(false);
       expect(fourteenth && "error" in fourteenth ? fourteenth.error : "").toBe(
@@ -66,15 +73,16 @@ test.describe("magic-link rate limit", () => {
         where: { email },
         include: { _count: { select: { magicLinks: true } } },
       });
-      expect(organiser?._count.magicLinks).toBe(MAGIC_LINK_EMAIL_LIMIT);
+      expect(organiser?._count.magicLinks).toBe(5);
     });
   });
 
-  test("per-IP limit refuses a new email from the same address", async () => {
+  test("requests 1 to 20 from one IP succeed and the 21st is refused", async () => {
+    expect(MAGIC_LINK_IP_LIMIT).toBe(20);
     const ip = `203.0.113.${Date.now()}`;
     const stamp = Date.now();
     await withEnv(localDebug, async () => {
-      for (let i = 0; i < MAGIC_LINK_IP_LIMIT; i += 1) {
+      for (let i = 0; i < 20; i += 1) {
         const result = await requestMagicLinkForEmail(
           `ip-${stamp}-${i}@example.com`,
           "http://localhost:3000",
@@ -98,10 +106,72 @@ test.describe("magic-link rate limit", () => {
       ).toBeNull();
     });
   });
+
+  test("a spoofed client header cannot reset the per-IP limit", async () => {
+    expect(
+      clientIp(
+        new Headers({
+          "x-forwarded-for": "203.0.113.10, 198.51.100.8",
+          "x-client-ip": "1.2.3.4",
+          "cf-connecting-ip": "8.8.8.8",
+        }),
+      ),
+    ).toBe("203.0.113.10");
+    expect(
+      clientIp(
+        new Headers({
+          "x-forwarded-for": " , 203.0.113.99",
+          "x-client-ip": "1.1.1.1",
+        }),
+      ),
+    ).toBeNull();
+
+    const real = `198.51.100.${Date.now()}`;
+    const stamp = Date.now();
+    await withEnv(localDebug, async () => {
+      for (let i = 0; i < 20; i += 1) {
+        const headers = new Headers();
+        headers.set("x-vercel-forwarded-for", real);
+        headers.set("x-real-ip", real);
+        headers.set(
+          "x-forwarded-for",
+          `203.0.113.${i}, 10.0.0.${i}, ${real}`,
+        );
+        headers.set("x-client-ip", `192.0.2.${i}`);
+        headers.set("cf-connecting-ip", `192.0.2.${i + 20}`);
+        const ip = clientIp(headers);
+        expect(ip).toBe(real.toLowerCase());
+        const result = await requestMagicLinkForEmail(
+          `spoof-${stamp}-${i}@example.com`,
+          "http://localhost:3000",
+          ip,
+        );
+        expect(result.ok, `request ${i + 1}`).toBe(true);
+      }
+      const dodging = new Headers();
+      dodging.set("x-vercel-forwarded-for", `${real}, 203.0.113.250`);
+      dodging.set("x-real-ip", real);
+      dodging.set("x-forwarded-for", "198.51.100.250, 10.1.1.1");
+      dodging.set("x-client-ip", "192.0.2.250");
+      dodging.set("cf-connecting-ip", "192.0.2.251");
+      const ip = clientIp(dodging);
+      expect(ip).toBe(real.toLowerCase());
+      const refused = await requestMagicLinkForEmail(
+        `spoof-${stamp}-over@example.com`,
+        "http://localhost:3000",
+        ip,
+      );
+      expect(refused.ok).toBe(false);
+      expect("error" in refused ? refused.error : "").toBe(
+        MAGIC_LINK_LIMIT_MESSAGE,
+      );
+    });
+  });
 });
 
 test.describe("guest add rate limit", () => {
-  test("friend adds stop at the limit", async () => {
+  test("the first 20 friend adds succeed and the 21st is refused", async () => {
+    expect(GUEST_ADD_LIMIT).toBe(20);
     const stamp = `${Date.now()}`;
     const organiser = await prisma.organiser.create({
       data: { email: `guest-cap-${stamp}@example.com` },
@@ -126,7 +196,7 @@ test.describe("guest add rate limit", () => {
       },
     });
 
-    for (let i = 0; i < GUEST_ADD_LIMIT; i += 1) {
+    for (let i = 0; i < 20; i += 1) {
       const result = await addFriendForGuest({
         publicId: matchday.publicId,
         name: `Pal ${i}`,
@@ -153,7 +223,7 @@ test.describe("guest add rate limit", () => {
       await prisma.rsvp.count({
         where: { matchdayId: matchday.id, addedByGuestId: guestId },
       }),
-    ).toBe(GUEST_ADD_LIMIT);
+    ).toBe(20);
   });
 });
 

@@ -22,24 +22,43 @@ export const GUEST_ADD_IP_LIMIT = 40;
 export const GUEST_ADD_IP_WINDOW_MS = 60 * 60 * 1000;
 
 export const MAGIC_LINK_LIMIT_MESSAGE =
-  "Too many sign-in emails just now. Wait a little, then try again.";
+  "We've sent a few links already. Check your inbox (and spam), or try again in 15 minutes.";
 
 export const GUEST_ADD_LIMIT_MESSAGE =
-  "You've added a lot of people. Wait a little, then add the next one.";
+  "That's the limit for adding people right now. Try again in an hour.";
 
 export const RATE_LIMIT_ERROR_MESSAGE =
   "Something went wrong. Try again in a moment.";
 
+/**
+ * Left-most address only. A later comma-separated hop is not the client,
+ * even if the first entry is empty.
+ */
+function leftMostAddress(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const first = value.split(",")[0]?.trim() ?? "";
+  if (!first) return null;
+  return first.slice(0, 80).toLowerCase();
+}
+
+/**
+ * Public client IP as Vercel presents it.
+ *
+ * https://vercel.com/docs/headers/request-headers
+ * Vercel overwrites an incoming `x-forwarded-for` so a client cannot prepend
+ * a fake address, and sets `x-real-ip` to that same public IP.
+ * `x-vercel-forwarded-for` is the same value and stays Vercel's if a proxy
+ * in front replaces `x-forwarded-for`. Only the left-most address is used.
+ * `x-client-ip` and `cf-connecting-ip` are never read.
+ */
 export function clientIp(headerStore: {
   get(name: string): string | null;
 }): string | null {
-  const forwarded = headerStore.get("x-forwarded-for");
-  const candidate =
-    forwarded?.split(",")[0]?.trim() ||
-    headerStore.get("x-real-ip")?.trim() ||
-    "";
-  if (!candidate) return null;
-  return candidate.slice(0, 80).toLowerCase();
+  return (
+    leftMostAddress(headerStore.get("x-vercel-forwarded-for")) ||
+    leftMostAddress(headerStore.get("x-real-ip")) ||
+    leftMostAddress(headerStore.get("x-forwarded-for"))
+  );
 }
 
 /** Local Playwright and `next dev` share ::1. Production still counts every address. */
