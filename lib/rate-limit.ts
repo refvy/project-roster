@@ -38,7 +38,7 @@ export const RATE_LIMIT_BUCKET_GRACE_MS = 24 * 60 * 60 * 1000;
 export const COPY_EVENT_MATCH_LIMIT = 30;
 export const COPY_EVENT_MATCH_WINDOW_MS = 15 * 60 * 1000;
 
-/** Copy pings per client IP, across matches. Uses clientIp. Skipped for loopback in local dev. */
+/** Copy pings per client IP, across matches. Uses resolveClientIp. Skipped for loopback in local dev. */
 export const COPY_EVENT_IP_LIMIT = 60;
 export const COPY_EVENT_IP_WINDOW_MS = 15 * 60 * 1000;
 

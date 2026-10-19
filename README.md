@@ -108,9 +108,9 @@ Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form err
 | Magic-link sign-in | client IP (on Vercel: `ipAddress()` from `@vercel/functions`; local and CI: header chain) | 20 | 15 minutes |
 | Add someone else | guest + match | 20 | 1 hour |
 | Add someone else | client IP + match, when the request has one | 40 | 1 hour |
-| Self-RSVP | client IP + match, when the request has one | 60 | 1 hour |
+| Self-RSVP | client IP + match, same helper as sign-in. Skipped, with one warning, when no IP resolves | 60 | 1 hour |
 | Copy invitation / copy roster ping | match + event | 30 | 15 minutes |
-| Copy invitation / copy roster ping | client IP (same Vercel order as sign-in), when the request has one | 60 | 15 minutes |
+| Copy invitation / copy roster ping | client IP, same helper as sign-in. Skipped, with one warning, when no IP resolves | 60 | 15 minutes |
 
 A copy ping that hits the cap returns 429. The clipboard copy still succeeds; the browser does not wait on the ping.
 

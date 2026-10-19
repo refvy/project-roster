@@ -5,8 +5,8 @@ import {
   COPY_EVENT_IP_WINDOW_MS,
   COPY_EVENT_MATCH_LIMIT,
   COPY_EVENT_MATCH_WINDOW_MS,
-  clientIp,
   ipForRateLimit,
+  resolveClientIp,
   takeRateLimitSlot,
 } from "@/lib/rate-limit";
 import { emitMatchCopy, type CopyCaptureEvent } from "@/lib/server-analytics";
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   const body = readBody(payload);
   if (!body) return new NextResponse(null, { status: 400 });
 
-  const ip = ipForRateLimit(clientIp(request.headers));
+  const ip = ipForRateLimit(resolveClientIp(request.headers));
   try {
     if (ip) {
       const byIp = await takeRateLimitSlot(

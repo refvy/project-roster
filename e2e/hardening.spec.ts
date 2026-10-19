@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { POST as postCopyEvent } from "../app/api/analytics/copy/route";
 import { GUEST_ID_COOKIE, requestMagicLinkForEmail } from "../lib/auth";
 import { isAuthDebug } from "../lib/env";
 import { addFriendForGuest } from "../lib/friend-add";
@@ -80,6 +81,9 @@ test.describe("magic-link rate limit", () => {
         expect("error" in result ? result.error : "").toBe(
           MAGIC_LINK_LIMIT_MESSAGE,
         );
+        expect("rateLimited" in result ? result.rateLimited : undefined).toBe(
+          true,
+        );
       }
       for (let i = 0; i < 5; i += 1) {
         expect(results[i]?.ok, `request ${i + 1}`).toBe(true);
@@ -145,6 +149,9 @@ test.describe("magic-link rate limit", () => {
       for (const result of refused) {
         expect("error" in result ? result.error : "").toBe(
           MAGIC_LINK_LIMIT_MESSAGE,
+        );
+        expect("rateLimited" in result ? result.rateLimited : undefined).toBe(
+          true,
         );
       }
       const organiser = await prisma.organiser.findUnique({
@@ -556,6 +563,64 @@ test.describe("copy analytics endpoint", () => {
     });
     expect(ignoredSpoof.status()).toBe(404);
   });
+
+  test("on Vercel a missing IP skips the copy cap and warns", async () => {
+    const warnings: unknown[][] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+    try {
+      await withEnv({ VERCEL: "1", VERCEL_ENV: "production" }, async () => {
+        const skipped = await postCopyEvent(
+          new Request("http://localhost/api/analytics/copy", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-vercel-forwarded-for": "198.51.100.20",
+              "x-forwarded-for": "203.0.113.77",
+              "x-client-ip": "1.2.3.4",
+            },
+            body: JSON.stringify({
+              event: "invite_copied",
+              publicId: "doesnotexist01",
+            }),
+          }),
+        );
+        expect(skipped.status).toBe(404);
+
+        const real = "198.51.100.64";
+        for (let i = 0; i < COPY_EVENT_IP_LIMIT; i += 1) {
+          await takeRateLimitSlot(
+            `copy-ip:${real}`,
+            COPY_EVENT_IP_LIMIT,
+            COPY_EVENT_IP_WINDOW_MS,
+          );
+        }
+        const refused = await postCopyEvent(
+          new Request("http://localhost/api/analytics/copy", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-real-ip": real,
+              "x-vercel-forwarded-for": "203.0.113.9",
+              "x-forwarded-for": "203.0.113.50",
+            },
+            body: JSON.stringify({
+              event: "invite_copied",
+              publicId: "doesnotexist01",
+            }),
+          }),
+        );
+        expect(refused.status).toBe(429);
+      });
+    } finally {
+      console.warn = original;
+    }
+    expect(
+      warnings.some((args) => String(args[0]).includes("no client IP")),
+    ).toBe(true);
+  });
 });
 
 test.describe("self-rsvp rate limit", () => {
@@ -628,6 +693,17 @@ test.describe("self-rsvp rate limit", () => {
     expect(
       await prisma.rsvp.count({ where: { matchdayId: matchday.id } }),
     ).toBe(60);
+
+    const skipped = await saveGuestRsvp({
+      publicId: matchday.publicId,
+      name: "No Address",
+      status: "GOING",
+      positionKeyRaw: "ANY",
+      guestId: `self-${stamp}-noip`,
+      ip: null,
+    });
+    expect(skipped.ok).toBe(true);
+    expect(skipped.rateLimited).toBeUndefined();
   });
 });
 
