@@ -20,10 +20,17 @@ export function getAuthSecret() {
   return secret;
 }
 
+/** Local `next dev` only. Preview and production never qualify, even if NODE_ENV is wrong. */
+export function isLocalDev() {
+  if (process.env.NODE_ENV !== "development") return false;
+  if (process.env.VERCEL || process.env.VERCEL_ENV) return false;
+  return true;
+}
+
 export function isAuthDebug() {
-  // Production Vercel must never show the on-page magic-link shortcut,
-  // even if AUTH_DEBUG is still set in the dashboard.
-  if (process.env.VERCEL_ENV === "production") return false;
+  // A preview with AUTH_DEBUG set must not print a magic link for any email.
+  // Vercel sets VERCEL / VERCEL_ENV on production, preview, and `vercel dev`.
+  if (!isLocalDev()) return false;
   const value = process.env.AUTH_DEBUG?.trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes";
 }

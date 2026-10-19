@@ -115,3 +115,15 @@ model Rsvp {
   @@index([matchdayId, status])
   @@index([addedByGuestId])
 }
+
+/// Fixed-window counters. One row per key per window. Additive only.
+model RateLimitBucket {
+  id          String   @id @default(cuid())
+  key         String
+  windowStart DateTime
+  count       Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  @@unique([key, windowStart])
+  @@index([windowStart])
+}

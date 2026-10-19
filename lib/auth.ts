@@ -3,6 +3,16 @@ import { hashToken, randomToken, signValue, unsignValue } from "./crypto";
 import { getAppUrl, getResendApiKey, isAuthDebug } from "./env";
 import { sendMagicLinkEmail } from "./mail";
 import { prisma } from "./prisma";
+import {
+  MAGIC_LINK_EMAIL_LIMIT,
+  MAGIC_LINK_EMAIL_WINDOW_MS,
+  MAGIC_LINK_IP_LIMIT,
+  MAGIC_LINK_IP_WINDOW_MS,
+  MAGIC_LINK_LIMIT_MESSAGE,
+  RATE_LIMIT_ERROR_MESSAGE,
+  ipForRateLimit,
+  takeRateLimitSlot,
+} from "./rate-limit";
 
 export const SESSION_COOKIE = "roster_session";
 export const GUEST_ID_COOKIE = "roster_guest_id";
@@ -23,10 +33,36 @@ function cookieBase() {
 export async function requestMagicLinkForEmail(
   emailRaw: string,
   origin = getAppUrl(),
+  ip?: string | null,
 ) {
   const email = emailRaw.trim().toLowerCase();
   if (!email || !email.includes("@") || email.length > 120) {
     return { ok: false as const, error: "Enter a valid email." };
+  }
+
+  try {
+    const byEmail = await takeRateLimitSlot(
+      `magic-email:${email}`,
+      MAGIC_LINK_EMAIL_LIMIT,
+      MAGIC_LINK_EMAIL_WINDOW_MS,
+    );
+    if (!byEmail.allowed) {
+      return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
+    }
+    const clientIp = ipForRateLimit(ip);
+    if (clientIp) {
+      const byIp = await takeRateLimitSlot(
+        `magic-ip:${clientIp}`,
+        MAGIC_LINK_IP_LIMIT,
+        MAGIC_LINK_IP_WINDOW_MS,
+      );
+      if (!byIp.allowed) {
+        return { ok: false as const, error: MAGIC_LINK_LIMIT_MESSAGE };
+      }
+    }
+  } catch (err) {
+    console.error("[rate-limit] magic link check failed", err);
+    return { ok: false as const, error: RATE_LIMIT_ERROR_MESSAGE };
   }
 
   const organiser = await prisma.organiser.upsert({

@@ -1,5 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL =
+    "postgresql://roster:roster@127.0.0.1:5432/roster";
+}
+
 const baseURL = process.env.APP_URL || "http://localhost:3000";
 
 export default defineConfig({

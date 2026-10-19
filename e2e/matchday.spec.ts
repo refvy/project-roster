@@ -89,7 +89,7 @@ import {
   signupTitle,
 } from "../lib/share-pulse";
 
-const SCREENSHOT_DIR = "/opt/cursor/artifacts/screenshots";
+const SCREENSHOT_DIR = join(process.cwd(), "test-results", "screenshots");
 
 test.describe("imbalance rule", () => {
   test("two GKs and a CB: Too many GKs", () => {

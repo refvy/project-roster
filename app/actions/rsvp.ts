@@ -1,15 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import {
   getOrCreateGuestId,
   getOrganiser,
   rememberGuestName,
 } from "@/lib/auth";
-import { randomToken } from "@/lib/crypto";
+import { addFriendForGuest } from "@/lib/friend-add";
 import { isKnownPosition, parsePositions } from "@/lib/positions";
 import { isMatchdayLive } from "@/lib/matchday-status";
 import { normalizePersonName } from "@/lib/rsvp-name";
+import { clientIp } from "@/lib/rate-limit";
 import { emitPlayerRsvp, planRsvpCapture } from "@/lib/server-analytics";
 import { prisma } from "@/lib/prisma";
 import { RsvpStatus } from "@prisma/client";
@@ -135,59 +137,20 @@ export async function addFriendRsvp(
   _prev: RsvpState,
   formData: FormData,
 ): Promise<NonNullable<RsvpState>> {
-  const { publicId, name, status, positionKeyRaw } = readRsvpFields(formData);
-  if (!publicId) return { ok: false, error: "Missing matchday." };
-  const nameError = validatePerson(name);
-  if (nameError) return { ok: false, error: nameError };
-
-  const matchday = await prisma.matchday.findUnique({
-    where: { publicId },
+  const fields = readRsvpFields(formData);
+  const headerStore = await headers();
+  const result = await addFriendForGuest({
+    ...fields,
+    ip: clientIp(headerStore),
+    getGuestId: getOrCreateGuestId,
   });
-  if (!matchday || matchday.deletedAt) {
-    return { ok: false, error: "This matchday was deleted." };
+  if (result.revalidate) {
+    const planned = planRsvpCapture(null, fields.status);
+    if (planned) await emitPlayerRsvp(result.revalidate.publicId, planned);
+    revalidatePath(`/m/${result.revalidate.publicId}`);
+    revalidatePath(`/board/${result.revalidate.matchdayId}`);
   }
-  if (!isMatchdayLive(matchday)) {
-    return { ok: false, error: "This match was cancelled." };
-  }
-
-  const guestId = await getOrCreateGuestId();
-  const self = await prisma.rsvp.findUnique({
-    where: { matchdayId_guestId: { matchdayId: matchday.id, guestId } },
-  });
-  if (!self || self.addedByGuestId) {
-    return { ok: false, error: "Sign yourself in first, then add a friend." };
-  }
-
-  const positions = parsePositions(matchday.positions);
-  const positionKey = positionKeyRaw || null;
-  if (status === "GOING" && !isKnownPosition(positions, positionKey)) {
-    return { ok: false, error: "Pick a position." };
-  }
-  if (status === "GOING") {
-    const collision = await findGoingNameCollision(matchday.id, name);
-    if (collision) {
-      return { ok: false, duplicate: collision.name };
-    }
-  }
-
-  await prisma.rsvp.create({
-    data: {
-      matchdayId: matchday.id,
-      guestId: `extra:${randomToken(12)}`,
-      addedByGuestId: guestId,
-      addedByName: self.name,
-      name,
-      status,
-      positionKey: status === "GOING" ? positionKey : null,
-    },
-  });
-
-  const planned = planRsvpCapture(null, status);
-  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
-
-  revalidatePath(`/m/${publicId}`);
-  revalidatePath(`/board/${matchday.id}`);
-  return { ok: true };
+  return result.state;
 }
 
 export async function updateFriendRsvp(

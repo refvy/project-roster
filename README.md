@@ -80,7 +80,7 @@ npm run dev
 | `DATABASE_URL` | yes | Postgres connection string. Local default is `127.0.0.1`. Hosted value lives in the **Vercel project env** (not in git). |
 | `AUTH_SECRET` | yes | HMAC for session cookies. `openssl rand -base64 32` |
 | `APP_URL` | yes | Public origin for magic-link verify URLs and copied share links. Production: **`https://getskwad.com`** (not the `project-roster-tau.vercel.app` alias). |
-| `AUTH_DEBUG` | local / CI | `true` prints the magic link on the login screen (and in server logs). **Unset in Vercel production.** `isAuthDebug()` also returns false when `VERCEL_ENV=production`, so the on-page shortcut cannot leak on the production deployment even if the dashboard var is still set. |
+| `AUTH_DEBUG` | local dev | `true` prints the magic link on the login screen (and in server logs). Works only when `NODE_ENV=development` and neither `VERCEL` nor `VERCEL_ENV` is set. Preview and production ignore it, so a preview env var cannot sign someone in as any email. Playwright sets it for the local `next dev` server. |
 | `RESEND_API_KEY` | production | Resend API key. When set, magic-link emails are sent. Playwright blanks this so CI never burns send quota. |
 | `EMAIL_FROM` | with Resend | From header, e.g. `Skwad <onboarding@resend.dev>` until custom domain DNS is live. |
 | `CRON_SECRET` | production cron | Bearer token Vercel sends to `/api/cron/og-refresh`. Daily **5am Asia/Bangkok** (`0 22 * * *` UTC) bumps `ogBust` on LIVE matchdays so the next LINE paste can recrawl. Does not ping LINE. Unset locally — Playwright uses `AUTH_DEBUG`. |
@@ -95,6 +95,19 @@ AUTH_DEBUG="true"
 RESEND_API_KEY=""
 EMAIL_FROM="Skwad <onboarding@resend.dev>"
 ```
+
+## Rate limits
+
+Postgres table `RateLimitBucket` (fixed windows). A refusal is a normal form error: no stack trace, no email, no extra roster row.
+
+| Action | Bucket | Limit | Window |
+| --- | --- | --- | --- |
+| Magic-link sign-in | email address | 5 | 15 minutes |
+| Magic-link sign-in | client IP, when the request has one (`x-forwarded-for` or `x-real-ip`) | 20 | 15 minutes |
+| Add someone else | guest + match | 20 | 1 hour |
+| Add someone else | client IP + match, when the request has one | 40 | 1 hour |
+
+Vercel sends the client IP in `x-forwarded-for`. Local development does not count loopback (`::1`, `127.0.0.1`), so Playwright on one machine is not capped as if it were one public address. Preview and production count every address. The per-IP cap stays in place if the guest cookie is cleared.
 
 ## Tests
 
@@ -112,7 +125,7 @@ Redeploy **production** so **https://getskwad.com** picks this PR up. Do not dog
 
 1. Vercel production env: `APP_URL=https://getskwad.com` (so verify emails and Copy invitation link use getskwad.com / skwad.link, not a `*.vercel.app` host). **Unset `AUTH_DEBUG`.** Keep `RESEND_API_KEY` and `EMAIL_FROM`. Set `CRON_SECRET` (any long random string) so the 5am BKK OG refresh cron is authorized.
 2. Preview/tau may stay on a separate DB. Production `DATABASE_URL` must not be the tau database.
-3. Deploy. `npm run build` runs `prisma generate`, `prisma migrate deploy`, then `next build`.
+3. Deploy. `npm run build` runs `prisma generate`, then migrations, then `next build`. Migrations run when `VERCEL_ENV=production` or when `VERCEL_ENV` is unset (a local build). Preview builds skip `prisma migrate deploy`.
 4. Confirm https://getskwad.com loads, request a magic link, open it on getskwad.com, create a matchday, paste the guest link (host getskwad.com or skwad.link) in a private window.
 
 Custom domain DNS for `EMAIL_FROM` is handled separately — this pass uses Resend’s onboarding sender until that is live.

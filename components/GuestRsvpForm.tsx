@@ -39,19 +39,31 @@ export function GuestRsvpForm({
 }: Props) {
   const [status, setStatus] = useState<"GOING" | "OUT">(defaultStatus);
   const [position, setPosition] = useState(defaultPosition ?? "");
-  const [duplicate, setDuplicate] = useState<string | null>(null);
+  const [localDuplicate, setLocalDuplicate] = useState<string | null>(null);
+  const [dismissedDuplicate, setDismissedDuplicate] = useState<string | null>(
+    null,
+  );
   const [state, action, pending] = useActionState<RsvpState, FormData>(
     submitRsvp,
     confirmed ? { ok: true } : null,
   );
+  const serverDuplicate = state?.duplicate ?? null;
+  const duplicate =
+    localDuplicate ??
+    (serverDuplicate && serverDuplicate !== dismissedDuplicate
+      ? serverDuplicate
+      : null);
 
   useEffect(() => {
     if (state?.ok) onSaved?.();
+    // Intentionally only when the action succeeds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onSaved is a setState wrapper
   }, [state?.ok]);
 
-  useEffect(() => {
-    if (state?.duplicate) setDuplicate(state.duplicate);
-  }, [state?.duplicate]);
+  function closeDuplicate() {
+    setLocalDuplicate(null);
+    if (serverDuplicate) setDismissedDuplicate(serverDuplicate);
+  }
 
   return (
     <form
@@ -63,15 +75,15 @@ export function GuestRsvpForm({
         const hit = collidingGoingName(goingNames, name, ownName);
         if (hit) {
           event.preventDefault();
-          setDuplicate(hit);
+          setLocalDuplicate(hit);
         }
       }}
     >
       <DuplicateNameSheet
         name={duplicate}
-        onCancel={() => setDuplicate(null)}
+        onCancel={closeDuplicate}
         onChangeStatus={() => {
-          setDuplicate(null);
+          closeDuplicate();
           onChangeStatus?.();
         }}
       />

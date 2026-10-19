@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { parseMapUrl } from "@/lib/map-url";
 
@@ -23,13 +23,16 @@ export function PlaceSheet({
   const [draftVenue, setDraftVenue] = useState(venue);
   const [draftMap, setDraftMap] = useState(mapUrl);
   const [error, setError] = useState("");
+  const [seen, setSeen] = useState({ open, venue, mapUrl });
 
-  useEffect(() => {
-    if (!open) return;
-    setDraftVenue(venue);
-    setDraftMap(mapUrl);
-    setError("");
-  }, [open, venue, mapUrl]);
+  if (seen.open !== open || seen.venue !== venue || seen.mapUrl !== mapUrl) {
+    setSeen({ open, venue, mapUrl });
+    if (open) {
+      setDraftVenue(venue);
+      setDraftMap(mapUrl);
+      setError("");
+    }
+  }
 
   function save() {
     const nextVenue = draftVenue.trim();
