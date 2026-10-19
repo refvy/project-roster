@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { bangkokTodayDate } from "@/lib/when-where";
 
@@ -51,13 +51,16 @@ export function DateSheet({
     yearMonthOf(date || bangkokTodayDate()),
   );
   const [draftDate, setDraftDate] = useState(date);
+  const [seen, setSeen] = useState({ open, date });
   const today = bangkokTodayDate();
 
-  useEffect(() => {
-    if (!open) return;
-    setDraftDate(date);
-    setCursor(yearMonthOf(date || bangkokTodayDate()));
-  }, [open, date]);
+  if (seen.open !== open || seen.date !== date) {
+    setSeen({ open, date });
+    if (open) {
+      setDraftDate(date);
+      setCursor(yearMonthOf(date || bangkokTodayDate()));
+    }
+  }
 
   const cells = useMemo(() => {
     const pad = mondayOffset(year, month);

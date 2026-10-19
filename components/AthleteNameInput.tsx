@@ -21,7 +21,11 @@ export function AthleteNameInput({
 
   useEffect(() => {
     const index = Math.floor(Math.random() * names.length);
-    setPlaceholder(names[index]!);
+    const next = names[index]!;
+    // After paint, so the server placeholder hydrates. Deferred so this is a
+    // subscription callback, not a synchronous setState in the effect.
+    const timer = window.setTimeout(() => setPlaceholder(next), 0);
+    return () => window.clearTimeout(timer);
   }, [names]);
 
   return (

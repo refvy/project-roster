@@ -12,6 +12,10 @@ import { DuplicateNameSheet } from "@/components/DuplicateNameSheet";
 import { FatChoice } from "@/components/FatChoice";
 import { PositionChipGrid } from "@/components/GuestRsvpForm";
 import type { Position } from "@/lib/positions";
+import {
+  GUEST_ADD_LIMIT_MESSAGE,
+  RATE_LIMIT_NOTE_CLASS,
+} from "@/lib/rate-limit-copy";
 import { collidingGoingName } from "@/lib/rsvp-name";
 
 export type ExtraRsvp = {
@@ -195,11 +199,20 @@ function FriendForm({
     defaults?.status ?? "GOING",
   );
   const [position, setPosition] = useState(defaults?.positionKey ?? "");
-  const [duplicate, setDuplicate] = useState<string | null>(null);
+  const [localDuplicate, setLocalDuplicate] = useState<string | null>(null);
+  const [dismissedDuplicate, setDismissedDuplicate] = useState<string | null>(
+    null,
+  );
   const [state, formAction, pending] = useActionState<RsvpState, FormData>(
     action,
     null,
   );
+  const serverDuplicate = state?.duplicate ?? null;
+  const duplicate =
+    localDuplicate ??
+    (serverDuplicate && serverDuplicate !== dismissedDuplicate
+      ? serverDuplicate
+      : null);
 
   useEffect(() => {
     if (state?.ok) onDone?.();
@@ -207,9 +220,10 @@ function FriendForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onDone is a setState wrapper
   }, [state?.ok]);
 
-  useEffect(() => {
-    if (state?.duplicate) setDuplicate(state.duplicate);
-  }, [state?.duplicate]);
+  function closeDuplicate() {
+    setLocalDuplicate(null);
+    if (serverDuplicate) setDismissedDuplicate(serverDuplicate);
+  }
 
   return (
     <form
@@ -221,14 +235,14 @@ function FriendForm({
         const hit = collidingGoingName(goingNames, name, ownName);
         if (hit) {
           event.preventDefault();
-          setDuplicate(hit);
+          setLocalDuplicate(hit);
         }
       }}
     >
       <DuplicateNameSheet
         name={duplicate}
-        onCancel={() => setDuplicate(null)}
-        onChangeStatus={() => setDuplicate(null)}
+        onCancel={closeDuplicate}
+        onChangeStatus={closeDuplicate}
       />
       <input type="hidden" name="publicId" value={publicId} />
       {extraId ? <input type="hidden" name="extraId" value={extraId} /> : null}
@@ -266,7 +280,14 @@ function FriendForm({
         />
       ) : null}
       {state?.error ? (
-        <p className="text-sm font-medium text-danger" role="alert">
+        <p
+          className={
+            state.error === GUEST_ADD_LIMIT_MESSAGE
+              ? RATE_LIMIT_NOTE_CLASS
+              : "text-sm font-medium text-danger"
+          }
+          role={state.error === GUEST_ADD_LIMIT_MESSAGE ? "status" : "alert"}
+        >
           {state.error}
         </p>
       ) : null}

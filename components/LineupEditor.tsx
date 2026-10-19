@@ -49,9 +49,30 @@ export function LineupEditor({
 }) {
   const [name, setName] = useState(draft.name);
   const [formation, setFormation] = useState<LineupFormationId>(draft.formation);
-  const [slots, setSlots] = useState<LineupSlotSnap[]>(draft.slots);
+  const [slots, setSlots] = useState<LineupSlotSnap[]>(() =>
+    draft.id
+      ? hydrateEditorSlots(draft.formation, draft.slots, going)
+      : draft.slots,
+  );
   const [picking, setPicking] = useState<LineupSlotSnap | null>(null);
   const [query, setQuery] = useState("");
+  const [seen, setSeen] = useState({ open, draft });
+
+  // Hydrate once when the sheet opens — live Going refreshes must not wipe taps.
+  if (seen.open !== open || seen.draft !== draft) {
+    setSeen({ open, draft });
+    if (open) {
+      setName(draft.name);
+      setFormation(draft.formation);
+      setSlots(
+        draft.id
+          ? hydrateEditorSlots(draft.formation, draft.slots, going)
+          : draft.slots,
+      );
+      setPicking(null);
+      setQuery("");
+    }
+  }
   const [createState, createAction, creating] = useActionState<
     LineupState,
     FormData
@@ -60,21 +81,6 @@ export function LineupEditor({
     LineupState,
     FormData
   >(updateLineup, null);
-
-  useEffect(() => {
-    if (!open) return;
-    setName(draft.name);
-    setFormation(draft.formation);
-    setSlots(
-      draft.id
-        ? hydrateEditorSlots(draft.formation, draft.slots, going)
-        : draft.slots,
-    );
-    setPicking(null);
-    setQuery("");
-    // Hydrate once when the sheet opens — live Going refreshes must not wipe taps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- going is the open-time pool
-  }, [open, draft]);
 
   useEffect(() => {
     if (!open) return;

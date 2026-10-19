@@ -2,6 +2,10 @@
 
 import { useActionState } from "react";
 import { requestMagicLink, type MagicLinkState } from "@/app/actions/auth";
+import {
+  MAGIC_LINK_LIMIT_MESSAGE,
+  RATE_LIMIT_NOTE_CLASS,
+} from "@/lib/rate-limit-copy";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<
@@ -30,7 +34,14 @@ export function LoginForm() {
         {pending ? "Sending…" : "Email me a magic link"}
       </button>
       {state?.error ? (
-        <p className="text-sm font-medium text-danger" role="alert">
+        <p
+          className={
+            state.error === MAGIC_LINK_LIMIT_MESSAGE
+              ? RATE_LIMIT_NOTE_CLASS
+              : "text-sm font-medium text-danger"
+          }
+          role={state.error === MAGIC_LINK_LIMIT_MESSAGE ? "status" : "alert"}
+        >
           {state.error}
         </p>
       ) : null}

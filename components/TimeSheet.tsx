@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import {
   HOURS_24,
@@ -29,12 +29,19 @@ export function TimeSheet({
 }) {
   const [start, setStart] = useState(startTime);
   const [end, setEnd] = useState(endTime);
+  const [seen, setSeen] = useState({ open, startTime, endTime });
 
-  useEffect(() => {
-    if (!open) return;
-    setStart(startTime);
-    setEnd(endTime);
-  }, [open, startTime, endTime]);
+  if (
+    seen.open !== open ||
+    seen.startTime !== startTime ||
+    seen.endTime !== endTime
+  ) {
+    setSeen({ open, startTime, endTime });
+    if (open) {
+      setStart(startTime);
+      setEnd(endTime);
+    }
+  }
 
   const startParts = splitTime(start);
   const endParts = splitTime(end || (start ? addOneHour(start).time : ""));
