@@ -168,7 +168,7 @@ export async function createMatchday(
     },
   });
 
-  await emitMatchCreated(matchday.publicId);
+  await emitMatchCreated(matchday.publicId, organiser.id);
 
   revalidatePath("/board");
   redirect(`/board/${matchday.id}`);

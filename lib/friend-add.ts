@@ -23,7 +23,7 @@ export type FriendAddState = {
 
 export type FriendAddResult = {
   state: FriendAddState;
-  revalidate?: { publicId: string; matchdayId: string };
+  revalidate?: { publicId: string; matchdayId: string; organiserId: string };
 };
 
 function validatePerson(name: string) {
@@ -126,6 +126,10 @@ export async function addFriendForGuest(input: {
 
   return {
     state: { ok: true },
-    revalidate: { publicId, matchdayId: matchday.id },
+    revalidate: {
+      publicId,
+      matchdayId: matchday.id,
+      organiserId: matchday.organiserId,
+    },
   };
 }

@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import nextConfig from "../next.config";
@@ -43,8 +44,12 @@ import {
   getPosthogKey,
   isAnalyticsEnabled,
 } from "../lib/analytics";
+import { organiserAnalyticsId } from "../lib/organiser-id";
+import { prisma } from "../lib/prisma";
 import {
   buildCaptureBody,
+  buildCopyCaptureBody,
+  emitMatchCopy,
   emitMatchCreated,
   emitPlayerRsvp,
   planRsvpCapture,
@@ -814,6 +819,119 @@ test.describe("server analytics", () => {
     }
   });
 
+  test("organiser_id is an HMAC of the user id and is omitted without the secret", async () => {
+    const prevKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    const prevSecret = process.env.ORGANISER_ID_SECRET;
+    process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test_key";
+    delete process.env.ORGANISER_ID_SECRET;
+    const bodies: Record<string, unknown>[] = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+    const userId = "org_user_123";
+    const email = "dan@example.com";
+    try {
+      expect(organiserAnalyticsId(userId)).toBeNull();
+      await emitMatchCreated("pub_new", userId);
+      await emitPlayerRsvp(
+        "pub_new",
+        { status: "going", change: "create" },
+        userId,
+      );
+      expect(bodies[0]).toEqual({
+        api_key: "phc_test_key",
+        event: "match_created",
+        distinct_id: "match:pub_new",
+        properties: {
+          match_id: "pub_new",
+          $process_person_profile: false,
+          $geoip_disable: true,
+        },
+      });
+      expect(
+        (bodies[1]!.properties as Record<string, unknown>).organiser_id,
+      ).toBeUndefined();
+
+      process.env.ORGANISER_ID_SECRET = "organiser-secret-a";
+      const idA = organiserAnalyticsId(userId);
+      const idAAgain = organiserAnalyticsId(userId);
+      process.env.ORGANISER_ID_SECRET = "organiser-secret-b";
+      const idB = organiserAnalyticsId(userId);
+      process.env.ORGANISER_ID_SECRET = "organiser-secret-a";
+      expect(idA).toMatch(/^[0-9a-f]{64}$/);
+      expect(idA).toBe(idAAgain);
+      expect(idA).not.toBe(idB);
+      expect(idA).not.toBe(createHash("sha256").update(userId).digest("hex"));
+      expect(idA).not.toBe(createHash("sha256").update(email).digest("hex"));
+      expect(organiserAnalyticsId(email)).not.toBe(idA);
+
+      bodies.length = 0;
+      await emitMatchCreated("pub_new", userId);
+      await emitPlayerRsvp(
+        "pub_new",
+        { status: "out", change: "update" },
+        userId,
+      );
+      await emitMatchCopy("invite_copied", {
+        publicId: "pub_new",
+        organiserUserId: userId,
+        sport: "football",
+        startsAt: new Date("2026-10-03T13:00:00.000Z"),
+        hasTime: true,
+        mapUrl: "https://maps.app.goo.gl/yvCNh8AbCdEfGh",
+        goingCount: 4,
+      });
+      for (const body of bodies) {
+        const properties = body.properties as Record<string, unknown>;
+        expect(properties.organiser_id).toBe(idA);
+        expect(properties.$geoip_disable).toBe(true);
+        const encoded = JSON.stringify(body);
+        expect(encoded).not.toContain(userId);
+        expect(encoded).not.toContain(email);
+        expect(encoded).not.toContain("name");
+      }
+      expect(publicCaptureKeys(bodies[0]!.properties as Record<string, unknown>)).toEqual([
+        "match_id",
+        "organiser_id",
+      ]);
+      expect(publicCaptureKeys(bodies[2]!.properties as Record<string, unknown>)).toEqual([
+        "going_count",
+        "has_datetime",
+        "has_map",
+        "match_id",
+        "organiser_id",
+        "role",
+        "sport",
+      ]);
+      expect(buildCopyCaptureBody("roster_copied", {
+        publicId: "pub_new",
+        organiserUserId: userId,
+        sport: "basketball",
+        startsAt: null,
+        hasTime: false,
+        mapUrl: "  ",
+        goingCount: 1,
+      }).properties).toMatchObject({
+        sport: "basketball",
+        going_count: 1,
+        has_datetime: false,
+        has_map: false,
+        role: "manager",
+        match_id: "pub_new",
+        organiser_id: idA,
+        $geoip_disable: true,
+      });
+    } finally {
+      globalThis.fetch = origFetch;
+      if (prevKey === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+      else process.env.NEXT_PUBLIC_POSTHOG_KEY = prevKey;
+      if (prevSecret === undefined) delete process.env.ORGANISER_ID_SECRET;
+      else process.env.ORGANISER_ID_SECRET = prevSecret;
+    }
+  });
+
   test("create then same-status save is not a second capture", () => {
     expect(planRsvpCapture(null, "GOING")).toEqual({
       status: "going",
@@ -1010,8 +1128,6 @@ test.describe("indexing", () => {
         }),
       ]),
     );
-    expect(JSON.stringify(redirects)).not.toMatch(/skwad\.link/);
-
     const root = await request.get("/", {
       headers: { host: "www.getskwad.com" },
       maxRedirects: 0,
@@ -1027,6 +1143,41 @@ test.describe("indexing", () => {
     expect(nested.headers()["location"]).toBe(
       "https://getskwad.com/privacy?from=www",
     );
+  });
+
+  test("skwad.link and www.skwad.link 301 to the same path on getskwad.com", async ({
+    request,
+  }) => {
+    for (const host of ["skwad.link", "www.skwad.link"]) {
+      const root = await request.get("/", {
+        headers: { host },
+        maxRedirects: 0,
+      });
+      expect(root.status(), host).toBe(301);
+      expect(root.headers()["location"]).toBe("https://getskwad.com/");
+
+      const nested = await request.get("/privacy?from=link", {
+        headers: { host },
+        maxRedirects: 0,
+      });
+      expect(nested.status(), host).toBe(301);
+      expect(nested.headers()["location"]).toBe(
+        "https://getskwad.com/privacy?from=link",
+      );
+
+      const board = await request.get("/m/abc123", {
+        headers: { host: `${host}:443` },
+        maxRedirects: 0,
+      });
+      expect(board.status(), host).toBe(301);
+      expect(board.headers()["location"]).toBe("https://getskwad.com/m/abc123");
+    }
+
+    const apex = await request.get("/privacy", {
+      headers: { host: "getskwad.com" },
+      maxRedirects: 0,
+    });
+    expect(apex.status()).toBe(200);
   });
 
   test("landing and privacy have canonicals; boards do not", async ({
@@ -1139,8 +1290,8 @@ test.describe("share pulse", () => {
       tiltDeg: -12,
       border: "#FF5A3D",
       fill: "#ffffff",
-      line1: { text: "NEED", color: "#FF5A3D" },
-      line2: { text: "2 MORE", color: "#FF5A3D" },
+      line1: { text: "NEED", color: "#FF5A3D", fontSize: 65 },
+      line2: { text: "2 MORE", color: "#FF5A3D", fontSize: 65 },
     });
   });
 
@@ -1152,8 +1303,8 @@ test.describe("share pulse", () => {
       tiltDeg: 12,
       border: "#00D4C8",
       fill: "#ffffff",
-      line1: { text: "8 GOING", color: "#1a1714" },
-      line2: { text: "2 OUT", color: "#6B7280" },
+      line1: { text: "8 GOING", color: "#1a1714", fontSize: 65 },
+      line2: { text: "2 OUT", color: "#6B7280", fontSize: 36 },
     });
   });
 
@@ -1165,7 +1316,7 @@ test.describe("share pulse", () => {
       tiltDeg: 12,
       border: "#00D4C8",
       fill: "#ffffff",
-      line1: { text: "5 GOING", color: "#1a1714" },
+      line1: { text: "5 GOING", color: "#1a1714", fontSize: 65 },
       line2: null,
     });
   });
@@ -2234,7 +2385,8 @@ test.describe("matchday board", () => {
     test.setTimeout(60_000);
     const organiser = await browser.newContext();
     const orgPage = await organiser.newPage();
-    await signIn(orgPage, `mark+remove+${Date.now()}@example.com`);
+    const removeEmail = `mark+remove+${Date.now()}@example.com`;
+    await signIn(orgPage, removeEmail);
     await orgPage.getByRole("link", { name: /new matchday/i }).click();
     await orgPage.getByLabel("Title").fill("TEST remove");
     await orgPage.getByRole("button", { name: /create matchday/i }).click();
@@ -2266,14 +2418,17 @@ test.describe("matchday board", () => {
     });
     await dupPage.getByTestId("rsvp-submit").click();
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toBeVisible();
-    expect(
-      await dupPage.evaluate(
-        () =>
-          (window.__SKWAD_ANALYTICS__ ?? []).filter(
-            (row) => row.event === "dupe_warn_shown",
-          ).length,
-      ),
-    ).toBe(1);
+    const dupeRows = await dupPage.evaluate(
+      () =>
+        (window.__SKWAD_ANALYTICS__ ?? []).filter(
+          (row) => row.event === "dupe_warn_shown",
+        ),
+    );
+    expect(dupeRows).toHaveLength(1);
+    expect(dupeRows[0]?.props.organiser_id).toBe(
+      await organiserIdForEmail(removeEmail),
+    );
+    expect(JSON.stringify(dupeRows[0]?.props)).not.toContain(removeEmail);
     await expect(dupPage.getByTestId("duplicate-name-sheet")).toContainText(
       "“Nok” is already on the list — change status instead?",
     );
@@ -2305,14 +2460,17 @@ test.describe("matchday board", () => {
     await orgPage.getByTestId("remove-rsvp-confirm").click();
     await expect(orgPage.getByTestId("removed-toast")).toHaveText("Removed");
     await expect(orgPage.getByRole("heading", { name: "Going · 0" })).toBeVisible();
-    expect(
-      await orgPage.evaluate(
-        () =>
-          (window.__SKWAD_ANALYTICS__ ?? []).filter(
-            (row) => row.event === "rsvp_removed",
-          ).length,
-      ),
-    ).toBe(1);
+    const removedRows = await orgPage.evaluate(
+      () =>
+        (window.__SKWAD_ANALYTICS__ ?? []).filter(
+          (row) => row.event === "rsvp_removed",
+        ),
+    );
+    expect(removedRows).toHaveLength(1);
+    expect(removedRows[0]?.props.organiser_id).toBe(
+      await organiserIdForEmail(removeEmail),
+    );
+    expect(JSON.stringify(removedRows[0]?.props)).not.toContain(removeEmail);
     await expect(orgPage.getByTestId("roster")).toHaveCount(0);
     await expect(orgPage.getByRole("button", { name: "Remove Nok" })).toHaveCount(0);
 
@@ -2416,18 +2574,28 @@ test.describe("matchday board", () => {
     await orgPage.evaluate(() => {
       window.__SKWAD_ANALYTICS__ = [];
     });
+    const copyPing = orgPage.waitForRequest(
+      (req) =>
+        req.method() === "POST" && req.url().includes("/api/analytics/copy"),
+    );
     await button.click();
     await expect(orgPage.getByTestId("roster-copied-toast")).toHaveText(
       "Roster copied",
     );
+    const copyReq = await copyPing;
+    expect(copyReq.postDataJSON()).toEqual({
+      event: "roster_copied",
+      publicId: new URL(shareUrl).pathname.split("/").pop(),
+    });
     expect(
       await orgPage.evaluate(
         () =>
           (window.__SKWAD_ANALYTICS__ ?? []).filter(
-            (row) => row.event === "roster_copied",
+            (row) =>
+              row.event === "roster_copied" || row.event === "invite_copied",
           ).length,
       ),
-    ).toBe(1);
+    ).toBe(0);
     expect(await orgPage.evaluate(() => navigator.clipboard.readText())).toBe(
       expected,
     );
@@ -3083,6 +3251,20 @@ async function expectShareCard(
   await expect(page.getByTestId("remove-rsvp")).toHaveCount(0);
   await expect(page.getByTestId("lineups")).toHaveCount(0);
   await expect(page.getByTestId("create-lineup")).toHaveCount(0);
+}
+
+const PLAYWRIGHT_ORGANISER_SECRET = "playwright-organiser-id-secret";
+
+async function organiserIdForEmail(email: string) {
+  const prev = process.env.ORGANISER_ID_SECRET;
+  process.env.ORGANISER_ID_SECRET = PLAYWRIGHT_ORGANISER_SECRET;
+  try {
+    const row = await prisma.organiser.findUnique({ where: { email } });
+    return organiserAnalyticsId(row?.id ?? null);
+  } finally {
+    if (prev === undefined) delete process.env.ORGANISER_ID_SECRET;
+    else process.env.ORGANISER_ID_SECRET = prev;
+  }
 }
 
 async function signIn(page: Page, email: string) {

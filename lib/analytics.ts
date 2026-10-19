@@ -20,6 +20,8 @@ export type AnalyticsProps = {
   has_map: boolean;
   role: AnalyticsRole;
   match_id?: string;
+  /** HMAC of the match organiser's user id. Omitted when the server has no secret. */
+  organiser_id?: string;
 };
 
 export function getPosthogKey() {
@@ -47,6 +49,7 @@ export function analyticsFromMatchday(
   },
   goingCount: number,
   role: AnalyticsRole,
+  organiserId?: string | null,
 ): AnalyticsProps {
   return {
     sport: parseSport(matchday.sport),
@@ -55,6 +58,7 @@ export function analyticsFromMatchday(
     has_map: Boolean(matchday.mapUrl?.trim()),
     role,
     ...(matchday.publicId ? { match_id: matchday.publicId } : {}),
+    ...(organiserId ? { organiser_id: organiserId } : {}),
   };
 }
 
@@ -66,7 +70,29 @@ function eventPayload(props: AnalyticsProps) {
     has_map: props.has_map,
     role: props.role,
     ...(props.match_id ? { match_id: props.match_id } : {}),
+    ...(props.organiser_id ? { organiser_id: props.organiser_id } : {}),
   };
+}
+
+/**
+ * First-party copy ping. Does not call posthog-js, so invite_copied and
+ * roster_copied are not counted twice. Fire-and-forget: never throws, never awaited by the button.
+ */
+export function reportServerCopy(
+  event: "invite_copied" | "roster_copied",
+  publicId: string,
+) {
+  if (typeof window === "undefined" || !publicId) return;
+  try {
+    void fetch("/api/analytics/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, publicId }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // The clipboard write already finished. A failed ping must not surface.
+  }
 }
 
 function tapSink(event: string, props: AnalyticsProps) {

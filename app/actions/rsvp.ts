@@ -126,7 +126,9 @@ export async function submitRsvp(
   });
 
   const planned = planRsvpCapture(existing?.status ?? null, status);
-  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
+  if (planned) {
+    await emitPlayerRsvp(matchday.publicId, planned, matchday.organiserId);
+  }
 
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);
@@ -146,7 +148,13 @@ export async function addFriendRsvp(
   });
   if (result.revalidate) {
     const planned = planRsvpCapture(null, fields.status);
-    if (planned) await emitPlayerRsvp(result.revalidate.publicId, planned);
+    if (planned) {
+      await emitPlayerRsvp(
+        result.revalidate.publicId,
+        planned,
+        result.revalidate.organiserId,
+      );
+    }
     revalidatePath(`/m/${result.revalidate.publicId}`);
     revalidatePath(`/board/${result.revalidate.matchdayId}`);
   }
@@ -207,7 +215,9 @@ export async function updateFriendRsvp(
   });
 
   const planned = planRsvpCapture(extra.status, status);
-  if (planned) await emitPlayerRsvp(matchday.publicId, planned);
+  if (planned) {
+    await emitPlayerRsvp(matchday.publicId, planned, matchday.organiserId);
+  }
 
   revalidatePath(`/m/${publicId}`);
   revalidatePath(`/board/${matchday.id}`);

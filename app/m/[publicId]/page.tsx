@@ -12,6 +12,7 @@ import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
 import { analyticsFromMatchday } from "@/lib/analytics";
+import { organiserAnalyticsId } from "@/lib/organiser-id";
 import { getGuestId, getRememberedGuestName } from "@/lib/auth";
 import { orderGoingForRoster } from "@/lib/pitch";
 import { parsePositions } from "@/lib/positions";
@@ -201,7 +202,12 @@ export default async function GuestMatchdayPage({
     );
   }
 
-  const analytics = analyticsFromMatchday(matchday, going.length, "guest");
+  const analytics = analyticsFromMatchday(
+    matchday,
+    going.length,
+    "guest",
+    organiserAnalyticsId(matchday.organiserId),
+  );
   const positions = parsePositions(matchday.positions);
   const guestId = await getGuestId();
   const rememberedName = await getRememberedGuestName();

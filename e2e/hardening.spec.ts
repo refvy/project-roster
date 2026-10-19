@@ -5,6 +5,9 @@ import { addFriendForGuest } from "../lib/friend-add";
 import { prisma } from "../lib/prisma";
 import { FOOTBALL_POSITIONS } from "../lib/positions";
 import {
+  COPY_EVENT_IP_LIMIT,
+  COPY_EVENT_IP_WINDOW_MS,
+  COPY_EVENT_MATCH_LIMIT,
   GUEST_ADD_LIMIT,
   GUEST_ADD_LIMIT_MESSAGE,
   MAGIC_LINK_EMAIL_LIMIT,
@@ -12,6 +15,7 @@ import {
   MAGIC_LINK_LIMIT_MESSAGE,
   clientIp,
   resolveClientIp,
+  takeRateLimitSlot,
 } from "../lib/rate-limit";
 
 async function withEnv<T>(
@@ -460,5 +464,86 @@ test.describe("migration gate", () => {
     expect(skipped.stdout).toContain("skipped");
     expect(skipped.stdout).toContain("VERCEL is set and VERCEL_ENV is missing");
     expect(skipped.stdout).not.toContain("applying migrations");
+  });
+});
+
+test.describe("copy analytics endpoint", () => {
+  test("rejects a bad body, unknown matches, and a flooded match or IP", async ({
+    request,
+  }) => {
+    const bad = await request.post("/api/analytics/copy", {
+      data: { event: "player_rsvp", publicId: "nope" },
+    });
+    expect(bad.status()).toBe(400);
+
+    const missing = await request.post("/api/analytics/copy", {
+      data: { event: "invite_copied", publicId: "missingmatch" },
+    });
+    expect(missing.status()).toBe(404);
+
+    const stamp = `${Date.now()}`;
+    const organiser = await prisma.organiser.create({
+      data: { email: `copy-cap-${stamp}@example.com` },
+    });
+    const matchday = await prisma.matchday.create({
+      data: {
+        publicId: `copy${stamp}`,
+        organiserId: organiser.id,
+        title: "Copy cap",
+        positions: FOOTBALL_POSITIONS.map((position) => ({ ...position })),
+        sport: "football",
+      },
+    });
+
+    const ok = await request.post("/api/analytics/copy", {
+      data: { event: "roster_copied", publicId: matchday.publicId },
+    });
+    expect(ok.status()).toBe(204);
+
+    for (let i = 1; i < COPY_EVENT_MATCH_LIMIT; i += 1) {
+      const next = await request.post("/api/analytics/copy", {
+        data: { event: "roster_copied", publicId: matchday.publicId },
+      });
+      expect(next.status(), `copy ${i + 1}`).toBe(204);
+    }
+    const refused = await request.post("/api/analytics/copy", {
+      data: { event: "roster_copied", publicId: matchday.publicId },
+    });
+    expect(refused.status()).toBe(429);
+
+    const other = await request.post("/api/analytics/copy", {
+      data: { event: "invite_copied", publicId: matchday.publicId },
+    });
+    expect(other.status()).toBe(204);
+
+    const real = `198.51.100.${stamp.slice(-2)}`;
+    for (let i = 0; i < COPY_EVENT_IP_LIMIT; i += 1) {
+      await takeRateLimitSlot(
+        `copy-ip:${real}`,
+        COPY_EVENT_IP_LIMIT,
+        COPY_EVENT_IP_WINDOW_MS,
+      );
+    }
+    const ipRefused = await request.post("/api/analytics/copy", {
+      headers: {
+        "x-vercel-forwarded-for": `${real}, 203.0.113.9`,
+        "x-real-ip": real,
+        "x-forwarded-for": "203.0.113.50, 10.0.0.1",
+        "x-client-ip": "192.0.2.8",
+        "cf-connecting-ip": "8.8.8.8",
+      },
+      data: { event: "invite_copied", publicId: "doesnotexist01" },
+    });
+    expect(ipRefused.status()).toBe(429);
+
+    const ignoredSpoof = await request.post("/api/analytics/copy", {
+      headers: {
+        "x-forwarded-for": "203.0.113.77",
+        "x-client-ip": real,
+        "cf-connecting-ip": real,
+      },
+      data: { event: "invite_copied", publicId: "doesnotexist01" },
+    });
+    expect(ignoredSpoof.status()).toBe(404);
   });
 });

@@ -9,6 +9,7 @@ export function ManagerGoing({
   empty,
   canRemove,
   matchdayId,
+  publicId,
   rosterPaste,
   counts,
 }: {
@@ -21,6 +22,7 @@ export function ManagerGoing({
   empty: string;
   canRemove: boolean;
   matchdayId: string;
+  publicId: string;
   rosterPaste: string;
   counts: string;
 }) {
@@ -59,7 +61,9 @@ export function ManagerGoing({
           </button>
         </h2>
         <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-          {going.length > 0 ? <CopyRosterButton text={rosterPaste} /> : null}
+          {going.length > 0 ? (
+            <CopyRosterButton text={rosterPaste} publicId={publicId} />
+          ) : null}
           {open ? (
             <p
               className="max-w-xl text-right text-sm text-ink-soft"

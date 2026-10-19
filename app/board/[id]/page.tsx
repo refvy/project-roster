@@ -15,6 +15,7 @@ import { SportChip } from "@/components/SportChip";
 import { WhenWhereLine } from "@/components/WhenWhereLine";
 import { Wordmark } from "@/components/Wordmark";
 import { analyticsFromMatchday } from "@/lib/analytics";
+import { organiserAnalyticsId } from "@/lib/organiser-id";
 import { getOrganiser } from "@/lib/auth";
 import { getAppUrl } from "@/lib/env";
 import { describeImbalance } from "@/lib/imbalance";
@@ -70,7 +71,12 @@ export default async function OrganiserMatchdayPage({
     going: ordered,
     positions,
   });
-  const analytics = analyticsFromMatchday(matchday, going.length, "manager");
+  const analytics = analyticsFromMatchday(
+    matchday,
+    going.length,
+    "manager",
+    organiserAnalyticsId(matchday.organiserId),
+  );
 
   return (
     <AnalyticsScope value={analytics}>
@@ -147,7 +153,7 @@ export default async function OrganiserMatchdayPage({
         </div>
 
         <div className="flex flex-col gap-4">
-          <CopyLinkButton url={shareUrl} />
+          <CopyLinkButton url={shareUrl} publicId={matchday.publicId} />
         </div>
 
         <CoachBoard
@@ -174,6 +180,7 @@ export default async function OrganiserMatchdayPage({
           empty="Waiting on the first Going. Share the link."
           canRemove={matchday.status === "LIVE"}
           matchdayId={matchday.id}
+          publicId={matchday.publicId}
           rosterPaste={rosterPaste}
           counts={counts.map((item) => `${item.label} ${item.count}`).join(" · ")}
         />

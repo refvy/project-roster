@@ -26,7 +26,10 @@ export function LineupPitch({
   const byId = new Map(slots.map((slot) => [slot.id, slot]));
   const lines = lineupLines(formation);
 
-  function renderChip(slot: (typeof lines)[number]["slots"][number]) {
+  function renderChip(
+    slot: (typeof lines)[number]["slots"][number],
+    dense = false,
+  ) {
     const snap = byId.get(slot.id);
     const name = snap?.name ?? null;
     const filled = Boolean(name);
@@ -37,6 +40,7 @@ export function LineupPitch({
         name={name}
         compact={compact}
         fit={fit}
+        dense={dense}
         selected={selectedSlotId === slot.id}
         interactive={Boolean(onSlot)}
         onClick={onSlot ? () => onSlot(slot.id) : undefined}
@@ -96,7 +100,7 @@ function FitLines({
   renderChip,
 }: {
   lines: LineupLine[];
-  renderChip: (slot: LineupSlotDef) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
 }) {
   const keeper = lines.filter((line) => line.area === "the keeper");
   const defence = lines.filter((line) => line.area === "defence");
@@ -104,7 +108,10 @@ function FitLines({
   const attack = lines.filter((line) => line.area === "attack");
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col-reverse">
+    <div
+      className="absolute inset-0 z-10 box-border flex flex-col-reverse"
+      style={{ padding: "calc(4% + 8px)" }}
+    >
       <div
         className="flex items-end justify-center pb-2.5"
         style={{ height: "13%" }}
@@ -127,7 +134,7 @@ function OutfieldBand({
   renderChip,
 }: {
   lines: LineupLine[];
-  renderChip: (slot: LineupSlotDef) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col-reverse justify-evenly">
@@ -143,20 +150,35 @@ function EvenRow({
   renderChip,
 }: {
   line: LineupLine;
-  renderChip: (slot: LineupSlotDef) => ReactNode;
+  renderChip: (slot: LineupSlotDef, dense: boolean) => ReactNode;
 }) {
+  const dense = line.slots.length >= 5;
   return (
-    <div className="flex w-full items-center">
+    <div className="flex w-full min-w-0 items-center">
       {line.slots.map((slot) => (
         <div
           key={slot.id}
-          className="flex flex-1 items-center justify-center"
+          className="flex min-w-0 flex-1 items-center justify-center"
         >
-          {renderChip(slot)}
+          {renderChip(slot, dense)}
         </div>
       ))}
     </div>
   );
+}
+
+/** Editor chip fills its cell minus a 4px gap. No fixed min-width, so a row of 5 can shrink. */
+function fitChipClass() {
+  return "lineup-fit-chip min-h-[38px] w-[calc(100%-4px)] min-w-0 max-w-full overflow-hidden py-1";
+}
+
+/** 14px, or 12px on a row of 5+ and on every row at 320px. Sized in globals.css. */
+function fitNameClass() {
+  return "lineup-fit-name block w-full min-w-0 truncate text-center font-display leading-none tracking-tight text-ink";
+}
+
+function chipFirstName(name: string) {
+  return name.trim().split(/\s+/)[0] ?? "";
 }
 
 function SlotChip({
@@ -165,6 +187,7 @@ function SlotChip({
   name,
   compact,
   fit = false,
+  dense = false,
   selected,
   interactive,
   onClick,
@@ -175,6 +198,7 @@ function SlotChip({
   name: string | null;
   compact: boolean;
   fit?: boolean;
+  dense?: boolean;
   selected: boolean;
   interactive: boolean;
   onClick?: () => void;
@@ -183,7 +207,7 @@ function SlotChip({
   const size = compact
     ? "min-h-8 min-w-8 px-1.5 py-1"
     : fit
-      ? "min-h-[38px] min-w-[38px] px-2 py-1"
+      ? fitChipClass()
       : "min-h-12 min-w-[3.5rem] px-2.5 py-1.5 sm:min-h-14 sm:min-w-[4rem]";
   const className = filled
     ? `flex flex-col items-center justify-center rounded-full bg-accent text-center ${size} ${
@@ -197,15 +221,20 @@ function SlotChip({
     <>
       {filled ? (
         <span
-          className={`font-display leading-none tracking-tight text-ink ${
-            compact ? "text-[11px]" : fit ? "text-[13px]" : "text-lg"
-          }`}
+          data-testid={fit ? "lineup-slot-name" : undefined}
+          className={
+            fit
+              ? fitNameClass()
+              : `font-display leading-none tracking-tight text-ink ${
+                  compact ? "text-[11px]" : "text-lg"
+                }`
+          }
         >
-          {firstName(name ?? "")}
+          {fit ? chipFirstName(name ?? "") : firstName(name ?? "")}
         </span>
       ) : (
         <span
-          className={`font-medium uppercase tracking-wide text-ink/40 ${
+          className={`max-w-full truncate font-medium uppercase tracking-wide text-ink/40 ${
             compact ? "text-[8px]" : fit ? "text-[10px]" : "text-[11px]"
           }`}
         >
@@ -215,9 +244,15 @@ function SlotChip({
     </>
   );
 
+  const denseAttr = fit ? (dense ? "true" : "false") : undefined;
+
   if (!interactive) {
     return (
-      <div data-testid={`lineup-slot-${slotId}`} className={className}>
+      <div
+        data-testid={`lineup-slot-${slotId}`}
+        data-dense={denseAttr}
+        className={className}
+      >
         {inner}
       </div>
     );
@@ -229,6 +264,7 @@ function SlotChip({
       data-testid={`lineup-slot-${slotId}`}
       data-slot-key={slotKey}
       data-filled={filled ? "true" : "false"}
+      data-dense={denseAttr}
       onClick={onClick}
       className={className}
     >

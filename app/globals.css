@@ -55,6 +55,32 @@ body {
   letter-spacing: -0.025em;
 }
 
+/* Editor pitch chips. 14px / 12px side padding, stepping to 12px / 8px
+   on a row of 5 (data-dense) and on every row at 320px. */
+.lineup-fit-chip {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.lineup-fit-name {
+  font-size: 14px;
+}
+.lineup-fit-chip[data-dense="true"] {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.lineup-fit-chip[data-dense="true"] .lineup-fit-name {
+  font-size: 12px;
+}
+@media (max-width: 320px) {
+  .lineup-fit-chip {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .lineup-fit-name {
+    font-size: 12px;
+  }
+}
+
 /* Occupied-slot +N: outlined ExtraBold text on the pill, not a circle badge.
    paint-order draws the white stroke first, then the black fill on top so
    a thick outline cannot cover the numeral. */

@@ -27,6 +27,14 @@ export const GUEST_ADD_WINDOW_MS = 60 * 60 * 1000;
 export const GUEST_ADD_IP_LIMIT = 40;
 export const GUEST_ADD_IP_WINDOW_MS = 60 * 60 * 1000;
 
+/** Copy pings per match per event. The clipboard still succeeds when this trips. */
+export const COPY_EVENT_MATCH_LIMIT = 30;
+export const COPY_EVENT_MATCH_WINDOW_MS = 15 * 60 * 1000;
+
+/** Copy pings per client IP, across matches. Uses clientIp. Skipped for loopback in local dev. */
+export const COPY_EVENT_IP_LIMIT = 60;
+export const COPY_EVENT_IP_WINDOW_MS = 15 * 60 * 1000;
+
 export const RATE_LIMIT_ERROR_MESSAGE =
   "Something went wrong. Try again in a moment.";
 
